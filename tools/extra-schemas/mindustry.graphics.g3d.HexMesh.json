@@ -1,5 +1,5 @@
 {
-  "superclass": "mindustry.graphics.g3d.PlanetMesh",
+  "superclass": "orbital.graphics.g3d.PlanetMesh",
   "doc": "Not parsed via the mesh-type switch itself - falls through to the default (Planet, int divisions) constructor when 'type' is 'HexMesh'.",
   "divisions": {
     "type": "int",

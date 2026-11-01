@@ -1,5 +1,5 @@
 {
-  "superclass": "mindustry.graphics.g3d.HexMesh",
+  "superclass": "orbital.graphics.g3d.HexMesh",
   "divisions": {
     "type": "int",
     "default": "1"

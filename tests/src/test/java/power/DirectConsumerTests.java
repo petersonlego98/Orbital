@@ -1,11 +1,11 @@
 package power;
 
-import mindustry.content.*;
-import mindustry.type.*;
-import mindustry.world.*;
-import mindustry.world.blocks.power.PowerGenerator.*;
-import mindustry.world.blocks.power.*;
-import mindustry.world.blocks.production.*;
+import orbital.content.*;
+import orbital.type.*;
+import orbital.world.*;
+import orbital.world.blocks.power.PowerGenerator.*;
+import orbital.world.blocks.power.*;
+import orbital.world.blocks.production.*;
 import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;

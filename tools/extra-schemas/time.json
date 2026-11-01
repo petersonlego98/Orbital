@@ -1,4 +1,4 @@
 {
   "doc": "Current unscaled value of Time.time. A sensor value for PartProgress.type - not an operation (see PartProgress and the 'op' field for those).",
-  "superclass": "mindustry.entities.part.DrawPart$PartProgress"
+  "superclass": "orbital.entities.part.DrawPart$PartProgress"
 }

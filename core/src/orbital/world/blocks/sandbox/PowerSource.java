@@ -1,0 +1,34 @@
+package orbital.world.blocks.sandbox;
+
+import orbital.world.blocks.power.*;
+import orbital.world.meta.*;
+
+public class PowerSource extends PowerNode{
+    public float powerProduction = 10000f;
+
+    public PowerSource(String name){
+        super(name);
+        maxNodes = 100;
+        outputsPower = true;
+        consumesPower = false;
+        drawDisabled = true;
+        //TODO maybe don't?
+        envEnabled = Env.any;
+    }
+
+    public class PowerSourceBuild extends PowerNodeBuild{
+        @Override
+        public void onProximityUpdate(){
+            super.onProximityUpdate();
+            if(!allowUpdate()){
+                enabled = false;
+            }
+        }
+
+        @Override
+        public float getPowerProduction(){
+            return enabled ? powerProduction : 0f;
+        }
+    }
+
+}

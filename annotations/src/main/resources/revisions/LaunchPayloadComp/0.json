@@ -1,1 +1,1 @@
-{fields:[{name:lifetime,type:float,size:4},{name:stacks,type:arc.struct.Seq<mindustry.type.ItemStack>,size:-1},{name:team,type:mindustry.game.Team,size:-1},{name:time,type:float,size:4},{name:x,type:float,size:4},{name:y,type:float,size:4}]}
+{fields:[{name:lifetime,type:float},{name:stacks,type:arc.struct.Seq<orbital.type.ItemStack>},{name:team,type:orbital.game.Team},{name:time,type:float},{name:x,type:float},{name:y,type:float}]}

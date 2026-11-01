@@ -1,6 +1,6 @@
 sourceSets.main.java.srcDirs = ["src/"]
 
-project.ext.mainClassName = "mindustry.desktop.DesktopLauncher"
+project.ext.mainClassName = "orbital.desktop.DesktopLauncher"
 project.ext.assetsDir = new File("../core/assets")
 
 def JDK_DIR = "$System.env.JDK_DIR"
@@ -30,11 +30,11 @@ tasks.register('run', JavaExec){
     }
 
     if(project.hasProperty("dataDir")){
-        environment("MINDUSTRY_DATA_DIR", project.getProperties()["dataDir"])
+        environment("ORBITAL_DATA_DIR", project.getProperties()["dataDir"])
     }
 
     if(args.contains("debug")){
-        mainClass = "mindustry.debug.DebugLauncher"
+        mainClass = "orbital.debug.DebugLauncher"
     }
 }
 
@@ -77,15 +77,15 @@ tasks.register('steamtest'){
     dependsOn dist
     doLast{
         copy{
-            from "build/libs/Mindustry.jar"
+            from "build/libs/Orbital.jar"
             if(project.hasProperty("destination")){
                 into project.property("destination")
             }else if(System.properties["os.name"].contains("Mac")){
-                into "/Users/anuke/Library/Application Support/Steam/steamapps/common/Mindustry/Mindustry.app/Contents/Resources"
+                into "/Users/anuke/Library/Application Support/Steam/steamapps/common/Orbital/Orbital.app/Contents/Resources"
             }else{
-                into "/home/anuke/.steam/steam/steamapps/common/Mindustry/jre"
+                into "/home/anuke/.steam/steam/steamapps/common/Orbital/jre"
             }
-            rename("Mindustry.jar", "desktop.jar")
+            rename("Orbital.jar", "desktop.jar")
         }
     }
 }
@@ -143,7 +143,7 @@ platforms.each{ platform ->
                 standardOutput = System.out
             }
 
-            def outputJsonFile = platform != "MacOS" ? file("build/packr/output/Mindustry.json") : file("build/packr/output/${appName}.app/Contents/Resources/Mindustry.json")
+            def outputJsonFile = platform != "MacOS" ? file("build/packr/output/Orbital.json") : file("build/packr/output/${appName}.app/Contents/Resources/Orbital.json")
 
             if(platform != "MacOS"){
                 copy{

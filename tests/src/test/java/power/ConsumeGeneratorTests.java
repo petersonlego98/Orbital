@@ -2,15 +2,15 @@ package power;
 
 import arc.struct.*;
 import arc.util.*;
-import mindustry.*;
-import mindustry.content.*;
-import mindustry.core.*;
-import mindustry.game.*;
-import mindustry.type.*;
-import mindustry.world.*;
-import mindustry.world.blocks.power.*;
-import mindustry.world.blocks.power.ConsumeGenerator.*;
-import mindustry.world.consumers.*;
+import orbital.*;
+import orbital.content.*;
+import orbital.core.*;
+import orbital.game.*;
+import orbital.type.*;
+import orbital.world.*;
+import orbital.world.blocks.power.*;
+import orbital.world.blocks.power.ConsumeGenerator.*;
+import orbital.world.consumers.*;
 import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;

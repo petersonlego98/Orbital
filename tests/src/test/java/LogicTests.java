@@ -1,6 +1,6 @@
 import arc.graphics.*;
-import mindustry.logic.*;
-import mindustry.logic.LExecutor.*;
+import orbital.logic.*;
+import orbital.logic.LExecutor.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.*;
 import org.junit.jupiter.params.provider.*;

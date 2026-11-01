@@ -1,7 +1,7 @@
 {
-  "superclass": "mindustry.graphics.g3d.GenericMesh",
+  "superclass": "orbital.graphics.g3d.GenericMesh",
   "mesh": {
-    "type": "mindustry.graphics.g3d.GenericMesh",
+    "type": "orbital.graphics.g3d.GenericMesh",
     "doc": "Wrapped mesh to render with the extra transform applied. Required - no default."
   },
   "mat": {

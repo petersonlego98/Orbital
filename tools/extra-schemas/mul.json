@@ -5,7 +5,7 @@
     "doc": "Constant multiplier."
   },
   "other": {
-    "type": "mindustry.entities.part.DrawPart$PartProgress",
+    "type": "orbital.entities.part.DrawPart$PartProgress",
     "doc": "Another progress function whose value is multiplied instead of a constant."
   }
 }

@@ -62,7 +62,7 @@ tasks.register('pack'){
         file(genFolder).mkdirs()
 
         project.services.get(ExecOperations).javaexec{
-            mainClass = "mindustry.tools.ImagePacker"
+            mainClass = "orbital.tools.ImagePacker"
             classpath = sourceSets.main.runtimeClasspath
             workingDir = genFolder
         }
@@ -117,7 +117,7 @@ tasks.register('genSprites', JavaExec){
     dependsOn classes
     finalizedBy 'antialiasGen'
 
-    mainClass = "mindustry.tools.ImagePacker"
+    mainClass = "orbital.tools.ImagePacker"
     classpath = sourceSets.main.runtimeClasspath
     standardInput = System.in
     workingDir = genFolder
@@ -170,7 +170,7 @@ tasks.register('fontgen', JavaExec){
 
 tasks.register('icongen', JavaExec){
     dependsOn classes
-    mainClass = "mindustry.tools.IconConverter"
+    mainClass = "orbital.tools.IconConverter"
     classpath = sourceSets.main.runtimeClasspath
     standardInput = System.in
     workingDir = "../core/assets-raw"
@@ -178,7 +178,7 @@ tasks.register('icongen', JavaExec){
 
 tasks.register('updateScripts', JavaExec){
     dependsOn classes
-    mainClass = "mindustry.tools.ScriptMainGenerator"
+    mainClass = "orbital.tools.ScriptMainGenerator"
     classpath = sourceSets.main.runtimeClasspath
     standardInput = System.in
     workingDir = "../core/assets"
@@ -186,7 +186,7 @@ tasks.register('updateScripts', JavaExec){
 
 tasks.register('fixMaps', JavaExec){
     dependsOn classes
-    mainClass = "mindustry.tools.MapFixer"
+    mainClass = "orbital.tools.MapFixer"
     classpath = sourceSets.main.runtimeClasspath
     standardInput = System.in
     workingDir = "../core/assets"

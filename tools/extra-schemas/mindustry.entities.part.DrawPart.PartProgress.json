@@ -9,11 +9,11 @@
     "doc": "Alias for 'op'."
   },
   "ops": {
-    "type": "Seq<mindustry.entities.part.DrawPart$PartProgress$Op>",
+    "type": "Seq<orbital.entities.part.DrawPart$PartProgress$Op>",
     "doc": "Chain of operations applied in sequence to the sensor value (alias: 'operations'). Each array entry is its own flat object: an 'op'/'operation' name plus that operation's own parameter fields - not a nested PartProgress. Mutually exclusive with a single 'op'/'operation'."
   },
   "operations": {
-    "type": "Seq<mindustry.entities.part.DrawPart$PartProgress$Op>",
+    "type": "Seq<orbital.entities.part.DrawPart$PartProgress$Op>",
     "doc": "Alias for 'ops'."
   }
 }

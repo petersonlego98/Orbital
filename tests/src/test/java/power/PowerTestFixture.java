@@ -3,16 +3,16 @@ package power;
 import arc.*;
 import arc.mock.*;
 import arc.util.*;
-import mindustry.*;
-import mindustry.content.*;
-import mindustry.core.*;
-import mindustry.game.*;
-import mindustry.gen.*;
-import mindustry.world.*;
-import mindustry.world.blocks.power.*;
+import orbital.*;
+import orbital.content.*;
+import orbital.core.*;
+import orbital.game.*;
+import orbital.gen.*;
+import orbital.world.*;
+import orbital.world.blocks.power.*;
 import org.junit.jupiter.api.*;
 
-import static mindustry.Vars.*;
+import static orbital.Vars.*;
 
 /**
  * This class provides objects commonly used by power related unit tests.

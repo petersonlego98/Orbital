@@ -2,12 +2,12 @@ package power;
 
 import arc.math.*;
 import arc.util.*;
-import mindustry.*;
-import mindustry.core.*;
-import mindustry.gen.*;
-import mindustry.world.*;
-import mindustry.world.blocks.power.PowerGenerator.*;
-import mindustry.world.blocks.power.*;
+import orbital.*;
+import orbital.core.*;
+import orbital.gen.*;
+import orbital.world.*;
+import orbital.world.blocks.power.PowerGenerator.*;
+import orbital.world.blocks.power.*;
 import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;

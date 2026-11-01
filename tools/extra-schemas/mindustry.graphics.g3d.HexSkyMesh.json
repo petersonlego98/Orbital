@@ -1,5 +1,5 @@
 {
-  "superclass": "mindustry.graphics.g3d.PlanetMesh",
+  "superclass": "orbital.graphics.g3d.PlanetMesh",
   "seed": {
     "type": "int",
     "default": "0"

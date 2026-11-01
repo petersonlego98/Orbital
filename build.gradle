@@ -41,7 +41,7 @@ allprojects{
         versionNumber = '8'
         if(!project.hasProperty("versionModifier")) versionModifier = 'release'
         if(!project.hasProperty("versionType")) versionType = 'official'
-        appName = 'Mindustry'
+        appName = 'Orbital'
         steamworksVersion = '185e76cfe630a6f0e1dd7b9bf57be41f6064a1f2'
         rhinoVersion = '32395f942976a6d1d21ec9877664554cd5762306'
 
@@ -50,7 +50,7 @@ allprojects{
         }
 
         debugged = {
-            return new File(projectDir.parent, '../Mindustry-Debug').exists() && !project.hasProperty("release") && project.hasProperty("args")
+            return new File(projectDir.parent, '../Orbital-Debug').exists() && !project.hasProperty("release") && project.hasProperty("args")
         }
 
         generateDeployName = { String platform ->
@@ -419,7 +419,7 @@ project(":core"){
 
     //comp** classes are only used for code generation
     jar{
-        exclude("mindustry/entities/comp/**")
+        exclude("orbital/entities/comp/**")
     }
 }
 

@@ -5,7 +5,7 @@
     "doc": "Constant amount to add."
   },
   "other": {
-    "type": "mindustry.entities.part.DrawPart$PartProgress",
+    "type": "orbital.entities.part.DrawPart$PartProgress",
     "doc": "Another progress function whose value is added instead of a constant."
   }
 }

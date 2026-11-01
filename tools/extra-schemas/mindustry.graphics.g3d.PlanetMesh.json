@@ -1,5 +1,5 @@
 {
   "doc": "Planet mesh.",
   "abstract": true,
-  "superclass": "mindustry.graphics.g3d.GenericMesh"
+  "superclass": "orbital.graphics.g3d.GenericMesh"
 }

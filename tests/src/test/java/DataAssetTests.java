@@ -1,11 +1,11 @@
 import arc.struct.*;
-import mindustry.*;
-import mindustry.ctype.*;
-import mindustry.entities.bullet.*;
-import mindustry.game.*;
-import mindustry.gen.*;
-import mindustry.mod.data.*;
-import mindustry.type.*;
+import orbital.*;
+import orbital.ctype.*;
+import orbital.entities.bullet.*;
+import orbital.game.*;
+import orbital.gen.*;
+import orbital.mod.data.*;
+import orbital.type.*;
 import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;

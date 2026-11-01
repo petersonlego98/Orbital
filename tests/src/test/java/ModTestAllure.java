@@ -1,10 +1,10 @@
 import arc.util.*;
-import mindustry.*;
-import mindustry.gen.*;
-import mindustry.type.*;
+import orbital.*;
+import orbital.gen.*;
+import orbital.type.*;
 import org.junit.jupiter.api.*;
 
-import static mindustry.Vars.*;
+import static orbital.Vars.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 //grabs a version-locked exotic-mod commit and makes sure its content is parsed correctly
