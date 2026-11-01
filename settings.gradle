@@ -1,0 +1,17 @@
+if(JavaVersion.current().ordinal() < JavaVersion.VERSION_17.ordinal()){
+    throw new Exception("!!! YOU MUST USE JAVA 17 OR ABOVE TO COMPILE !!! Your version: ${System.properties["java.version"]}")
+}
+
+// Orbital: desktop and server only. Android/iOS modules are not part of v1.
+include 'desktop', 'core', 'server', 'annotations', 'tools', 'tests'
+
+if(!hasProperty("noLocalArc")){
+    if(new File(rootDir.parent, 'Arc').exists()){
+        println("Compiling with localArc")
+        includeBuild("../Arc")
+    }else{
+        println("Local Arc not found. Using jitpack (unreliable).")
+    }
+}else{
+    println("Not including local repositories.")
+}
