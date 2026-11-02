@@ -70,6 +70,14 @@ O mapa dá acesso a dois destinos principais:
 - **Planetas:** abrem mapas locais de produção.
 - **Estrelas vermelhas:** abrem expedições temporárias de combate e mineração.
 
+### 4.1.1 Sistema inicial de Orbital
+
+No mapa estelar, o sistema inicial de Orbital usa a estrela amarela já existente (`sun`) como centro e um primeiro planeta processualmente nomeado orbitando próximo a ela: **Quatia**.
+
+Nesta etapa, Quatia é apenas um corpo visual e clicável no mapa estelar. Ele orbita a estrela normalmente, pode ser focado pelo jogador, mas não possui setor, gerador, núcleo ou opção de pouso. A visão inicial do mapa é de cima do sistema, mostrando a estrela e o planeta juntos; a câmera permite zoom, rotação e inclinação, sem arrastar os astros.
+
+**Serpulo e Erekir deixaram de ser campanhas jogáveis.** Os corpos continuam existindo no mapa estelar como corpos visuais, mas sem campanha, setor jogável ou lançamento. A entrada de mapa no menu chama-se agora “Mapa Estelar”.
+
 ### 4.2 Planetas
 
 Ao abrir um planeta, o jogador entra em um mapa de construção no qual pode organizar sua produção de recursos. O planeta é uma colônia jogável, não apenas um ícone no mapa.

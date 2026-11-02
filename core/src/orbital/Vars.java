@@ -87,8 +87,6 @@ public class Vars implements Loadable{
     public static final String[] serverJsonBeURLs = {"https://raw.githubusercontent.com/Anuken/OrbitalServerList/master/servers_be.json", "https://cdn.jsdelivr.net/gh/anuken/orbitalserverlist/servers_be.json"};
     /** URLs to the JSON file containing all the stable servers. */
     public static final String[] serverJsonURLs = {"https://raw.githubusercontent.com/Anuken/OrbitalServerList/master/servers_v8.json", "https://cdn.jsdelivr.net/gh/anuken/orbitalserverlist/servers_v8.json"};
-    /** URLs to the JSON files containing the list of mods. */
-    public static final String[] modJsonURLs = {"https://raw.githubusercontent.com/Anuken/OrbitalMods/master/mods.json", "https://cdn.jsdelivr.net/gh/anuken/orbitalmods/mods.json"};
     /** URLs to the JSON file containing players banned from Steam. */
     public static final String[] steamBansURLs = {"https://raw.githubusercontent.com/Anuken/OrbitalSteamBans/master/data.json", "https://cdn.jsdelivr.net/gh/anuken/orbitalsteambans/data.json"};
     /** URL of the github issue report template. */

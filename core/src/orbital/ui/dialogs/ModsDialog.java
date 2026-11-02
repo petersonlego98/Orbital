@@ -13,10 +13,6 @@ import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
 import arc.struct.*;
 import arc.util.*;
-import arc.util.Http.*;
-import arc.util.io.*;
-import arc.util.serialization.*;
-import arc.util.serialization.Jval.*;
 import orbital.core.*;
 import orbital.ctype.*;
 import orbital.game.EventType.*;
@@ -34,19 +30,10 @@ import static orbital.Vars.*;
 public class ModsDialog extends BaseDialog{
     private static final Pattern modVersionPattern = Pattern.compile("\\[[vb](\\d+)(?:\\.(\\d+))?\\]");
 
-    public ModBrowserDialog browser;
-
-    protected float modImportProgress;
-    protected boolean cancelledImport;
     protected BaseDialog currentContent;
-    protected BaseDialog downloads;
     protected BaseDialog modDetails;
 
     protected float scroll = 0f;
-    //only records mods that have a valid repo!
-    protected ObjectMap<LoadedMod, ModListing> modToListing = new ObjectMap<>();
-    protected ObjectSet<LoadedMod> withUpdates = new ObjectSet<>();
-    protected @Nullable Element updaterElement;
 
     public ModsDialog(){
         super("@mods");
@@ -65,12 +52,7 @@ public class ModsDialog extends BaseDialog{
             buttons.button("@mods.openfolder", Icon.link, () -> Core.app.openFolder(modDirectory.absolutePath()));
         }
 
-        shown(() -> {
-            setup();
-
-            withUpdates.clear();
-            refreshModUpdates();
-        });
+        shown(this::setup);
         onResize(this::setup);
 
         Events.on(ResizeEvent.class, event -> {
@@ -84,47 +66,7 @@ public class ModsDialog extends BaseDialog{
             if(mods.requiresReload()){
                 mods.reload();
             }
-
-            if(updaterElement != null){
-                updaterElement.remove();
-                updaterElement = null;
-            }
         });
-
-        browser = new ModBrowserDialog();
-    }
-
-    public void refreshModUpdates(){
-        ObjectMap<String, LoadedMod> repoToMod = new ObjectMap<>();
-        for(var mod : mods.getMods()){
-            String repo = mod.getRepo();
-            if(!mod.hasSteamID() && repo != null){
-                repoToMod.put(repo, mod);
-            }
-        }
-
-        browser.getModList(list -> {
-            withUpdates.clear();
-            for(var entry : list){
-                var mod = repoToMod.get(entry.repo);
-                if(mod != null){
-                    modToListing.put(mod, entry);
-                    var release = entry.getMatchingRelease();
-                    //Only compare to the release that fits the current version the client is using, if one exists; don't look for updates that don't match the version
-                    if(Strings.checkNewerSemver(entry.version, release == null ? mod.meta.version : release.version)){
-                        withUpdates.add(mod);
-                    }
-                }
-            }
-
-            if(withUpdates.size > 0){
-                setup();
-            }
-        });
-    }
-
-    public boolean hasUpdate(LoadedMod mod){
-        return withUpdates.contains(mod);
     }
 
     void setup(){
@@ -170,34 +112,12 @@ public class ModsDialog extends BaseDialog{
 
                     t.row();
 
-                    t.button("@mod.import.github", Icon.github, bstyle, () -> {
-                        dialog.hide();
-
-                        ui.showTextInput("@mod.import.github", "", 64, Core.settings.getString("lastmod", ""), text -> {
-                            //clean up the text in case somebody inputs a URL or adds random spaces
-                            text = text.trim().replace(" ", "");
-                            if(text.startsWith("https://github.com/")) text = text.substring("https://github.com/".length());
-
-                            Core.settings.put("lastmod", text);
-                            var listing = browser.getCachedMod(text);
-                            if(listing != null){
-                                //auto-choose release when a listing is found
-                                githubImportMod(listing);
-                            }else{
-                                //this will auto-detect whether it's java, then grab latest release unconditionally
-                                //TODO: would be nice to grab version-appropriate release but I don't want to copy-paste browser logic for this
-                                githubImportMod(text, false, null, true);
-                            }
-                        });
-                    }).margin(12f);
                 });
                 dialog.addCloseButton();
 
                 dialog.show();
 
             }).margin(margin);
-
-            buttons.button("@mods.browser", Icon.menu, style, () -> browser.show()).margin(margin);
         }).width(w);
 
         cont.row();
@@ -279,7 +199,6 @@ public class ModsDialog extends BaseDialog{
                                     if(!mod.hasSteamID()){
                                         ui.showConfirm("@confirm", "@mod.remove.confirm", () -> {
                                             mods.removeMod(mod);
-                                            withUpdates.remove(mod);
                                             setup();
                                         });
                                     }else{
@@ -295,18 +214,6 @@ public class ModsDialog extends BaseDialog{
                                 }
                             }).growX().right().padRight(-8f).padTop(-8f);
                         }, Styles.grayt, () -> showMod(mod)).size(w, h).growX().pad(4f).padTop(8f).row();
-
-                        if(hasUpdate(mod)){
-                            cont.button(b -> {
-                                b.margin(6f);
-                                b.left();
-                                b.image(Icon.download).color(Color.lightGray).size(iconMed).padRight(8f);
-                                var list = modToListing.get(mod);
-                                b.add(Core.bundle.format("mods.update.available", list == null ? "<unknown>" : list.version));
-                            }, Styles.grayt, () -> {
-                                githubImportMod(mod.getRepo(), mod.isJava(), null, false);
-                            }).width(w).height(48f).padTop(-4f).row();
-                        }
                     }
                 }
 
@@ -329,36 +236,6 @@ public class ModsDialog extends BaseDialog{
             }).scrollX(false).update(s -> scroll = s.getScrollY()).get().setScrollYForce(scroll);
 
             cont.row();
-
-            if(withUpdates.size > 1){
-                cont.button(b -> {
-                    b.margin(6f);
-                    b.image(Icon.download).size(iconMed).padRight(8f);
-                    b.add("@mods.update.all");
-                    b.image(Icon.download).size(iconMed).padLeft(8f);
-                }, Styles.grayt, () -> {
-                    var queue = withUpdates.toSeq();
-
-                    int[] index = {0};
-
-                    //TODO: this is an awful hack that forces mods to be downloaded in sequence
-                    //handling callbacks in the functions is extremely tedious, so this is the cleanest method I could find
-                    cancelledImport = false;
-                    if(updaterElement != null) updaterElement.remove();
-                    updaterElement = new Element();
-
-                    updaterElement.update(() -> {
-                        if(index[0] >= queue.size || cancelledImport){
-                            updaterElement.remove();
-                        }else if(!ui.loadfrag.shown()){ //loading not shown, queue next one
-                            var next = queue.get(index[0] ++);
-
-                            githubImportMod(next.getRepo(), next.isJava(), null, false);
-                        }
-                    });
-                    addChild(updaterElement);
-                }).padTop(8f).width(w).height(60f).padTop(12f).row();
-            }
         }else{
             cont.table(Styles.black6, t -> t.add("@mods.none")).height(80f);
         }
@@ -416,10 +293,7 @@ public class ModsDialog extends BaseDialog{
         }
 
         if(mod.getRepo() != null){
-            boolean showImport = !mod.hasSteamID();
             modDetails.buttons.button("@mods.github.open", Icon.link, () -> Core.app.openURI("https://github.com/" + mod.getRepo()));
-            if(mobile && showImport) modDetails.buttons.row();
-            if(showImport) modDetails.buttons.button("@mods.browser.reinstall", Icon.download, () -> viewReleases(mod.getRepo(), mod.isJava(), true));
         }
 
         modDetails.cont.pane(desc -> {
@@ -484,227 +358,6 @@ public class ModsDialog extends BaseDialog{
         }
 
         modDetails.show();
-    }
-
-    protected void handleMod(String repo, HttpResponse result, boolean forceEnable){
-        try{
-            Fi file = tmpDirectory.child(repo.replace("/", "") + ".zip");
-            long len = result.getContentLength();
-            Floatc cons = len <= 0 ? f -> {} : p -> modImportProgress = p;
-
-            try(var stream = file.write(false)){
-                Streams.copyProgress(result.getResultAsStream(), stream, len, 4096, p -> {
-                    if(cancelledImport) throw new RuntimeException("cancelled");
-                    cons.get(p);
-                });
-            }
-
-            if(cancelledImport) return;
-
-            var mod = mods.importMod(file, forceEnable);
-            mod.setRepo(repo);
-            file.delete();
-            Core.app.post(() -> {
-                var same = withUpdates.toSeq().find(l -> Structs.eq(l.getRepo(), repo));
-                if(same != null) withUpdates.remove(same);
-
-                try{
-                    setup();
-                    ui.loadfrag.hide();
-                    if(downloads != null) downloads.hide();
-                    if(modDetails != null) modDetails.hide();
-                }catch(Throwable e){
-                    ui.showException(e);
-                }
-            });
-        }catch(Throwable e){
-            if(cancelledImport) return;
-            showModError(e);
-        }
-    }
-
-    protected void importFail(Throwable t){
-        Core.app.post(() -> showModError(t));
-    }
-
-    public void showModError(Throwable error){
-        ui.loadfrag.hide();
-
-        if(error instanceof NoSuchMethodError || Strings.getCauses(error).contains(t -> t.getMessage() != null && (t.getMessage().contains("trust anchor") || t.getMessage().contains("SSL") || t.getMessage().contains("protocol")))){
-            ui.showErrorMessage("@feature.unsupported");
-        }else if(error instanceof HttpStatusException st){
-            ui.showErrorMessage(Core.bundle.format("connectfail", Strings.capitalize(st.status.toString().toLowerCase())));
-        }else if(error.getMessage() != null && error.getMessage().toLowerCase(Locale.ROOT).contains("writable dex")){
-            ui.showException("@error.moddex", error);
-        }else{
-            ui.showException(error);
-        }
-    }
-
-    public void viewReleases(String repo, boolean isJava, boolean reinstall){
-        BaseDialog load = new BaseDialog("");
-        load.cont.add("[accent]" + Core.bundle.get("mods.browser.fetching"));
-        load.show();
-        Http.get(ghApi + "/repos/" + repo + "/releases", res -> {
-            var json = Jval.read(res.getResultAsString());
-            JsonArray releases = json.asArray();
-
-            Core.app.post(() -> {
-                load.hide();
-
-                if(releases.size == 0){
-                    if(reinstall && !isJava){
-                        githubImportMod(repo, isJava, null, false);
-                    }else{
-                        ui.showInfo("@mods.browser.noreleases");
-                    }
-                }else{
-                    downloads = new BaseDialog("@mods.browser.releases");
-                    downloads.cont.pane(p -> {
-                        if(reinstall && !isJava){
-                            p.table(((TextureRegionDrawable)Tex.whiteui).tint(Pal.darkestGray), t -> {
-                                t.add("@mods.browser.current").top().left().growX().wrap().pad(5f).padBottom(15f);
-                                t.row();
-                                t.table(b -> {
-                                    b.defaults().size(150f, 54f).pad(2f);
-                                    b.button("@mods.github.open", Icon.link, () -> Core.app.openURI("https://github.com/" + repo));
-                                    b.button("@mods.browser.add", Icon.download, () -> githubImportMod(repo, isJava, null, false));
-                                }).right();
-                            }).margin(5f).growX().pad(5f);
-                            p.row();
-                        }
-
-                        for(int j = 0; j < releases.size; j++){
-                            var release = releases.get(j);
-
-                            int index = j;
-                            p.table(((TextureRegionDrawable)Tex.whiteui).tint(Pal.darkestGray), t -> {
-                                t.add("[accent]" + release.getString("name") + (index == 0 ? " " + Core.bundle.get("mods.browser.latest") : "")).top().left().growX().wrap().pad(5f);
-                                t.row();
-                                t.add((release.getString("published_at")).substring(0, 10).replaceAll("-", "/")).top().left().growX().wrap().pad(5f).color(Color.gray);
-                                t.row();
-                                t.table(b -> {
-                                    b.defaults().size(150f, 54f).pad(2f);
-                                    b.button("@mods.github.open-release", Icon.link, () -> Core.app.openURI(release.getString("html_url")));
-                                    b.button("@mods.browser.add", Icon.download, () -> {
-                                        String releaseUrl = release.getString("url");
-                                        githubImportMod(repo, isJava, releaseUrl.substring(releaseUrl.lastIndexOf("/") + 1), true);
-                                    });
-                                }).right();
-                            }).margin(5f).growX().pad(5f);
-
-                            if(j < releases.size - 1) p.row();
-                        }
-                    }).width(500f).scrollX(false).fillY();
-                    downloads.buttons.button("@back", Icon.left, () -> {
-                        downloads.clear();
-                        downloads.hide();
-                    }).size(150f, 54f).pad(2f);
-                    downloads.keyDown(KeyCode.escape, downloads::hide);
-                    downloads.keyDown(KeyCode.back, downloads::hide);
-                    downloads.show();
-                }
-            });
-        }, t -> Core.app.post(() -> {
-            showModError(t);
-            load.hide();
-        }));
-    }
-
-    public void githubImportMod(ModListing mod){
-        var matchingRelease = mod.getMatchingRelease();
-        githubImportMod(mod.repo, mod.hasJava, matchingRelease == null ? null : matchingRelease.id, true);
-    }
-
-    public void githubImportMod(String repo, boolean isJava, boolean forceEnable){
-        githubImportMod(repo, isJava, null, forceEnable);
-    }
-
-    public void githubImportMod(String repo, boolean isJava, @Nullable String release, boolean forceEnable){
-        modImportProgress = 0f;
-        cancelledImport = false;
-        ui.loadfrag.show(Core.bundle.format("mods.downloading", repo));
-        ui.loadfrag.setProgress(() -> modImportProgress);
-        ui.loadfrag.setButton(() -> {
-            ui.loadfrag.hide();
-            cancelledImport = true;
-        });
-
-        if(isJava){
-            githubImportJavaMod(repo, release, forceEnable);
-        }else{
-            Http.get(ghApi + "/repos/" + repo, res -> {
-                if(cancelledImport) return;
-                var json = Jval.read(res.getResultAsString());
-                String mainBranch = json.getString("default_branch");
-                String language = json.getString("language", "<none>");
-
-                //this is a crude heuristic for class mods; only required for direct github import
-                //TODO make a more reliable way to distinguish java mod repos
-                if(language.equals("Java") || language.equals("Kotlin") || language.equals("Groovy") || language.equals("Scala")){
-                    githubImportJavaMod(repo, release, forceEnable);
-                }else{
-                    githubImportBranch(mainBranch, repo, release, forceEnable);
-                }
-            }, this::importFail);
-        }
-    }
-
-    public void githubImportJavaMod(String repo, @Nullable String release, boolean forceEnable){
-        //grab latest release
-        Http.get(ghApi + "/repos/" + repo + "/releases/" + (release == null ? "latest" : release), res -> {
-            if(cancelledImport) return;
-            var json = Jval.read(res.getResultAsString());
-            var assets = json.get("assets").asArray();
-
-            //prioritize dexed jar, as that's what Sonnicon's mod template outputs
-            var dexedAsset = assets.find(j -> j.getString("name").startsWith("dexed") && j.getString("name").endsWith(".jar"));
-            var asset = dexedAsset == null ? assets.find(j -> j.getString("name").endsWith(".jar")) : dexedAsset;
-
-            if(asset != null){
-                //grab actual file
-                var url = asset.getString("browser_download_url");
-
-                Http.get(url, result -> {
-                    if(cancelledImport) return;
-                    handleMod(repo, result, forceEnable);
-                }, this::importFail);
-            }else{
-                throw new ArcRuntimeException("No JAR file found in releases. Make sure you have a valid jar file in the mod's latest Github Release.");
-            }
-        }, this::importFail);
-    }
-
-    public void githubImportBranch(String branch, String repo, @Nullable String release, boolean forceEnable){
-        if(release != null) {
-            Http.get(ghApi + "/repos/" + repo + "/releases/" + release, res -> {
-                if(cancelledImport) return;
-                String zipUrl = Jval.read(res.getResultAsString()).getString("zipball_url");
-                Http.get(zipUrl, loc -> {
-                    if(cancelledImport) return;
-                    if(loc.getHeader("Location") != null){
-                        Http.get(loc.getHeader("Location"), result -> {
-                            if(cancelledImport) return;
-                            handleMod(repo, result, forceEnable);
-                        }, this::importFail);
-                    }else{
-                        handleMod(repo, loc, forceEnable);
-                    }
-                }, this::importFail);
-            });
-        }else{
-            Http.get(ghApi + "/repos/" + repo + "/zipball/" + branch, loc -> {
-                if(cancelledImport) return;
-                if(loc.getHeader("Location") != null){
-                    Http.get(loc.getHeader("Location"), result -> {
-                        if(cancelledImport) return;
-                        handleMod(repo, result, forceEnable);
-                    }, this::importFail);
-                }else{
-                    handleMod(repo, loc, forceEnable);
-                }
-            }, this::importFail);
-        }
     }
 
     /** @return {major, minor} parsed from a leading/trailing "[v{major}]" or "[v{major}.{minor}]" tag, or null if none is found at either end (or the numbers are unparseable). */

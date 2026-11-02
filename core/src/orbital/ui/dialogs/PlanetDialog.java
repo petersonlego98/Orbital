@@ -1,10 +1,8 @@
 package orbital.ui.dialogs;
 
 import arc.*;
-import arc.assets.loaders.TextureLoader.*;
 import arc.func.*;
 import arc.graphics.*;
-import arc.graphics.Texture.*;
 import arc.graphics.g2d.*;
 import arc.graphics.gl.*;
 import arc.input.*;
@@ -70,7 +68,6 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
     public Table sectorTop = new Table(), notifs = new Table(), expandTable = new Table();
     public Label hoverLabel = new Label("");
 
-    private Texture[] planetTextures;
     private Element mainView;
     private SectorSelectDialog selectDialog = new SectorSelectDialog();
 
@@ -118,6 +115,17 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
             if(showing() && newPresets.peek() != state.planet.getLastSector()) return;
 
             newPresets.clear();
+
+            //system view: orbit the star itself, and keep the view above the orbital plane
+            if(state.systemView){
+                Vec3 sysPos = state.camPos;
+                sysPos.rotate(Vec3.Y, cx / 9f);
+
+                float sysUp = sysPos.angle(Vec3.Y);
+                float sysAmount = Mathf.clamp(sysUp + cy / 10f, 8f, 88f) - sysUp;
+                sysPos.rotate(Tmp.v31.set(Vec3.Y).rotate(state.camDir, 90), sysAmount);
+                return;
+            }
 
             Vec3 pos = state.camPos;
 
@@ -177,60 +185,6 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
         });
 
         shown(this::setup);
-
-        //show selection of Erekir/Serpulo campaign if the user has no bases, and hasn't selected yet (essentially a "have they played campaign before" check)
-        shown(() -> {
-            if(!settings.getBool("campaignselect") && !content.planets().contains(p -> p.sectors.contains(Sector::hasBase))){
-                var diag = new BaseDialog("@campaign.select");
-
-                Planet[] selected = {null};
-                var group = new ButtonGroup<>();
-                group.setMinCheckCount(0);
-                state.planet = Planets.sun;
-                Planet[] choices = {Planets.serpulo, Planets.erekir};
-                int i = 0;
-                for(var planet : choices){
-                    TextureRegion tex = new TextureRegion(planetTextures[i]);
-
-                    diag.cont.button(b -> {
-                        b.top();
-                        b.add(planet.localizedName).color(Pal.accent).style(Styles.outlineLabel);
-                        b.row();
-                        b.image(new TextureRegionDrawable(tex)).grow().scaling(Scaling.fit);
-                    }, Styles.togglet, () -> selected[0] = planet).size(mobile ? 220f : 320f).group(group);
-                    i ++;
-                }
-
-                diag.cont.row();
-                diag.cont.label(() -> selected[0] == null ? "@campaign.none" : "@campaign." + selected[0].name).labelAlign(Align.center).style(Styles.outlineLabel).width(440f).wrap().colspan(2);
-
-                diag.buttons.button("@ok", Icon.ok, () -> {
-                    state.planet = selected[0];
-                    lookAt(state.planet.getStartSector());
-                    selectSector(state.planet.getStartSector());
-                    settings.put("campaignselect", true);
-                    diag.hide();
-                }).size(300f, 64f).disabled(b -> selected[0] == null);
-
-                app.post(diag::show);
-            }else if(hadSerpuloRemaps && settings.getBoolOnce("serpulo-remaps-notice")){
-                var diag = new BaseDialog("@campaign.rework.title");
-                diag.cont.add("@campaign.rework.serpulo").labelAlign(Align.center).growX().wrap().maxWidth(500f);
-                diag.buttons.button("@ok", Icon.ok, diag::hide).size(280f, 64f);
-
-                app.post(diag::show);
-            }
-        });
-
-        planetTextures = new Texture[2];
-        String[] names = {"sprites/planets/serpulo.png", "sprites/planets/erekir.png"};
-        for(int i = 0; i < names.length; i++){
-            int fi = i;
-            assets.load(names[i], Texture.class, new TextureParameter(){{
-                minFilter = magFilter = TextureFilter.linear;
-            }}).loaded = t -> planetTextures[fi] = t;
-            assets.finishLoadingAsset(names[i]);
-        }
     }
 
     /** show with no limitations, just as a map. */
@@ -265,6 +219,13 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
         showed = false;
         listener = s -> {};
 
+        //when the map is opened from the menu and not from inside a sector, show the system itself
+        if(Vars.state.rules.sector == null && Vars.state.isMenu()){
+            viewSystem();
+        }else{
+            state.systemView = false;
+        }
+
         newPresets.clear();
 
         //announce new presets
@@ -298,9 +259,11 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
         if(Core.graphics.isPortrait()){
             buttons.add(sectorTop).colspan(2).fillX().row();
             addBack();
+            addSystem();
             addTech();
         }else{
             addBack();
+            addSystem();
             buttons.add().growX();
             buttons.add(sectorTop).minWidth(230f);
             buttons.add().growX();
@@ -310,6 +273,10 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
 
     void addBack(){
         buttons.button("@back", Icon.left, this::hide).size(200f, 54f).pad(2).bottom();
+    }
+
+    void addSystem(){
+        buttons.button("@planets.system", Icon.planet, this::viewSystem).size(200f, 54f).pad(2).bottom().visible(() -> mode == look && !state.systemView);
     }
 
     void addTech(){
@@ -397,6 +364,7 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
 
         //TODO should this even set `state.planet`? the other lookAt() doesn't, so...
         state.planet = sector.planet;
+        state.systemView = false;
         sector.planet.lookAt(sector, state.camPos);
 
         clampZoom();
@@ -608,6 +576,7 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
         if(planet.removed) return false;
         if(mode == select) return planet == state.planet;
         if(mode == planetLaunch) return launchSector != null && (launchCandidates.contains(planet) || (planet == launchSector.planet && planet.allowSelfSectorLaunch));
+        if(mode == look && planet.mapView) return planet.visible;
         return (planet.alwaysUnlocked && planet.isLandable()) || planet.sectors.contains(Sector::hasBase) || debugSelect;
     }
 
@@ -885,7 +854,7 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
     }
 
     public void viewPlanet(Planet planet, boolean pan){
-        if(state.planet != planet){
+        if(state.planet != planet || state.systemView){
             selected = null;
             if(pan){
                 state.otherCamPos = state.planet.position;
@@ -893,14 +862,35 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
             }
             newPresets.clear();
             state.planet = planet;
+            state.systemView = false;
 
             clampZoom();
 
             selected = null;
             updateSelected();
             rebuildExpand();
-            settings.put("lastplanet", planet.name);
+            if(!planet.mapView){
+                settings.put("lastplanet", planet.name);
+            }
         }
+    }
+
+    /** Frames the whole solar system from above, centered on its star. */
+    public void viewSystem(){
+        selected = null;
+        hovered = null;
+        newPresets.clear();
+
+        state.systemView = true;
+        state.planet = Planets.sun;
+        state.otherCamPos = null;
+        state.otherCamAlpha = 0f;
+        state.camPos.set(0.18f, 1f, 0.24f).nor();
+        state.systemDistance = 34f;
+        zoom = state.zoom = 1f;
+
+        updateSelected();
+        rebuildExpand();
     }
 
     @Override
@@ -1003,9 +993,9 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
             }
         }
 
-        if(state.planet.hasGrid()){
+        if(!state.planet.mapView && state.planet.hasGrid()){
             hovered = Core.scene.getDialog() == this ? state.planet.getSector(planets.cam.getMouseRay(), PlanetRenderer.outlineRad * state.planet.radius) : null;
-        }else if(state.planet.isLandable()){
+        }else if(!state.planet.mapView && state.planet.isLandable()){
             boolean wasNull = selected == null;
             //always have the first sector selected.
             //TODO better support for multiple sectors in gridless planets?

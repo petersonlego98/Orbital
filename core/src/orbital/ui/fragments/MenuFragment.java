@@ -140,7 +140,7 @@ public class MenuFragment{
         container.defaults().size(size).pad(5).padTop(4f);
 
         MobileButton
-            play = new MobileButton(Icon.play, "@campaign", () -> checkPlay(ui.planet::show)),
+            play = new MobileButton(Icon.play, "@starmap", () -> checkPlay(ui.planet::show)),
             expedition = new MobileButton(Icon.terrain, "Expedição", () -> checkPlay(ui.expedition::show)),
             custom = new MobileButton(Icon.rightOpenOut, "@customgame", () -> checkPlay(ui.custom::show)),
             maps = new MobileButton(Icon.download, "@loadgame", () -> checkPlay(ui.load::show)),
@@ -213,7 +213,7 @@ public class MenuFragment{
             if(desktopButtons == null){
                 desktopButtons = Seq.with(
                     new MenuButton("@play", Icon.play,
-                        new MenuButton("@campaign", Icon.play, () -> checkPlay(ui.planet::show)),
+                        new MenuButton("@starmap", Icon.planet, () -> checkPlay(ui.planet::show)),
                         new MenuButton("Expedição asteroidária", Icon.terrain, () -> checkPlay(ui.expedition::show)),
                         new MenuButton("@joingame", Icon.add, () -> checkPlay(ui.join::show)),
                         new MenuButton("@customgame", Icon.terrain, () -> checkPlay(ui.custom::show)),

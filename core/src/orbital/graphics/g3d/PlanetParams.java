@@ -8,6 +8,10 @@ import orbital.type.*;
 
 /** Parameters for rendering a solar system. */
 public class PlanetParams{
+    /** If true, the camera frames the whole solar system from above instead of a planet. */
+    public boolean systemView = false;
+    /** Base camera distance used only while in system view. */
+    public float systemDistance = 34f;
     /** Camera direction relative to the planet. Length is determined by zoom. */
     public Vec3 camPos = new Vec3(0f, 0f, 4f);
     /** If not null, this is the position of the "previous" planet for smooth camera movement. */

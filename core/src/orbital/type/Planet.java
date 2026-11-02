@@ -83,6 +83,8 @@ public class Planet extends UnlockableContent{
     public boolean tidalLock = false;
     /** Whether this planet is listed in the planet access UI. **/
     public boolean accessible = true;
+    /** Whether this planet can be viewed/clicked in the map without being landable. */
+    public boolean mapView = false;
     /** Environment flags for sectors on this planet. */
     public int defaultEnv = Env.terrestrial | Env.spores | Env.groundOil | Env.groundWater | Env.oxygen;
     /** Environment attributes. */

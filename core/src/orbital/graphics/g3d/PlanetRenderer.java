@@ -62,7 +62,9 @@ public class PlanetRenderer implements Disposable{
         cam.up.set(Vec3.Y);
 
         cam.resize(w, h);
-        params.camPos.setLength((params.planet.radius + params.planet.camRadius) * camLength + (params.zoom-1f) * (params.planet.radius + params.planet.camRadius) * 2);
+        params.camPos.setLength(params.systemView ?
+        params.systemDistance * params.zoom :
+        (params.planet.radius + params.planet.camRadius) * camLength + (params.zoom-1f) * (params.planet.radius + params.planet.camRadius) * 2);
 
         if(params.otherCamPos != null){
             cam.position.set(params.otherCamPos).lerp(params.planet.position, params.otherCamAlpha).add(params.camPos);

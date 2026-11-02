@@ -756,29 +756,7 @@ public class Mods implements Loadable{
             cont.row();
 
             cont.button("@cancel", Icon.cancel, this::hide).size(160, 50);
-            cont.button(soft ? "@mod.dependencies.downloadreq" : "@mod.dependencies.download", Icon.download, () -> {
-                hide();
-                Seq<String> toImport = new Seq<>();
-                toCheck.each(mod -> mod.missingDependencies.each(toImport::addUnique));
-                downloadDependencies(toImport);
-            }).size(160, 50);
-            if(soft){
-                if(Core.graphics.isPortrait()){
-                    cont.row();
-                }
-                cont.button("@mod.dependencies.downloadall", Icon.download, () -> {
-                    hide();
-                    Seq<String> toImport = new Seq<>();
-                    toCheck.each(mod -> mod.missingDependencies.each(toImport::addUnique));
-                    toCheck.each(mod -> mod.missingSoftDependencies.each(toImport::addUnique));
-                    downloadDependencies(toImport);
-                }).size(160, 50);
-            }
         }}.show();
-    }
-
-    private void downloadDependencies(Seq<String> toImport){
-        ui.mods.browser.downloadDependencies(toImport, results -> requiresReload |= results.any());
     }
 
     public void reload(){

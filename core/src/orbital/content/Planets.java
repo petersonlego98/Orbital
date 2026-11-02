@@ -6,6 +6,7 @@ import arc.math.*;
 import arc.math.geom.*;
 import arc.struct.*;
 import arc.util.*;
+import java.util.Locale;
 import orbital.game.*;
 import orbital.graphics.*;
 import orbital.graphics.g3d.*;
@@ -23,7 +24,11 @@ public class Planets{
     serpulo,
     gier,
     notva,
-    verilus;
+    verilus,
+    qatia;
+
+    /** Key of the first procedural planet. Changing this changes its name, mesh and orbit seed. */
+    private static final String originKey = "orbital:origin";
 
     public static void load(){
         sun = new Planet("sun", null, 4f){{
@@ -172,6 +177,88 @@ public class Planets{
             gen.carbonChance = 0.1f;
             gen.ferricChance = 0f;
         });
+
+        createOrigin();
+        removeCampaigns();
+    }
+
+    /**
+     * Serpulo and Erekir are no longer playable campaigns.
+     * The bodies remain visible in the star map, but have no generator, launch route or sectors to land on.
+     */
+    private static void removeCampaigns(){
+        //their old HexMesh requires a HexMesher/generator; replace it with generator-free meshes
+        serpulo.meshLoader = () -> new NoiseMesh(
+            serpulo, 12, 4, 1.05f, 5, 0.55f, 7.5f, 0.16f,
+            Color.valueOf("4d2a75"),
+            Color.valueOf("7d4dff"),
+            5, 0.55f, 6.5f, 0.12f
+        );
+        serpulo.cloudMeshLoader = () -> new MultiMesh(
+            new HexSkyMesh(serpulo, 12, 0.12f, 0.14f, 4, Color.valueOf("c69bff").a(0.5f), 5, 0.5f, 6.5f, 0.42f)
+        );
+
+        erekir.meshLoader = () -> new NoiseMesh(
+            erekir, 13, 4, 1.05f, 5, 0.55f, 7.5f, 0.16f,
+            Color.valueOf("a8552b"),
+            Color.valueOf("ff9266"),
+            5, 0.55f, 6.5f, 0.12f
+        );
+        erekir.cloudMeshLoader = () -> new MultiMesh(
+            new HexSkyMesh(erekir, 13, 0.12f, 0.14f, 4, Color.valueOf("ffc39a").a(0.55f), 5, 0.5f, 6.5f, 0.42f)
+        );
+
+        serpulo.generator = null;
+        erekir.generator = null;
+        serpulo.mapView = true;
+        erekir.mapView = true;
+        serpulo.launchCandidates.clear();
+        erekir.launchCandidates.clear();
+    }
+
+    /**
+     * Creates the first procedural planet of Orbital: a non-playable body that orbits the sun and
+     * is visible/clickable in the star map. It has no generator or sectors yet, so there is no
+     * landing or campaign on it in this stage.
+     */
+    private static void createOrigin(){
+        String generated = PlanetNames.generate(originKey, 3);
+        String internal = generated.toLowerCase(Locale.ROOT);
+
+        qatia = new Planet(internal, sun, 1.1f){{
+            //no campaign, sectors or landing yet: map-only body
+            generator = null;
+            sectors.clear();
+            visible = true;
+            drawOrbit = true;
+
+            //orbit close to the sun, so both bodies fit in a top-down view
+            orbitRadius = 9.2f;
+            totalRadius = radius;
+            orbitTime = Mathf.pow(orbitRadius, 1.5f) * 1000f;
+
+            //soft look: blue-green ocean + light continents and a thin atmosphere
+            meshLoader = () -> new NoiseMesh(
+            this, 3, 4, 1.1f, 5, 0.55f, 9f, 0.14f,
+            Color.valueOf("2b5f86"),
+            Color.valueOf("4c9a5f"),
+            5, 0.55f, 7.5f, 0.12f
+            );
+            cloudMeshLoader = () -> new HexSkyMesh(
+            this, 2, 0.12f, 0.14f, 4, Color.valueOf("e8f4ff").a(0.55f), 5, 0.5f, 6.5f, 0.42f
+            );
+
+            atmosphereColor = Color.valueOf("4ba3e0");
+            atmosphereRadIn = 0.02f;
+            atmosphereRadOut = 0.3f;
+            hasAtmosphere = true;
+            iconColor = Color.valueOf("4f9bd6");
+            icon = "planet";
+            bloom = false;
+            updateLighting = true;
+            defaultEnv = Env.terrestrial;
+            allowLaunchToNumbered = false;
+        }};
     }
 
     private static Planet makeAsteroid(String name, Planet parent, Block base, Block tint, int seed, float tintThresh, int pieces, float scale, Cons<AsteroidGenerator> cgen){
