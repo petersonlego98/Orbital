@@ -1376,6 +1376,12 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
             return;
         }
 
+        //Orbital: the asteroid expedition can only be entered while its clock is running
+        if(ExpeditionClock.isExpedition(sector) && !ExpeditionClock.active()){
+            ui.showInfo("A expedição em Gier não está ativa. Inicie uma nova expedição para entrar.");
+            return;
+        }
+
         if(sector.preset != null && sector.preset.requireUnlock && sector.preset.locked() && sector.preset.techNode != null && !sector.hasBase()){
             return;
         }

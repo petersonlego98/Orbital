@@ -21,6 +21,7 @@ import arc.scene.ui.layout.*;
 import arc.struct.*;
 import arc.util.*;
 import orbital.editor.*;
+import orbital.game.*;
 import orbital.game.EventType.*;
 import orbital.gen.*;
 import orbital.graphics.*;
@@ -70,6 +71,7 @@ public class UI implements ApplicationListener, Loadable{
     public DatabaseDialog database;
     public ContentInfoDialog content;
     public PlanetDialog planet;
+    public ExpeditionDialog expedition;
     public ResearchDialog research;
     public SchematicsDialog schematics;
     public ModsDialog mods;
@@ -162,6 +164,9 @@ public class UI implements ApplicationListener, Loadable{
 
         PerfCounter.ui.begin();
 
+        //Orbital: real-time expedition deadline; this must run even while the game is paused
+        ExpeditionClock.update();
+
         Events.fire(Trigger.uiDrawBegin);
 
         Core.scene.act();
@@ -219,6 +224,7 @@ public class UI implements ApplicationListener, Loadable{
         maps = new EditorMapsDialog();
         content = new ContentInfoDialog();
         planet = new PlanetDialog();
+        expedition = new ExpeditionDialog();
         research = new ResearchDialog();
         mods = new ModsDialog();
         schematics = new SchematicsDialog();

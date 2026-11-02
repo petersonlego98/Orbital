@@ -513,6 +513,9 @@ public class HudFragment{
 
             addInfoTable(wavesMain.table().width(dsize * 5f + 4f).left().get());
 
+            wavesMain.row();
+            addExpeditionTable(wavesMain.table().width(dsize * 5f + 4f).left().get());
+
             editorMain.name = "editor";
             editorMain.table(Tex.buttonEdge4, t -> {
                 t.name = "teams";
@@ -1229,6 +1232,21 @@ public class HudFragment{
                 }
             }
         }).left();
+    }
+
+    /** Orbital: remaining time of the asteroid expedition, shown only while inside Gier. */
+    private void addExpeditionTable(Table table){
+        table.name = "expedition";
+        table.left();
+
+        table.table(Styles.black6, t -> {
+            t.image(Icon.terrain).padLeft(8f).size(18f);
+
+            Label time = t.label(() -> "Expedição " + ExpeditionClock.formattedRemaining()).style(Styles.outlineLabel).pad(8f).get();
+            time.update(() -> time.setColor(ExpeditionClock.lowTime() ? Color.scarlet : Color.white));
+        }).padTop(4f);
+
+        table.visible(ExpeditionClock::inExpedition);
     }
 
     private boolean canSkipWave(){

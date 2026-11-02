@@ -141,6 +141,7 @@ public class MenuFragment{
 
         MobileButton
             play = new MobileButton(Icon.play, "@campaign", () -> checkPlay(ui.planet::show)),
+            expedition = new MobileButton(Icon.terrain, "Expedição", () -> checkPlay(ui.expedition::show)),
             custom = new MobileButton(Icon.rightOpenOut, "@customgame", () -> checkPlay(ui.custom::show)),
             maps = new MobileButton(Icon.download, "@loadgame", () -> checkPlay(ui.load::show)),
             join = new MobileButton(Icon.add, "@joingame", () -> checkPlay(ui.join::show)),
@@ -158,6 +159,7 @@ public class MenuFragment{
             container.add(join);
             container.add(custom);
             container.add(maps);
+            container.add(expedition);
             // add odd custom buttons
             for(int i = 1; i < customs.size; i += 2){
                 container.add(customs.get(i));
@@ -176,6 +178,8 @@ public class MenuFragment{
             container.marginTop(0f);
             container.add(play);
             container.add(maps);
+            container.row();
+            container.add(expedition);
             container.row();
             container.add(custom);
             container.add(join);
@@ -210,6 +214,7 @@ public class MenuFragment{
                 desktopButtons = Seq.with(
                     new MenuButton("@play", Icon.play,
                         new MenuButton("@campaign", Icon.play, () -> checkPlay(ui.planet::show)),
+                        new MenuButton("Expedição asteroidária", Icon.terrain, () -> checkPlay(ui.expedition::show)),
                         new MenuButton("@joingame", Icon.add, () -> checkPlay(ui.join::show)),
                         new MenuButton("@customgame", Icon.terrain, () -> checkPlay(ui.custom::show)),
                         new MenuButton("@loadgame", Icon.download, () -> checkPlay(ui.load::show))
