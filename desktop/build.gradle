@@ -53,6 +53,7 @@ tasks.register('dist', Jar){
     //GPLv3 notices and credits are also embedded in the jar for reference.
     from(rootProject.projectDir){
         include "LICENSE"
+        include "README.md"
         include "CREDITS.md"
         include "NOTICE.txt"
         include "THIRD_PARTY_LICENSES/**"
@@ -203,6 +204,7 @@ platforms.each{ platform ->
                 from rootProject.projectDir
                 into "build/packr/output"
                 include "LICENSE"
+                include "README.md"
                 include "CREDITS.md"
                 include "NOTICE.txt"
                 include "THIRD_PARTY_LICENSES/**"

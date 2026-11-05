@@ -65,7 +65,7 @@ A GPLv3 exige que a licença e os avisos acompanhem os binários. Copie os arqui
 
 ```powershell
 $dest = "deploy\windows64\Orbital"
-Copy-Item LICENSE, CREDITS.md, NOTICE.txt -Destination $dest -Force
+Copy-Item LICENSE, README.md, CREDITS.md, NOTICE.txt -Destination $dest -Force
 Copy-Item THIRD_PARTY_LICENSES -Destination $dest -Recurse -Force
 ```
 
@@ -74,6 +74,7 @@ Resultado esperado:
 ```
 Orbital/
 ├── LICENSE
+├── README.md
 ├── THIRD_PARTY_LICENSES/
 │   ├── GPL-3.0.txt
 │   ├── libraries.txt
@@ -103,7 +104,7 @@ jpackage --type app-image --name "Orbital" --input "desktop\build\libs" --main-j
 
 # 4. Licenças e créditos
 $dest = "deploy\windows64\Orbital"
-Copy-Item LICENSE, CREDITS.md, NOTICE.txt -Destination $dest -Force
+Copy-Item LICENSE, README.md, CREDITS.md, NOTICE.txt -Destination $dest -Force
 Copy-Item THIRD_PARTY_LICENSES -Destination $dest -Recurse -Force
 ```
 
@@ -120,6 +121,7 @@ Arquivos temporários e pastas de build como `.gradle/`, `build/` e `deploy/wind
 Antes de publicar qualquer binário, confirme que:
 
 - [ ] `LICENSE` contém o texto da GPLv3.
+- [ ] `README.md` descreve o fork, a origem e a licença do projeto.
 - [ ] `THIRD_PARTY_LICENSES/GPL-3.0.txt` também está presente.
 - [ ] `CREDITS.md` credita Anuken, a comunidade original e os colaboradores do fork.
 - [ ] `NOTICE.txt` informa onde o código-fonte correspondente pode ser obtido.
