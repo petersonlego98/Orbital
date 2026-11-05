@@ -9,7 +9,7 @@
 - Para carregar os WAVs, `FileTree` procura `.wav` após `.ogg`/`.mp3`; `DataAssetType` aceita WAV para som e música. O código Arc consultado usa `wavLoadBytes` para decodificar `Sound.load`.
 - `THIRD_PARTY_LICENSES/MIT-Original-Sounds.txt`, `tools/asset_license_rules.json`, `manifest.csv`, créditos, avisos e documentação foram atualizados.
 - A auditoria de licença retornou código 0: 39 sons MIT, nenhum som CC0, 165 GPL-3.0-or-later e um em domínio público. A regra por caminho preserva a atribuição do efeito em domínio público sem depender de tags opcionais. A verificação da CLI foi corrigida para não regravar o manifesto quando chamada com `--check`.
-- Ainda pendente: validação audiovisual dentro do jogo e revisão do pacote final de distribuição. Nenhum commit foi criado ainda.
+- O pacote final foi gerado e publicado no release **v1.0.0** (`Orbital-1.0-win64-usuario.zip` + `.sha256`); o código foi commitado e enviado ao GitHub. **Ainda pendente:** validação interativa — abrir o jogo, ouvir as categorias de som e conferir fontes/ícones na tela; confirmação da titularidade do aviso MIT antes de considerar a versão final.
 
 ## Objetivo e regra definida
 
@@ -36,7 +36,7 @@ Fonte de inventário: `THIRD_PARTY_LICENSES/manifest.csv` (39 registros). Os nom
 - `sounds/shoot/`: `shootArtillery.ogg`, `shootArtillerySap.ogg`, `shootArtillerySapBig.ogg`, `shootArtillerySmall.ogg`, `shootCyclone.ogg`, `shootDisperse.ogg`, `shootHorizon.ogg`, `shootReign.ogg`, `shootRipple.ogg`, `shootScatter.ogg`, `shootScepter.ogg`.
 - `sounds/ui/`: `waveSpawn.ogg`.
 
-**Nota:** os outros 166 sons, conforme o manifesto, aparecem como GPL-3.0-or-later e não devem ser tocados por esta migração. Antes de qualquer substituição, confirmar que arquivo, licença, atribuição e comportamento em jogo correspondem ao manifesto.
+**Nota:** no manifesto inicial os outros 166 sons apareciam como GPL-3.0-or-later e não deveriam ser tocados por esta migração. Após corrigir a regra por caminho do efeito de Iwan "qubodup" Gabovitch, o inventário atual é **165 GPL-3.0-or-later + 1 domínio público**, além dos 39 sons migrados para MIT.
 
 ## Pesquisa preliminar e recomendações
 
@@ -77,23 +77,22 @@ O manifesto declara um glifo Font Awesome sob CC BY 4.0 e um Entypo sob CC BY-SA
 3. Gerados os 39 WAVs de forma determinística em Python puro, sem usar amostras ou bibliotecas de áudio de terceiros.
 4. Movidos os OGGs CC0 anteriores para a área local ignorada de staging e instalados os WAVs originais nos mesmos diretórios, com extensão compatível com o decoder WAV de Arc.
 5. Atualizados licença MIT, regras, manifesto, créditos, avisos, suporte de carregamento e documentação.
-6. Verificada a consistência do inventário em memória: 39 sons MIT; 0 sons CC0; 166 sons GPL preservados; validação retornou 0.
-7. Pendente: compilar/testar o jogo, verificar audivelmente cada categoria em contexto, atualizar/reconstruir o pacote de distribuição e revisar o diff antes do commit.
+6. Verificada a consistência do inventário: 39 sons MIT; 0 sons CC0; 165 sons GPL-3.0-or-later e 1 em domínio público preservados; `audit_assets.py --check` retornou 0 sem regravar o manifesto.
+7. Concluído: compilação (`./gradlew build -x test`), empacotamento, commits, push e release público v1.0.0. **Pendente:** abrir o jogo e ouvir as categorias de som em sessão interativa.
 
 ## Critérios de aceite e estado
 
 - [x] Os 39 sons substitutos são gerados localmente sem amostras de terceiros e têm licença MIT registrada.
-- [x] Nenhum dos 166 sons GPL-3.0-or-later foi alterado.
+- [x] Nenhum dos 165 sons GPL-3.0-or-later nem o efeito em domínio público foi alterado.
 - [x] O usuário aprovou as amostras representativas antes da substituição.
 - [x] O manifesto registra 39 sons MIT e nenhum CC0; a auditoria retornou código 0.
 - [x] Fontes/ícones MIT já existentes têm seus textos de licença referenciados na documentação.
-- [ ] Compilação/teste do jogo e audição dentro do jogo.
-- [ ] Atualização e revisão do pacote final de distribuição.
-- [ ] Revisão do diff e commit.
+- [x] Compilação concluída e pacote final publicado no release v1.0.0 (zip + `.sha256`); diff revisado, commits e push realizados.
+- [ ] Abrir o jogo e ouvir os novos sons em sessão interativa; conferir fontes e ícones na tela.
 
 ## Pendências
 
-Não se decidiu uniformizar para MIT os glifos CC BY 4.0/CC BY-SA 4.0 atualmente declarados compatíveis com GPLv3. A titularidade e a validade legal do aviso MIT das gravações/sínteses precisam ser confirmadas pelo responsável pelo projeto antes de distribuir uma versão final; este documento não é parecer jurídico.
+Não se decidiu uniformizar para MIT os glifos CC BY 4.0/CC BY-SA 4.0 atualmente declarados compatíveis com GPLv3. A titularidade e a validade legal do aviso MIT das sínteses precisam ser confirmadas pelo responsável pelo projeto antes de considerar a versão final; o release público **v1.0.0** já existe e declara que pode conter bugs. Este documento não é parecer jurídico.
 
 ## Limites desta pesquisa
 

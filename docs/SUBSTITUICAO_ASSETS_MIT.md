@@ -21,7 +21,9 @@ um equivalente MIT.**
 Permanecem sem alteração:
 
 - código, música, sprites, mapas, shaders e traduções — GPLv3;
-- sons CC0 e de domínio público já documentados;
+- sons GPL-3.0-or-later e o arquivo em domínio público — preservados. Os 39
+  sons antes declarados CC0 foram migrados para WAV originais sob MIT em
+  `docs/PROPOSTA_MIT_ASSETS.md`;
 - Font Awesome — CC BY 4.0 (compatível com GPLv3);
 - Entypo — CC BY-SA 4.0 (compatível com GPLv3);
 - Iconic, Elusive e MFG Labs — SIL OFL 1.1;
@@ -121,14 +123,15 @@ desenho do glifo muda.
 
 ## 5. Critérios de aceite
 
-- [ ] Nenhuma referência a CC BY-SA 3.0 em fontes ou ícones do jogo.
-- [ ] `tech.ttf` com metadados e licença MIT.
-- [ ] 29 glifos substituídos em `icon.ttf` e `font.woff`.
-- [ ] Nomes e códigos de ícones inalterados.
-- [ ] Manifesto sem `REVISAR`.
-- [ ] `audit_assets.py --check` retorna 0.
-- [ ] Jogo compila, abre e exibe os ícones e a fonte `tech` corretamente.
-- [ ] Deploy contém os novos textos de licença.
+- [x] Nenhuma referência a CC BY-SA 3.0 em fontes ou ícones do jogo (manifesto).
+- [x] `tech.ttf` substituída por Cozette Vector, com licença MIT registrada.
+- [x] 29 glifos substituídos em `icon.ttf` e `font.woff` por Bootstrap Icons (MIT).
+- [x] Nomes e códigos de ícones inalterados.
+- [x] Manifesto sem `REVISAR`.
+- [x] `audit_assets.py --check` retorna 0 sem regravar o manifesto.
+- [x] Compilação concluída (`./gradlew build -x test`, BUILD SUCCESSFUL).
+- [x] Deploy contém os 11 textos de licença.
+- [ ] Abrir o jogo em sessão interativa e conferir ícones e fonte `tech`.
 
 ---
 
@@ -142,7 +145,8 @@ desenho do glifo muda.
 | Substituição dos 29 glifos | Aplicada; validação visual pendente |
 | Atualização de configuração e licenças | Aplicada |
 | Manifesto e validação automática | Atualizado; auditoria local passou |
-| Build e teste | Em validação |
-| Atualização do deploy | Pendente; não aplicada nesta etapa |
-| Commit | Pendente |
-| Push | Não solicitado |
+| Build | Concluído (`./gradlew build -x test`, BUILD SUCCESSFUL); testes não executados |
+| Atualização do deploy | Aplicada: 6 documentos e 11 textos de licença sincronizados localmente |
+| Commit | Concluído (`6459a03b3d` e seguintes) |
+| Push / release | Concluído: `origin/master` atualizado e release público v1.0.0 publicado |
+| Validação interativa | Pendente: abrir o jogo e conferir ícones/fonte/áudio |

@@ -63,7 +63,8 @@ Detalhes completos, arquivos afetados e links:
 
 > **Auditoria de novembro de 2026:** as 39 mídias sonoras antes declaradas CC0
 > foram substituídas por novos arquivos WAV sintetizados para o Orbital e
-> distribuídos sob MIT. Os 166 sons GPL-3.0-or-later foram preservados. A fonte
+> distribuídos sob MIT. Os 165 sons GPL-3.0-or-later e o som em domínio público
+> foram preservados. A fonte
 > `tech.ttf` e os glifos de ícones incompatíveis também foram substituídos por
 > equivalentes MIT (Cozette e Bootstrap Icons). O inventário completo está em
 > `manifest.csv` e pode ser validado sem regravá-lo com

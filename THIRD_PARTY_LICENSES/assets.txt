@@ -8,8 +8,9 @@ RESUMO
 - Codigo-fonte e recursos originais do Mindustry/Orbital: GPLv3.
 - Musica (core/assets/music): integralmente de Anuken -> GPLv3.
 - Sprites, mapas, shaders, cubemaps e traducoes: GPLv3.
-- Efeitos sonoros: 166 arquivos GPL-3.0-or-later e 39 WAV originais do Orbital
-  sob MIT. Consulte o manifesto; a GPLv3 nao relicencia materiais externos.
+- Efeitos sonoros: 165 arquivos OGG GPL-3.0-or-later, 1 arquivo OGG em dominio
+  publico e 39 WAV originais do Orbital sob MIT (205 no total). Consulte o
+  manifesto; a GPLv3 nao relicencia materiais externos.
 - Fontes: Noto Sans JP e Fira Code (SIL OFL 1.1), Cozette e ProggyCleanTT (MIT)
   e a fonte de icones Fontello (varios conjuntos, cada um com sua licenca).
 - Icones: Font Awesome, Bootstrap Icons, Entypo, Zocial, Iconic, Elusive,

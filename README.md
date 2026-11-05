@@ -223,9 +223,9 @@ Os assets também têm origens distintas:
 
 - **Música:** todas as 16 faixas são de Anuken e estão sob GPLv3.
 - **Sprites, mapas, shaders e traduções:** GPLv3.
-- **Efeitos sonoros:** 165 arquivos GPL-3.0-or-later de Anuken e colaboradores,
-  39 WAV sintetizados para o Orbital sob MIT e um arquivo em domínio público.
-  Consulte o manifesto arquivo por arquivo.
+- **Efeitos sonoros:** 165 arquivos OGG GPL-3.0-or-later de Anuken e
+  colaboradores, 39 WAV originais sintetizados para o Orbital sob MIT e 1 OGG
+  em domínio público (205 no total). Consulte o manifesto arquivo por arquivo.
 - **Fontes:** Noto Sans JP e Fira Code (SIL OFL 1.1), Cozette e ProggyCleanTT
   (MIT) e a fonte de ícones Fontello/Bootstrap Icons.
 - **Ícones:** Font Awesome, Bootstrap Icons, Entypo, Zocial, Iconic, Elusive,
