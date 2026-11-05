@@ -114,9 +114,8 @@ public class MenuFragment{
         parent.fill((x, y, w, h) -> {
             TextureRegion logo = Core.atlas.find("logo");
             float width = Core.graphics.getWidth(), height = Core.graphics.getHeight() - Core.scene.marginTop;
-            float logoscl = Scl.scl(1) * logo.scale;
-            float logow = Math.min(logo.width * logoscl, Core.graphics.getWidth() - Scl.scl(20));
-            float logoh = logow * (float)logo.height / logo.width;
+            float logow = logoWidth();
+            float logoh = logoHeight();
 
             float fx = (int)(width / 2f);
             float fy = (int)(height - 6 - logoh) + logoh / 2 - (Core.graphics.isPortrait() ? Scl.scl(30f) : 0f);
@@ -128,32 +127,57 @@ public class MenuFragment{
             Draw.rect(logo, fx, fy, logow, logoh);
 
             Fonts.outline.setColor(Color.white);
-            Fonts.outline.draw(versionText, fx, fy - logoh/2f - Scl.scl(2f), Align.center);
+            Fonts.outline.draw(versionText, fx, fy - logoh/2f - Scl.scl(7f), Align.center);
         }).touchable = Touchable.disabled;
 
         //Atribuição resumida no menu principal, logo abaixo do logo/versão.
         parent.fill(t -> {
             t.top();
             t.touchable = Touchable.childrenOnly;
-            TextureRegion logo = Core.atlas.find("logo");
-            float logoscl = Scl.scl(1) * logo.scale;
-            float logow = Math.min(logo.width * logoscl, Core.graphics.getWidth() - Scl.scl(20));
-            float logoh = logow * (float)logo.height / logo.width;
-            float topOffset = logoh + Scl.scl(Core.graphics.isPortrait() ? 44f : 20f);
+            float logoh = logoHeight();
+            float topOffset = logoh + Scl.scl(Core.graphics.isPortrait() ? 58f : 38f);
             float maxWidth = Math.min(Core.graphics.getWidth() - Scl.scl(24f), Scl.scl(620f));
 
             t.table(banner -> {
                 banner.margin(2f);
-                banner.add(Core.bundle.get("menu.attribution.title"))
-                    .style(Styles.outlineLabel).fontScale(0.9f).width(maxWidth).wrap().center().row();
-                banner.add(Core.bundle.get("menu.attribution.disclaimer"))
-                    .style(Styles.outlineLabel).fontScale(0.75f).color(Color.lightGray)
-                    .width(maxWidth).wrap().center().padTop(1f).row();
+
+                //Labels are created and sized up front so their wrapped height is known before the table lays out the rows.
+                Label title = new Label(Core.bundle.get("menu.attribution.title"), Styles.outlineLabel);
+                title.setFontScale(0.9f);
+                title.setWrap(true);
+                title.setAlignment(Align.center);
+                title.setWidth(maxWidth);
+
+                Label disclaimer = new Label(Core.bundle.get("menu.attribution.disclaimer"), Styles.outlineLabel);
+                disclaimer.setFontScale(0.75f);
+                disclaimer.setWrap(true);
+                disclaimer.setAlignment(Align.center);
+                disclaimer.setColor(Color.lightGray);
+                disclaimer.setWidth(maxWidth);
+
+                banner.add(title).width(maxWidth).center().row();
+                banner.add(disclaimer).width(maxWidth).center().padTop(7f).row();
                 banner.button(Core.bundle.get("menu.attribution.link"), Icon.link, Styles.cleart, () -> {
                     Core.app.openURI(Links.originalRepo);
-                }).fontScale(0.75f).height(30f).padTop(1f);
+                }).fontScale(0.75f).height(30f).padTop(6f);
             }).width(maxWidth).padTop(topOffset).center();
         });
+    }
+
+    /** Logo width in screen units, capped so the mark leaves room for the version and attribution on short windows. */
+    private float logoWidth(){
+        TextureRegion logo = Core.atlas.find("logo");
+        float width = Math.min(logo.width * Scl.scl(1) * logo.scale, Core.graphics.getWidth() - Scl.scl(20));
+        float maxHeight = (Core.graphics.getHeight() - Core.scene.marginTop) * 0.13f;
+        if(maxHeight > 0f){
+            width = Math.min(width, maxHeight * logo.width / logo.height);
+        }
+        return width;
+    }
+
+    private float logoHeight(){
+        TextureRegion logo = Core.atlas.find("logo");
+        return logoWidth() * logo.height / logo.width;
     }
 
     private void buildMobile(){
