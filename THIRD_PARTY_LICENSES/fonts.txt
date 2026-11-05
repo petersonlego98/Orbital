@@ -1,0 +1,50 @@
+FONTES DISTRIBUIDAS COM O ORBITAL
+================================================================================
+Este arquivo detalha a origem e a licenca das fontes em core/assets/fonts/.
+Nenhuma delas e relicenciada como GPLv3: cada uma mantem a sua licenca.
+
+1. font_jp.woff
+   Familia: Noto Sans JP Medium
+   Copyright: (c) 2014-2021 Adobe (http://www.adobe.com/), com Reserved Font
+   Name 'Source'.
+   Designers: Ryoko Nishizuka, Paul D. Hunt, Sandoll Communications,
+   Soo-young Jang, Joo-yeon Kang.
+   Licenca: SIL Open Font License, Version 1.1
+   Texto: THIRD_PARTY_LICENSES/OFL-1.1.txt
+   URL: https://scripts.sil.org/OFL
+
+2. monospace.woff
+   Familia: Fira Code Medium
+   Copyright: 2014-2021 The Fira Code Project Authors
+   (https://github.com/tonsky/FiraCode)
+   Designers: Carrois Corporate, Edenspiekermann AG, Nikita Prokopov.
+   Licenca: SIL Open Font License, Version 1.1
+   Texto: THIRD_PARTY_LICENSES/OFL-1.1.txt
+   URL: https://scripts.sil.org/OFL
+
+3. tech.ttf
+   Familia: Darktech LDR
+   Autor: Michal "Neoqueto" Nowak (2012)
+   Origem: http://fontstruct.com/fontstructions/show/715809
+   Licenca: Creative Commons Attribution-ShareAlike 3.0 Unported
+   (CC BY-SA 3.0)
+   URL: https://creativecommons.org/licenses/by-sa/3.0/
+
+4. logic.ttf
+   Familia: ProggyCleanTT
+   Autor: Tristan Grimmer (2004)
+   Licenca: MIT License
+   Texto: THIRD_PARTY_LICENSES/MIT-ProggyCleanTT.txt
+   URL: http://proggyfonts.net
+
+5. font.woff e icon.ttf
+   Fonte de icones gerada pelo Fontello (http://fontello.com).
+   Copyright (C) 2026 by original authors @ fontello.com.
+   Contem glifos de Font Awesome, Typicons, Zocial, Iconic, Entypo, Elusive,
+   MFG Labs, Brandico, ModernPics e 53 icones customizados.
+   Cada conjunto de icones mantem a sua licenca original. Consulte
+   THIRD_PARTY_LICENSES/assets.txt, secao 5, para a lista e as licencas.
+
+A redistribuicao do jogo deve manter este arquivo, o texto da OFL 1.1 e a
+atribuicao dos autores acima.
+================================================================================

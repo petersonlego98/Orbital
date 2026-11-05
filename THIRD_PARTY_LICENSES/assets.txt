@@ -1,19 +1,161 @@
 ASSETS AND MEDIA LICENSING
 ================================================================================
-All base sprites, sounds, music, UI icons, fonts and map assets are distributed
-as part of Orbital under the terms of the GNU General Public License v3.0
-(GPLv3), originally authored by Anuken and community artists, musicians,
-translators and contributors.
+Este arquivo descreve o licenciamento dos recursos visuais, sonoros e
+tipograficos distribuidos com o Orbital.
 
-Custom Orbital sprites, dorsal turret modules, sector artwork and other
-modifications are also distributed under GPLv3.
+RESUMO
+--------------------------------------------------------------------------------
+- Codigo-fonte e recursos originais do Mindustry/Orbital: GPLv3.
+- Musica (core/assets/music): integralmente de Anuken -> GPLv3.
+- Sprites, mapas, shaders, cubemaps e traducoes: GPLv3.
+- Efeitos sonoros: parte e de terceiros (Freesound, OpenGameArt, SoundJay e
+  outros), com licencas proprias. A GPLv3 NAO relicencia esses arquivos.
+- Fontes: Noto Sans JP e Fira Code (SIL OFL 1.1), Darktech LDR (CC BY-SA 3.0),
+  ProggyCleanTT (licenca permissiva) e a fonte de icones Fontello (varios
+  conjuntos, cada um com sua licenca).
+- Icones: Font Awesome, Typicons, Entypo, Zocial, Iconic, Elusive, MFG Labs,
+  Brandico, ModernPics e icones customizados.
 
-Some fonts, icons or sounds may originate from third-party projects with their
-own attribution requirements. Their use here does not remove those requirements.
-When redistributing the game, keep this file, CREDITS.md and NOTICE.txt together
-with the assets, and preserve the attribution to the original authors.
+Nenhuma licenca de terceiro e substituida pela GPLv3. Quando este arquivo diz
+que um recurso e "GPLv3", isso significa que ele foi criado por Anuken ou por
+colaboradores do Mindustry/Orbital e distribuido como parte do projeto sob a
+GPLv3.
 
-If you believe an asset has been credited incorrectly, please open an issue in
-the fork repository:
+================================================================================
+1. MUSICA - GPLv3
+================================================================================
+Todas as 16 faixas em core/assets/music/ foram compostas por Anuken
+(desenvolvedor do Mindustry) e fazem parte do repositorio original:
+
+  boss1.ogg   boss2.ogg   editor.ogg  fine.ogg    game1.ogg   game2.ogg
+  game3.ogg   game4.ogg   game5.ogg   game6.ogg   game7.ogg   game8.ogg
+  game9.ogg   land.ogg    launch.ogg  menu.ogg
+
+Os arquivos foram produzidos em LMMS (informacao presente nos metadados) e nao
+possuem tag de artista. Nao foi encontrado nenhum indicio de musica de terceiros
+no projeto. Licenca: GNU GPLv3, como parte do Mindustry.
+
+================================================================================
+2. SPRITES, ARTE, MAPAS, SHADERS, CUBEMAPS E TRADUCOES - GPLv3
+================================================================================
+Sprites, icones de interface, mapas, shaders, cubemaps e os arquivos de traducao
+(bundles) sao contribuicoes de Anuken e da comunidade do Mindustry, mantidas no
+repositorio original sob GPLv3. As contribuicoes proprias do Orbital (logo,
+modulos dorsais, setores, etc.) tambem sao distribuidas sob GPLv3.
+
+Os nomes de tradutores e colaboradores estao em core/assets/contributors.
+
+================================================================================
+3. EFEITOS SONOROS - LICENCAS DE TERCEIROS
+================================================================================
+Existem 205 arquivos de som em core/assets/sounds/. A maior parte e de
+Anuken/comunidade (GPLv3), mas os conjuntos abaixo vieram de terceiros e NAO
+sao relicenciados como GPLv3. Cada arquivo conserva a licenca da fonte
+original.
+
+3.1 Freesound.org
+    - jalastram (Jesus Lastra)
+    - newlocknew
+    - dsmolenaers
+    - Headphaze
+    Arquivos incluem os sons de clima (rain, wind, wind2, windHowl) e parte dos
+    lasers, explosões e loops adicionados em 2020.
+    Licenca: Creative Commons, conforme a pagina de cada som (CC0, CC BY ou
+    CC BY-SA). A licenca exata varia por arquivo e deve ser confirmada na
+    pagina original antes de qualquer redistribuicao isolada.
+    Perfis: https://freesound.org/people/jalastram/
+            https://freesound.org/people/newlocknew/
+            https://freesound.org/people/dsmolenaers/
+            https://freesound.org/people/Headphaze/
+
+3.2 OpenGameArt.org
+    - Michel Baradari
+    - Michael Klier
+    - Lee Barkovich
+    Arquivos incluem sons de torretas de Erekir (2022) e o conjunto "More
+    sounds" (2025).
+    Licenca: Creative Commons, conforme a pagina de cada envio (CC0, CC BY ou
+    CC BY-SA). Confirme na pagina original.
+    Site: https://opengameart.org
+
+3.3 Outros autores identificados nos metadados dos arquivos
+    Estes nomes aparecem nas tags dos proprios .ogg e precisam de verificacao
+    individual na fonte:
+
+    - rubberduck (OpenGameArt/Freesound) - grande parte dos sons de blocos,
+      explosoes, loops e passos. O conjunto "100 CC0 SFX" de rubberduck e CC0.
+      https://opengameart.org/content/100-cc0-sfx
+    - Iwan "qubodup" Gabovitch - "Synthetic explosion 1" (dominio publico) e
+      "Dark Magic Loop" (mix de sons CC0).
+      https://freesound.org/people/qubodup/
+    - Gregor Quendel / Designed Mecha - coreLand.ogg e coreLaunch.ogg
+      ("SCIEnrg_Elements Power 02", "SCIMech_Elements Gear 01").
+      https://freesound.org/people/GregorQuendel/
+    - Joseph Krebs - "018 Falling Rocks" (drillImpact.ogg).
+    - Jesus Lastra - "Shooting_Sounds_008" (shootLaser.ogg, shootSegment.ogg).
+    - SoundJay.com - environment/rain.ogg.
+      Termos: https://www.soundjay.com/tos.html
+
+    ATENCAO: os termos do SoundJay permitem usar os sons em projetos, mas
+    proibem redistribuir os arquivos como sons isolados. Isso e incompativel
+    com a GPLv3 e com a redistribuicao do arquivo-fonte do jogo. Recomenda-se
+    substituir environment/rain.ogg por um som CC0 antes de publicar uma
+    versao que se pretenda integralmente GPLv3.
+
+3.4 Sons restantes
+    Os demais arquivos foram criados por Anuken ou por colaboradores do
+    Mindustry e sao distribuidos sob GPLv3.
+
+================================================================================
+4. FONTES - LICENCAS DE TERCEIROS
+================================================================================
+Consulte tambem THIRD_PARTY_LICENSES/fonts.txt.
+
+  font_jp.woff    Noto Sans JP Medium (Adobe)          SIL OFL 1.1
+  monospace.woff  Fira Code Medium                     SIL OFL 1.1
+  tech.ttf        Darktech LDR, Michal "Neoqueto" Nowak CC BY-SA 3.0
+  logic.ttf       ProggyCleanTT, Tristan Grimmer       MIT
+  font.woff       fonte de icones gerada pelo Fontello varios conjuntos
+  icon.ttf        fonte de icones gerada pelo Fontello varios conjuntos
+
+O texto da SIL OFL 1.1 esta em THIRD_PARTY_LICENSES/OFL-1.1.txt.
+
+================================================================================
+5. ICONES - LICENCAS DE TERCEIROS
+================================================================================
+core/assets-raw/fontgen/config.json gera font.woff/icon.ttf a partir de 138
+glifos. As origens declaradas sao:
+
+  custom_icons (53)  icones proprios do Mindustry/Orbital
+  fontawesome  (46)  Font Awesome - fonte OFL 1.1 / icones CC BY 4.0
+  typicons     (27)  Typicons - CC BY-SA 3.0
+  zocial        (3)  Zocial - MIT
+  iconic        (2)  Iconic - SIL OFL 1.1
+  entypo        (2)  Entypo - CC BY-SA 4.0
+  elusive       (2)  Elusive - SIL OFL 1.1
+  mfglabs       (1)  MFG Labs - SIL OFL 1.1
+  brandico      (1)  Brandico - licenca do projeto de origem
+  modernpics    (1)  ModernPics - licenca do projeto de origem
+
+Cada conjunto mantem a sua licenca original; a compilacao em uma unica fonte
+nao as converte para GPLv3. Consulte http://fontello.com e os repositorios de
+cada conjunto para o texto exato.
+
+Os arquivos core/assets/icons/icon.png e icon.icns sao o icone do jogo,
+derivado do Mindustry e distribuido sob GPLv3.
+
+================================================================================
+6. NOTAS SOBRE A GPLv3
+================================================================================
+A GPLv3 cobre o codigo e os recursos originais do projeto. Ela nao relicencia
+automaticamente material de terceiros que tenha licenca propria. Ao
+redistribuir o Orbital:
+
+- mantenha LICENSE, NOTICE.txt, CREDITS.md e esta pasta;
+- preserve a atribuicao de cada autor listado acima;
+- mantenha os textos de OFL 1.1 e os links das licencas Creative Commons;
+- nao remova avisos de copyright dos arquivos de terceiros.
+
+Se voce acredita que algum recurso foi creditado incorretamente, abra uma issue:
 https://github.com/petersonlego98/Orbital/issues
 ================================================================================

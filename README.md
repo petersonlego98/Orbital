@@ -57,10 +57,13 @@ Orbital é um fork do [Mindustry](https://github.com/Anuken/Mindustry),
 criado originalmente por **Anuken** e desenvolvido por centenas de
 colaboradores da comunidade.
 
-- O código original e os recursos do Mindustry são distribuídos sob a
+- O código original e os recursos originais do Mindustry são distribuídos sob a
   **GNU General Public License v3.0 (GPLv3)**.
-- Orbital mantém a mesma licença e preserva os créditos e avisos do projeto
-  original.
+- Orbital mantém a mesma licença para o código e para os recursos próprios, e
+  preserva os créditos e avisos do projeto original.
+- Alguns efeitos sonoros, fontes e ícones de terceiros mantêm as suas próprias
+  licenças (Creative Commons, SIL OFL e termos específicos) e não são
+  relicenciados pela GPLv3. Veja `THIRD_PARTY_LICENSES/assets.txt`.
 - Este fork **não é afiliado, patrocinado ou endossado por Anuken**.
 
 Consulte [CREDITS.md](CREDITS.md) para os créditos completos.
@@ -177,10 +180,24 @@ O código-fonte correspondente deste fork está disponível em:
 O projeto utiliza bibliotecas de terceiros com licenças próprias, incluindo
 Arc, Rhino, LWJGL, FreeType, lz4-java, Steamworks4j, JLine e o backend SDL.
 
+Os assets também têm origens distintas:
+
+- **Música:** todas as 16 faixas são de Anuken e estão sob GPLv3.
+- **Sprites, mapas, shaders e traduções:** GPLv3.
+- **Efeitos sonoros:** em parte de terceiros (Freesound, OpenGameArt, SoundJay
+  e outros), com licenças Creative Commons ou termos próprios.
+- **Fontes:** Noto Sans JP e Fira Code (SIL OFL 1.1), Darktech LDR (CC BY-SA
+  3.0), ProggyCleanTT (MIT) e a fonte de ícones Fontello.
+- **Ícones:** Font Awesome, Typicons, Entypo, Zocial, Iconic, Elusive, MFG
+  Labs, Brandico, ModernPics e ícones próprios.
+
 Consulte:
 
 - [THIRD_PARTY_LICENSES/libraries.txt](THIRD_PARTY_LICENSES/libraries.txt)
 - [THIRD_PARTY_LICENSES/assets.txt](THIRD_PARTY_LICENSES/assets.txt)
+- [THIRD_PARTY_LICENSES/fonts.txt](THIRD_PARTY_LICENSES/fonts.txt)
+- [THIRD_PARTY_LICENSES/creative-commons.txt](THIRD_PARTY_LICENSES/creative-commons.txt)
+- [THIRD_PARTY_LICENSES/OFL-1.1.txt](THIRD_PARTY_LICENSES/OFL-1.1.txt)
 
 ### Sem garantia
 
@@ -215,7 +232,8 @@ Contribuições são bem-vindas. Antes de abrir uma issue ou pull request:
 1. Verifique se a proposta está alinhada com a visão de jogo em
    `docs/VISAO_DE_JOGO_ORBITAL.md`.
 2. Preserve os créditos e avisos de licença existentes.
-3. Mantenha o código e os assets sob GPLv3.
+3. Mantenha o código e os assets próprios sob GPLv3 e preserve as licenças e
+   atribuições dos recursos de terceiros.
 4. Descreva claramente o problema ou a funcionalidade proposta.
 
 Para bugs, inclua versão, sistema operacional, passos para reproduzir e, se

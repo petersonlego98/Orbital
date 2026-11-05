@@ -1,0 +1,38 @@
+CREATIVE COMMONS LICENSES REFERENCED BY ORBITAL ASSETS
+================================================================================
+Some assets shipped with Orbital are licensed under Creative Commons terms.
+Orbital does not relicense those assets, and the GPLv3 does not replace their
+original terms.
+
+The complete, authoritative legal texts are available at:
+
+  CC0 1.0 Universal (public domain dedication)
+    https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+  CC BY 4.0 (Attribution)
+    https://creativecommons.org/licenses/by/4.0/legalcode
+
+  CC BY 3.0 (Attribution)
+    https://creativecommons.org/licenses/by/3.0/legalcode
+
+  CC BY-SA 3.0 (Attribution-ShareAlike)
+    https://creativecommons.org/licenses/by-sa/3.0/legalcode
+
+  CC BY-SA 4.0 (Attribution-ShareAlike)
+    https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+Summary of obligations:
+
+  CC0        No conditions. Attribution is appreciated but not required.
+  CC BY      Credit the author, provide a link to the license, and indicate
+             whether changes were made.
+  CC BY-SA   Same as CC BY, and derivative works must be shared under the same
+             license (or a compatible one).
+
+Which license applies to which asset is listed in:
+  - THIRD_PARTY_LICENSES/assets.txt
+  - THIRD_PARTY_LICENSES/fonts.txt
+
+When redistributing the game, keep this file, the attribution notices and the
+links above together with the assets.
+================================================================================

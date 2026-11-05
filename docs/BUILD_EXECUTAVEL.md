@@ -78,7 +78,11 @@ Orbital/
 ├── THIRD_PARTY_LICENSES/
 │   ├── GPL-3.0.txt
 │   ├── libraries.txt
-│   └── assets.txt
+│   ├── assets.txt
+│   ├── fonts.txt
+│   ├── creative-commons.txt
+│   ├── OFL-1.1.txt
+│   └── MIT-ProggyCleanTT.txt
 ├── CREDITS.md
 ├── NOTICE.txt
 └── Orbital.exe
@@ -126,4 +130,6 @@ Antes de publicar qualquer binário, confirme que:
 - [ ] `CREDITS.md` credita Anuken, a comunidade original e os colaboradores do fork.
 - [ ] `NOTICE.txt` informa onde o código-fonte correspondente pode ser obtido.
 - [ ] `THIRD_PARTY_LICENSES/libraries.txt` e `assets.txt` acompanham a instalação.
+- [ ] `THIRD_PARTY_LICENSES/fonts.txt`, `creative-commons.txt`, `OFL-1.1.txt` e
+      `MIT-ProggyCleanTT.txt` acompanham a instalação.
 - [ ] O código-fonte correspondente à versão publicada está acessível no repositório do fork.

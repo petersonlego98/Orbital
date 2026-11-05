@@ -9,6 +9,12 @@ Código-fonte original: https://github.com/Anuken/Mindustry
 Licenciado sob os termos da GNU General Public License v3.0 (GPLv3).
 Veja o arquivo LICENSE e o diretório THIRD_PARTY_LICENSES/ para detalhes.
 
+O código e os recursos originais do projeto estão sob GPLv3. A trilha sonora
+também é de Anuken e está sob GPLv3. Alguns efeitos sonoros, fontes e ícones
+mantêm licenças de terceiros (Creative Commons, SIL OFL e termos próprios) e
+não são relicenciados pela GPLv3. Consulte THIRD_PARTY_LICENSES/assets.txt,
+fonts.txt, creative-commons.txt e OFL-1.1.txt.
+
 Código-fonte correspondente deste fork:
 https://github.com/petersonlego98/Orbital
 
