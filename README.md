@@ -12,8 +12,28 @@ expedições de combate e mineração em tempo real.
 O projeto preserva a base de automação, construção, mapas, mods e multiplayer
 herdada do Mindustry, mas desenvolve uma identidade e uma experiência próprias.
 
-> **Estado atual:** protótipo jogável em desenvolvimento. Mecânicas, conteúdo e
-> balanceamento podem mudar sem aviso.
+> **Estado atual:** protótipo jogável em desenvolvimento, com a **versão
+> instalável v1.0.0 para Windows** já publicada. Mecânicas, conteúdo e
+> balanceamento podem mudar sem aviso, e a build **pode conter bugs**.
+
+---
+
+## Versão instalável (Windows)
+
+O release **[v1.0.0](https://github.com/petersonlego98/Orbital/releases/tag/v1.0.0)**
+distribui `Orbital-1.0-win64-usuario.zip` com o instalador por usuário, que
+**não exige permissão de administrador**, e o JRE 21 embutido.
+
+1. Baixe o zip e confira a integridade com o arquivo `.sha256`.
+2. Extraia mantendo `OrbitalSetup.exe` e a pasta `payload/` **juntos**.
+3. Execute `OrbitalSetup.exe`.
+
+> ⚠️ **Esta versão pode conter bugs.**
+
+A instalação vai para `%LOCALAPPDATA%\Programs\Orbital`, cria o atalho na Área
+de Trabalho e registra o desinstalador em *Aplicativos e recursos*. O
+`Uninstall.exe` também funciona com duplo clique. Detalhes, limitações e
+validação em [docs/INSTALADOR_SEM_ADMIN.md](docs/INSTALADOR_SEM_ADMIN.md).
 
 ---
 
@@ -61,9 +81,9 @@ colaboradores da comunidade.
   **GNU General Public License v3.0 (GPLv3)**.
 - Orbital mantém a mesma licença para o código e para os recursos próprios, e
   preserva os créditos e avisos do projeto original.
-- Alguns efeitos sonoros, fontes e ícones de terceiros mantêm as suas próprias
-  licenças (Creative Commons, SIL OFL e termos específicos) e não são
-  relicenciados pela GPLv3. Veja `THIRD_PARTY_LICENSES/assets.txt`.
+- Efeitos sonoros, fontes e ícones mantêm licenças próprias (**MIT**,
+  Creative Commons, SIL OFL e termos específicos) e não são relicenciados pela
+  GPLv3. Veja `THIRD_PARTY_LICENSES/assets.txt`.
 - Este fork **não é afiliado, patrocinado ou endossado por Anuken**.
 
 Consulte [CREDITS.md](CREDITS.md) para os créditos completos.
@@ -113,6 +133,18 @@ O arquivo é gerado em `desktop/build/libs/Orbital.jar`.
 O processo completo com `jpackage` e a cópia dos arquivos legais está descrito
 em [docs/BUILD_EXECUTAVEL.md](docs/BUILD_EXECUTAVEL.md).
 
+### Gerar o instalador por usuário (Windows)
+
+```bash
+bash installer/build.sh
+```
+
+O comando produz `build/installer/OrbitalSetup.exe` e
+`build/installer/payload/`; os dois devem ser distribuídos juntos. Neste
+ambiente o build usa MinGW-w64 `g++`/`windres` — exceção autorizada à regra do
+`cl.exe`, documentada em
+[docs/INSTALADOR_SEM_ADMIN.md](docs/INSTALADOR_SEM_ADMIN.md).
+
 ### Rodar os testes
 
 ```powershell
@@ -130,6 +162,7 @@ em [docs/BUILD_EXECUTAVEL.md](docs/BUILD_EXECUTAVEL.md).
 | `server/` | Servidor dedicado. |
 | `tests/` | Testes automatizados. |
 | `tools/` | Ferramentas de build e geração de assets. |
+| `installer/` | Fonte e script de build do instalador por usuário para Windows. |
 | `annotations/` | Processadores de anotação usados na compilação. |
 | `docs/` | Visão de jogo, relatórios de design e guias de build. |
 | `THIRD_PARTY_LICENSES/` | Licenças de bibliotecas e recursos de terceiros. |
@@ -141,6 +174,7 @@ Os documentos de design ficam em:
 - [Torres como módulos](docs/RELATORIO_TORRES_COMO_MODULOS.md)
 - [Unidades de Orbital](docs/RELATORIO_UNIDADES_ORBITAL.md)
 - [Licenciamento de assets](docs/LICENCIAMENTO_ASSETS.md)
+- [Guia de compilação do executável](docs/BUILD_EXECUTAVEL.md)
 - [Auditoria de licenças (novembro de 2026)](docs/auditoria-licencas-2026-11.md)
 - [Substituição de assets incompatíveis por MIT](docs/SUBSTITUICAO_ASSETS_MIT.md)
 - [Migração dos efeitos sonoros para MIT](docs/PROPOSTA_MIT_ASSETS.md)
@@ -237,6 +271,9 @@ Créditos detalhados: [CREDITS.md](CREDITS.md).
 ## Links
 
 - **Repositório do Orbital:** https://github.com/petersonlego98/Orbital
+- **Releases e versão instalável:** https://github.com/petersonlego98/Orbital/releases
+- **Release v1.0.0 (Windows):** https://github.com/petersonlego98/Orbital/releases/tag/v1.0.0
+- **Issues:** https://github.com/petersonlego98/Orbital/issues
 - **Repositório original do Mindustry:** https://github.com/Anuken/Mindustry
 - **Licença GPLv3:** https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -253,5 +290,6 @@ Contribuições são bem-vindas. Antes de abrir uma issue ou pull request:
    atribuições dos recursos de terceiros.
 4. Descreva claramente o problema ou a funcionalidade proposta.
 
-Para bugs, inclua versão, sistema operacional, passos para reproduzir e, se
-possível, o log da sessão.
+Para bugs, abra uma [issue](https://github.com/petersonlego98/Orbital/issues)
+incluindo versão, sistema operacional, passos para reproduzir e, se possível,
+o log da sessão.
