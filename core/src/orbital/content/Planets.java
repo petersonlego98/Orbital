@@ -12,6 +12,7 @@ import orbital.graphics.*;
 import orbital.graphics.g3d.*;
 import orbital.graphics.g3d.PlanetGrid.*;
 import orbital.maps.planet.*;
+import orbital.maps.generators.QuatiaPlanetGenerator;
 import orbital.type.*;
 import orbital.world.*;
 import orbital.world.meta.*;
@@ -217,19 +218,22 @@ public class Planets{
     }
 
     /**
-     * Creates the first procedural planet of Orbital: a non-playable body that orbits the sun and
-     * is visible/clickable in the star map. It has no generator or sectors yet, so there is no
-     * landing or campaign on it in this stage.
+     * Creates Orbital's first playable colony. Quatia remains a single-sector planet for the
+     * production prototype, while later versions can add more sectors and local environments.
      */
     private static void createOrigin(){
         String generated = PlanetNames.generate(originKey, 3);
         String internal = generated.toLowerCase(Locale.ROOT);
 
         qatia = new Planet(internal, sun, 1.1f){{
-            //no campaign, sectors or landing yet: map-only body
-            generator = null;
-            sectors.clear();
+            generator = new QuatiaPlanetGenerator();
+            sectors.add(new Sector(this, Ptile.empty));
+            defaultCore = Blocks.coreShard;
+            startSector = 0;
+            alwaysUnlocked = true;
+            accessible = true;
             visible = true;
+            mapView = false;
             drawOrbit = true;
 
             //orbit close to the sun, so both bodies fit in a top-down view
@@ -258,6 +262,11 @@ public class Planets{
             updateLighting = true;
             defaultEnv = Env.terrestrial;
             allowLaunchToNumbered = false;
+            ruleSetter = rules -> {
+                rules.waveTeam = Team.crux;
+                rules.waves = false;
+                rules.attackMode = false;
+            };
         }};
     }
 

@@ -50,6 +50,15 @@ tasks.register('dist', Jar){
     exclude("**hs_err**.log")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
+    //GPLv3 notices and credits are also embedded in the jar for reference.
+    from(rootProject.projectDir){
+        include "LICENSE"
+        include "CREDITS.md"
+        include "NOTICE.txt"
+        include "THIRD_PARTY_LICENSES/**"
+        into "META-INF/legal"
+    }
+
     //don't include steam shared libraries unless necessary
     if(!versionModifier.contains("steam")){
         exclude("**steam**.so", "**steam**.dll", "**steam**.dylib")
@@ -187,6 +196,16 @@ platforms.each{ platform ->
                     }
                     into platform != "MacOS" ? "build/packr/output/" : "build/packr/output/${appName}.app/Contents/Resources"
                 }
+            }
+
+            //Ship the license, credits and third-party notices next to the game binary.
+            copy{
+                from rootProject.projectDir
+                into "build/packr/output"
+                include "LICENSE"
+                include "CREDITS.md"
+                include "NOTICE.txt"
+                include "THIRD_PARTY_LICENSES/**"
             }
 
             copy{

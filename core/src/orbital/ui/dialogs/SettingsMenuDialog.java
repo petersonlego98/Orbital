@@ -351,6 +351,7 @@ public class SettingsMenuDialog extends BaseDialog{
 
         menu.button("@settings.data", Icon.save, style, isize, () -> dataDialog.show()).marginLeft(marg).row();
         menu.button("@settings.dev", Icon.fileCode, style, isize, () -> visible(3)).marginLeft(marg).row();
+        menu.button("@about.button", Icon.info, style, isize, ui.about::show).marginLeft(marg).row();
 
         int i = 4;
         for(var cat : categories){

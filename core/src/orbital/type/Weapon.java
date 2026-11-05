@@ -170,6 +170,14 @@ public class Weapon implements Cloneable{
         this.name = name;
     }
 
+    /**
+     * @return true if this weapon occupies a turret/dorsal slot.
+     * Removable turret modules always qualify; native rotating weapons are treated as fixed turrets.
+     */
+    public boolean isTurretMount(){
+        return this instanceof TurretWeapon || rotate;
+    }
+
     public Weapon(){
         this("");
     }

@@ -3348,6 +3348,11 @@ public class Blocks{
             limitRange(5f);
         }};
 
+        //Default removable dorsal turrets (Duo) are no longer injected here.
+        //They are applied by TurretLoadouts.applyRemovableTurrets(), which runs from a
+        //ContentInitEvent handler (see orbital.Vars) AFTER mod content and JSON patches
+        //have been loaded, so mods that override a unit's weapons cannot wipe them.
+
         scatter = new ItemTurret("scatter"){{
             requirements(Category.turret, with(Items.copper, 85, Items.lead, 45));
             ammo(
@@ -6315,7 +6320,9 @@ public class Blocks{
             requirements(Category.units, with(Items.copper, 60, Items.lead, 70, Items.silicon, 60));
             plans = Seq.with(
                 new UnitPlan(UnitTypes.flare, 60f * 15, with(Items.silicon, 15)),
-                new UnitPlan(UnitTypes.mono, 60f * 35, with(Items.silicon, 30, Items.lead, 15))
+                new UnitPlan(UnitTypes.mono, 60f * 35, with(Items.silicon, 30, Items.lead, 15)),
+                new UnitPlan(UnitTypes.monoDuo, 60f * 35, with(Items.silicon, 35, Items.lead, 20)),
+                new UnitPlan(UnitTypes.flareDuo, 60f * 15, with(Items.silicon, 20))
             );
             size = 3;
             consumePower(1.2f);

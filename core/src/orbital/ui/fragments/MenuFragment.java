@@ -16,6 +16,7 @@ import arc.struct.*;
 import arc.util.*;
 import orbital.core.*;
 import orbital.game.EventType.*;
+import orbital.game.TestNewFeaturesMode;
 import orbital.gen.*;
 import orbital.graphics.*;
 import orbital.ui.*;
@@ -129,6 +130,30 @@ public class MenuFragment{
             Fonts.outline.setColor(Color.white);
             Fonts.outline.draw(versionText, fx, fy - logoh/2f - Scl.scl(2f), Align.center);
         }).touchable = Touchable.disabled;
+
+        //Atribuição resumida no menu principal, logo abaixo do logo/versão.
+        parent.fill(t -> {
+            t.top();
+            t.touchable = Touchable.childrenOnly;
+            TextureRegion logo = Core.atlas.find("logo");
+            float logoscl = Scl.scl(1) * logo.scale;
+            float logow = Math.min(logo.width * logoscl, Core.graphics.getWidth() - Scl.scl(20));
+            float logoh = logow * (float)logo.height / logo.width;
+            float topOffset = logoh + Scl.scl(Core.graphics.isPortrait() ? 44f : 20f);
+            float maxWidth = Math.min(Core.graphics.getWidth() - Scl.scl(24f), Scl.scl(620f));
+
+            t.table(banner -> {
+                banner.margin(2f);
+                banner.add(Core.bundle.get("menu.attribution.title"))
+                    .style(Styles.outlineLabel).fontScale(0.9f).width(maxWidth).wrap().center().row();
+                banner.add(Core.bundle.get("menu.attribution.disclaimer"))
+                    .style(Styles.outlineLabel).fontScale(0.75f).color(Color.lightGray)
+                    .width(maxWidth).wrap().center().padTop(1f).row();
+                banner.button(Core.bundle.get("menu.attribution.link"), Icon.link, Styles.cleart, () -> {
+                    Core.app.openURI(Links.originalRepo);
+                }).fontScale(0.75f).height(30f).padTop(1f);
+            }).width(maxWidth).padTop(topOffset).center();
+        });
     }
 
     private void buildMobile(){
@@ -142,6 +167,7 @@ public class MenuFragment{
         MobileButton
             play = new MobileButton(Icon.play, "@starmap", () -> checkPlay(ui.planet::show)),
             expedition = new MobileButton(Icon.terrain, "Expedição", () -> checkPlay(ui.expedition::show)),
+            testFeatures = new MobileButton(Icon.terrain, "@mode.testfeatures.name", () -> checkPlay(TestNewFeaturesMode::start)),
             custom = new MobileButton(Icon.rightOpenOut, "@customgame", () -> checkPlay(ui.custom::show)),
             maps = new MobileButton(Icon.download, "@loadgame", () -> checkPlay(ui.load::show)),
             join = new MobileButton(Icon.add, "@joingame", () -> checkPlay(ui.join::show)),
@@ -160,6 +186,7 @@ public class MenuFragment{
             container.add(custom);
             container.add(maps);
             container.add(expedition);
+            container.add(testFeatures);
             // add odd custom buttons
             for(int i = 1; i < customs.size; i += 2){
                 container.add(customs.get(i));
@@ -180,6 +207,8 @@ public class MenuFragment{
             container.add(maps);
             container.row();
             container.add(expedition);
+            container.row();
+            container.add(testFeatures);
             container.row();
             container.add(custom);
             container.add(join);
@@ -215,6 +244,7 @@ public class MenuFragment{
                     new MenuButton("@play", Icon.play,
                         new MenuButton("@starmap", Icon.planet, () -> checkPlay(ui.planet::show)),
                         new MenuButton("Expedição asteroidária", Icon.terrain, () -> checkPlay(ui.expedition::show)),
+                        new MenuButton("@mode.testfeatures.name", Icon.terrain, () -> checkPlay(TestNewFeaturesMode::start)),
                         new MenuButton("@joingame", Icon.add, () -> checkPlay(ui.join::show)),
                         new MenuButton("@customgame", Icon.terrain, () -> checkPlay(ui.custom::show)),
                         new MenuButton("@loadgame", Icon.download, () -> checkPlay(ui.load::show))

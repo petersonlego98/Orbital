@@ -3,7 +3,7 @@ package orbital.game;
 import arc.*;
 import arc.util.*;
 import orbital.content.Planets;
-import orbital.type.Sector;
+import orbital.type.*;
 
 import static orbital.Vars.*;
 
@@ -107,6 +107,51 @@ public final class ExpeditionClock{
         }
     }
 
+    /** @return whether the expedition core currently holds items that can be collected. */
+    public static boolean hasCargo(){
+        if(!inExpedition()) return false;
+
+        var core = state.rules.defaultTeam.core();
+        return core != null && core.items.any();
+    }
+
+    /** Moves the expedition core contents into the global inventory and saves the sector immediately. */
+    public static ItemSeq collectCargo(){
+        return collectCargo(true);
+    }
+
+    /**
+     * Moves the expedition core contents into the global inventory.
+     * @param saveSector whether to write the sector save after draining the core.
+     * @return the items that were collected.
+     */
+    public static ItemSeq collectCargo(boolean saveSector){
+        if(!inExpedition()) return new ItemSeq();
+
+        Sector sector = sector();
+        if(sector == null) return new ItemSeq();
+
+        ItemSeq collected = GlobalInventory.collectFromCore();
+        if(collected.total > 0 && saveSector){
+            saveCurrentSector(sector);
+        }
+        return collected;
+    }
+
+    /** Saves the sector that is currently being played. */
+    private static void saveCurrentSector(Sector sector){
+        try{
+            if(control.saves.getCurrent() != null){
+                control.saves.getCurrent().save();
+            }else{
+                //should not happen mid-run, but never lose the base because of it
+                control.saves.saveSector(sector);
+            }
+        }catch(Throwable e){
+            Log.err(e);
+        }
+    }
+
     /** Called every frame by the UI; handles the warnings and the forced withdrawal. */
     public static void update(){
         if(ui == null || headless) return;
@@ -169,16 +214,9 @@ public final class ExpeditionClock{
 
         Core.app.post(() -> {
             if(inExpedition()){
-                try{
-                    if(control.saves.getCurrent() != null){
-                        control.saves.getCurrent().save();
-                    }else{
-                        //should not happen mid-run, but never lose the base because of it
-                        control.saves.saveSector(sector);
-                    }
-                }catch(Throwable e){
-                    Log.err(e);
-                }
+                //drain the core into the global inventory before saving, so the cargo is not duplicated on reload
+                collectCargo(false);
+                saveCurrentSector(sector);
             }
 
             //these dialogs belong to the run that is being closed

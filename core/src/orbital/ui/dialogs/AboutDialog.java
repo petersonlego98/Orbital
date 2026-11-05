@@ -2,6 +2,7 @@ package orbital.ui.dialogs;
 
 import arc.*;
 import arc.graphics.*;
+import arc.scene.style.*;
 import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
 import arc.struct.*;
@@ -35,10 +36,47 @@ public class AboutDialog extends BaseDialog{
         buttons.clear();
 
         float h = Core.graphics.isPortrait() ? 90f : 80f;
-        float w = Core.graphics.isPortrait() ? 400f : 600f;
+        float w = Core.graphics.isPortrait() ? 400f : 650f;
 
         Table in = new Table();
+        in.margin(12f);
         ScrollPane pane = new ScrollPane(in);
+        pane.setFadeScrollBars(false);
+
+        //Seção 1: Sobre o jogo
+        section(in, "about.section.game", w);
+        body(in, "about.game.text", w);
+
+        //Seção 2: História e Origem do Projeto
+        section(in, "about.section.history", w);
+        body(in, "about.history.text", w);
+
+        //Seção 3: Créditos & Colaboradores
+        section(in, "about.section.credits", w);
+        body(in, Core.bundle.format("about.credits.original", Links.originalRepo), w, 6f);
+        body(in, Core.bundle.format("about.credits.fork", Links.forkRepo), w, 12f);
+
+        //Seção 4: Licença GPLv3
+        section(in, "about.section.license", w);
+        body(in, "about.license.text", w);
+
+        //Seção 5: Bibliotecas e licenças de terceiros
+        section(in, "about.section.libraries", w);
+        body(in, "about.libraries.text", w);
+
+        //Seção 6: Links de Repositórios e Licença
+        section(in, "about.section.links", w);
+
+        Table linksTable = new Table();
+        linksTable.left();
+        addLink(linksTable, "about.links.original", Icon.github, Links.originalRepo);
+        addLink(linksTable, "about.links.fork", Icon.github, Links.forkRepo);
+        addLink(linksTable, "about.links.license", Icon.book, Links.licenseUrl);
+        in.add(linksTable).growX().padBottom(6f).row();
+        in.add(Core.bundle.get("about.links.files")).width(w).wrap().color(Color.lightGray).left().padBottom(16f).row();
+
+        //Seção 7: Links da Comunidade
+        section(in, "about.section.community", w);
 
         for(LinkEntry link : Links.getLinks()){
             if((ios || steam) && bannedItems.contains(link.name)){
@@ -83,7 +121,27 @@ public class AboutDialog extends BaseDialog{
         addCloseButton();
 
         buttons.button("@credits", this::showCredits).size(200f, 64f);
+    }
 
+    private void section(Table table, String key, float width){
+        table.add("[accent]" + Core.bundle.get(key) + "[]").style(Styles.outlineLabel).width(width).left().padBottom(4f).row();
+    }
+
+    private void body(Table table, String key, float width){
+        body(table, Core.bundle.get(key), width, 12f);
+    }
+
+    private void body(Table table, String text, float width, float bottom){
+        table.add(text).width(width).wrap().color(Color.lightGray).left().padBottom(bottom).row();
+    }
+
+    private void addLink(Table table, String key, Drawable icon, String url){
+        table.button(Core.bundle.get(key), icon, Styles.flatt, () -> {
+            if(!Core.app.openURI(url)){
+                ui.showErrorMessage("@linkfail");
+                Core.app.setClipboardText(url);
+            }
+        }).growX().height(44f).padBottom(4f).row();
     }
 
     public void showCredits(){

@@ -1,0 +1,19 @@
+ASSETS AND MEDIA LICENSING
+================================================================================
+All base sprites, sounds, music, UI icons, fonts and map assets are distributed
+as part of Orbital under the terms of the GNU General Public License v3.0
+(GPLv3), originally authored by Anuken and community artists, musicians,
+translators and contributors.
+
+Custom Orbital sprites, dorsal turret modules, sector artwork and other
+modifications are also distributed under GPLv3.
+
+Some fonts, icons or sounds may originate from third-party projects with their
+own attribution requirements. Their use here does not remove those requirements.
+When redistributing the game, keep this file, CREDITS.md and NOTICE.txt together
+with the assets, and preserve the attribution to the original authors.
+
+If you believe an asset has been credited incorrectly, please open an issue in
+the fork repository:
+https://github.com/petersonlego98/Orbital/issues
+================================================================================

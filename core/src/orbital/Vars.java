@@ -20,6 +20,8 @@ import orbital.game.EventType.*;
 import orbital.game.*;
 import orbital.gen.*;
 import orbital.graphics.*;
+import orbital.content.Blocks;
+import orbital.content.TurretLoadouts;
 import orbital.input.*;
 import orbital.io.*;
 import orbital.logic.*;
@@ -385,6 +387,11 @@ public class Vars implements Loadable{
         Events.on(ContentInitEvent.class, e -> {
             emptyTile = new Tile(Short.MAX_VALUE - 20, Short.MAX_VALUE - 20);
         });
+
+        //Apply default removable dorsal turrets only AFTER all content (base + mods +
+        //patches) is loaded, so mods overriding a unit's weapons can't erase them.
+        //Idempotent - safe to run on every content (re)initialization.
+        Events.on(ContentInitEvent.class, e -> TurretLoadouts.applyRemovableTurrets(Blocks.duo));
 
         assetCache.load();
         mods.load();

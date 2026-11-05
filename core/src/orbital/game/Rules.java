@@ -274,7 +274,9 @@ public class Rules{
 
     /** Returns the gamemode that best fits these rules. */
     public Gamemode mode(){
-        if(pvp){
+        if(TestNewFeaturesMode.rulesName.equals(modeName)){
+            return Gamemode.testFeatures;
+        }else if(pvp){
             return Gamemode.pvp;
         }else if(editor){
             return Gamemode.editor;

@@ -31,6 +31,7 @@ import orbital.graphics.MultiPacker.*;
 import orbital.logic.*;
 import orbital.ui.*;
 import orbital.world.*;
+import orbital.world.blocks.defense.turrets.*;
 import orbital.world.blocks.environment.*;
 import orbital.world.blocks.payloads.*;
 import orbital.world.blocks.units.*;
@@ -288,6 +289,14 @@ public class UnitType extends UnlockableContent implements Senseable{
     public Seq<Ability> abilities = new Seq<>();
     /** All weapons that this unit will shoot with. */
     public Seq<Weapon> weapons = new Seq<>();
+    /** Dorsal mounting points available for removable turret modules. */
+    public Seq<TurretSlot> turretSlots = new Seq<>();
+    /** Multiplier applied to the dorsal budget. 1.0 means the default 50% of sprite area. */
+    public float loadoutBudgetMultiplier = 1f;
+    /** Optional sprite area override, in px². Used for deterministic headless validation. <0 to calculate. */
+    public float dorsalAreaOverride = -1f;
+    /** Optional base sprite name, for variants that reuse another unit's art. */
+    public @Nullable String spriteName;
     /** None of the status effects in this set can be applied to this unit. */
     public ObjectSet<StatusEffect> immunities = new ObjectSet<>();
 
@@ -632,6 +641,76 @@ public class UnitType extends UnlockableContent implements Senseable{
 
     public boolean hasWeapons(){
         return weapons.size > 0;
+    }
+
+    /** @return the sprite area in px², using the override when present. */
+    public float spriteArea(){
+        if(dorsalAreaOverride > 0f) return dorsalAreaOverride;
+        if(region != null && region.found()) return (float)region.width * region.height;
+        //headless fallback: a 48x48 sprite for a default hitSize of 6.
+        return hitSize * hitSize * 64f;
+    }
+
+    /** @return the sprite width in px, using the override when present. */
+    public float spriteWidth(){
+        if(region != null && region.found()) return region.width;
+        return Mathf.sqrt(spriteArea());
+    }
+
+    /** @return the sprite height in px, using the override when present. */
+    public float spriteHeight(){
+        if(region != null && region.found()) return region.height;
+        return Mathf.sqrt(spriteArea());
+    }
+
+    /** @return the total dorsal budget, in px². Base is 50% of the sprite area. */
+    public float dorsalBudget(){
+        return spriteArea() * 0.5f * loadoutBudgetMultiplier;
+    }
+
+    /** @return the dorsal cost of all removable turrets currently defined on this type. */
+    public float loadoutCost(){
+        float sum = 0f;
+        for(Weapon weapon : weapons){
+            if(weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable){
+                sum += turretWeapon.cost();
+            }
+        }
+        return sum;
+    }
+
+    /** @return the number of removable turrets currently defined on this type. */
+    public int mountedTurrets(){
+        int count = 0;
+        for(Weapon weapon : weapons){
+            if(weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable) count++;
+        }
+        return count;
+    }
+
+    /** @return true if the turret silhouette fits inside the hull's dorsal area. */
+    public boolean fitsSilhouette(int turretSize){
+        if(turretSize <= 0) return false;
+        float footprint = turretSize * TurretSlot.pxTile;
+        float coverage = (footprint * footprint) / spriteArea();
+        float widthRatio = footprint / Math.max(spriteWidth(), spriteHeight());
+        return coverage <= 0.5f && widthRatio <= 0.7f;
+    }
+
+    /** @return true if this unit has a slot large enough for the turret. */
+    public boolean hasSlotFor(int turretSize){
+        return turretSlots.contains(slot -> slot.maxSize >= turretSize);
+    }
+
+    /** @return true if a removable turret can be mounted on this unit right now. */
+    public boolean canMount(Turret turret){
+        if(turret == null) return false;
+        if(!hasSlotFor(turret.size)) return false;
+        if(!fitsSilhouette(turret.size)) return false;
+        if(mountedTurrets() >= turretSlots.size) return false;
+
+        float cost = turret.size * TurretSlot.pxTile;
+        return loadoutCost() + cost * cost <= dorsalBudget();
     }
 
     public boolean targetable(Unit unit, Team targeter){
@@ -1150,8 +1229,9 @@ public class UnitType extends UnlockableContent implements Senseable{
             part.load(name);
         }
         weapons.each(Weapon::load);
-        region = Core.atlas.find(name);
-        previewRegion = Core.atlas.find(name + "-preview", name);
+        String spriteBase = spriteName == null ? name : spriteName;
+        region = Core.atlas.find(spriteBase);
+        previewRegion = Core.atlas.find(spriteBase + "-preview", spriteBase);
         legRegion = Core.atlas.find(name + "-leg");
         jointRegion = Core.atlas.find(name + "-joint");
         baseJointRegion = Core.atlas.find(name + "-joint-base");

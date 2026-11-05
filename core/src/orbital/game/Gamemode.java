@@ -38,6 +38,15 @@ public enum Gamemode{
         rules.editor = true;
         rules.waves = false;
         rules.waveTimer = false;
+    }),
+    //keep last: Gamemode ordinals are written into network/save data, so existing modes must not shift
+    testFeatures(true, rules -> {
+        rules.infiniteResources = true;
+        rules.buildCostMultiplier = 0f;
+        rules.unitCostMultiplier = 0f;
+        rules.waves = false;
+        rules.waveTimer = false;
+        rules.modeName = TestNewFeaturesMode.rulesName;
     });
 
     private final Cons<Rules> rules;

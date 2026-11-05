@@ -53,6 +53,10 @@ public class UnitTypes{
 
     //air, legacy
     public static @EntityDef(value = {Unitc.class}, legacy = true) UnitType mono;
+    /** Dorsal demonstration variant: Mono hull with a removable Duo turret. */
+    public static UnitType monoDuo;
+    /** Dorsal demonstration variant: Flare hull with a removable Duo turret. */
+    public static UnitType flareDuo;
 
     //air, legacy
     public static @EntityDef(value = {Unitc.class}, legacy = true) UnitType poly;
@@ -1066,26 +1070,38 @@ public class UnitTypes{
             moveSoundPitchMax = 1.5f;
             moveSoundVolume = 0.2f;
 
-            weapons.add(new Weapon(){{
-                y = 1f;
-                x = 0f;
-                minShootVelocity = 2f;
-                shootCone = 10f;
-                reload = 80f;
-                shoot.shots = 3;
-                shoot.shotDelay = 3f;
-                ejectEffect = Fx.casing1;
-                mirror = false;
-                bullet = new BasicBulletType(2.5f, 9){{
-                    inaccuracy = 4f;
-                    width = 7f;
-                    height = 9f;
-                    lifetime = 32f;
-                    shootEffect = Fx.shootSmall;
-                    smokeEffect = Fx.shootSmallSmoke;
-                    ammoMultiplier = 2;
-                }};
-            }});
+            weapons.add(flareWeapon());
+        }};
+
+        //Phase A demonstration: the Flare hull with a removable Duo dorsal turret.
+        flareDuo = new UnitType("flare-duo"){{
+            internal = true;
+            researchCostMultiplier = 0.5f;
+            speed = 2.7f;
+            accel = 0.08f;
+            drag = 0.04f;
+            flying = true;
+            health = 70;
+            engineOffset = 5.75f;
+            targetFlags = new BlockFlag[]{BlockFlag.generator, null};
+            hitSize = 9;
+            itemCapacity = 10;
+            circleTarget = true;
+            omniMovement = false;
+            rotateSpeed = 5f;
+            circleTargetRadius = 60f;
+            wreckSoundVolume = 0.7f;
+
+            spriteName = "flare";
+            fullOverride = "flare";
+            alwaysUnlocked = true;
+
+            moveSound = Sounds.loopThruster;
+            moveSoundPitchMin = 0.3f;
+            moveSoundPitchMax = 1.5f;
+            moveSoundVolume = 0.2f;
+
+            weapons.add(flareWeapon());
         }};
 
         horizon = new UnitType("horizon"){{
@@ -1344,6 +1360,31 @@ public class UnitTypes{
 
         mono = new UnitType("mono"){{
             defaultCommand = UnitCommand.mineCommand;
+
+            flying = true;
+            drag = 0.06f;
+            accel = 0.12f;
+            speed = 1.5f;
+            health = 100;
+            engineSize = 1.8f;
+            engineOffset = 5.7f;
+            range = 50f;
+            isEnemy = false;
+            controlSelectGlobal = false;
+            wreckSoundVolume = deathSoundVolume = 0.7f;
+
+            mineTier = 1;
+            mineSpeed = 2.5f;
+        }};
+
+        //Phase A demonstration: the Mono hull with a removable Duo dorsal turret.
+        monoDuo = new UnitType("mono-duo"){{
+            internal = true;
+            defaultCommand = UnitCommand.mineCommand;
+
+            spriteName = "mono";
+            fullOverride = "mono";
+            alwaysUnlocked = true;
 
             flying = true;
             drag = 0.06f;
@@ -4669,5 +4710,29 @@ public class UnitTypes{
         }};
 
         //endregion
+    }
+
+    /** Shared weapon for Flare and its dorsal demonstration variant. */
+    private static Weapon flareWeapon(){
+        return new Weapon(){{
+            y = 1f;
+            x = 0f;
+            minShootVelocity = 2f;
+            shootCone = 10f;
+            reload = 80f;
+            shoot.shots = 3;
+            shoot.shotDelay = 3f;
+            ejectEffect = Fx.casing1;
+            mirror = false;
+            bullet = new BasicBulletType(2.5f, 9){{
+                inaccuracy = 4f;
+                width = 7f;
+                height = 9f;
+                lifetime = 32f;
+                shootEffect = Fx.shootSmall;
+                smokeEffect = Fx.shootSmallSmoke;
+                ammoMultiplier = 2;
+            }};
+        }};
     }
 }

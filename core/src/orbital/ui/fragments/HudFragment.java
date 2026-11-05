@@ -22,6 +22,7 @@ import orbital.core.GameState.*;
 import orbital.core.*;
 import orbital.ctype.*;
 import orbital.entities.abilities.*;
+import orbital.entities.units.*;
 import orbital.game.EventType.*;
 import orbital.game.*;
 import orbital.gen.*;
@@ -30,6 +31,7 @@ import orbital.input.*;
 import orbital.net.Packets.*;
 import orbital.type.*;
 import orbital.ui.*;
+import orbital.ui.dialogs.*;
 import orbital.world.*;
 import orbital.world.blocks.environment.*;
 import orbital.world.meta.*;
@@ -57,6 +59,15 @@ public class HudFragment{
     private Seq<Block> blocksOut = new Seq<>();
     private Table hudLabel;
     private float coreAttackTime;
+
+    /** currently highlighted turret icon in the selected-unit loadout bar. */
+    private @Nullable Weapon highlightedTurret;
+    /** last unit shown in the loadout bar, used to avoid rebuilding it every frame. */
+    private Unit turretBarUnit;
+    /** identity signature of the turret mounts currently drawn in the loadout bar. */
+    private long turretBarSignature = Long.MIN_VALUE;
+    /** turret add/remove menu for the selected unit. */
+    private @Nullable TurretLoadoutDialog turretDialog;
 
     private static ObjectSet<String> favoriteBlocks = new ObjectSet<>();
     private static String lastFavorited = null;
@@ -280,6 +291,9 @@ public class HudFragment{
             if(hudLabel != null){
                 hudLabel.color.a = 0f;
             }
+            highlightedTurret = null;
+            turretBarUnit = null;
+            turretBarSignature = Long.MIN_VALUE;
             showHudText = false;
         });
 
@@ -710,7 +724,221 @@ public class HudFragment{
                 }).visible(() -> state.isCampaign() && content.items().contains(i -> state.rules.sector != null && state.rules.sector.info.getExport(i) > 0));
             });
 
+        //dorsal loadout of the selected unit
+        parent.fill(t -> {
+            t.name = "turret-loadout";
+            t.bottom().left();
+            t.touchable = Touchable.childrenOnly;
+            t.visible(() -> shown() && !state.isMenu() && !state.isEditor() && selectedHasTurretBar());
+            t.table(Styles.black6, bar -> {
+                bar.margin(3f);
+                Table content = new Table();
+                bar.add(content);
+                content.update(() -> {
+                    Unit unit = selectedUnit();
+                    long signature = turretSignature(unit);
+                    if(unit != turretBarUnit || signature != turretBarSignature){
+                        turretBarUnit = unit;
+                        turretBarSignature = signature;
+                        rebuildTurretBar(content, unit);
+                    }
+                });
+            }).padBottom(mobile ? 96f : 8f);
+        });
+
+        buildTestFeaturesPanel(parent);
         blockfrag.build(parent);
+    }
+
+    private void buildTestFeaturesPanel(Group parent){
+        parent.fill(t -> {
+            t.bottom().right();
+            t.visible(() -> shown() && state.isGame() && TestNewFeaturesMode.active());
+            t.table(Styles.black6, panel -> {
+                panel.margin(8f).top().left();
+                panel.add("@mode.testfeatures.units").style(Styles.outlineLabel).left().padBottom(5f).row();
+                panel.pane(scroll -> {
+                    scroll.left().top();
+                    int columns = mobile ? 4 : 5;
+                    int index = 0;
+                    float btnSize = mobile ? 40f : 44f;
+                    float imgSize = mobile ? 28f : 32f;
+                    for(UnitType type : TestNewFeaturesMode.aerialTypes()){
+                        var btn = scroll.button(new TextureRegionDrawable(type.uiIcon), Styles.selecti, () -> {
+                            if(!TestNewFeaturesMode.spawn(type)){
+                                ui.showInfoToast(Core.bundle.get("mode.testfeatures.limit", "Unit cap reached or no valid spawn location."), 3f);
+                            }
+                        }).size(btnSize).tooltip(type.localizedName).pad(2f).get();
+                        btn.resizeImage(imgSize);
+                        if(++index % columns == 0) scroll.row();
+                    }
+                }).size(mobile ? 188f : 248f, mobile ? 138f : 184f).top().left().row();
+                panel.add("@mode.testfeatures.modules").color(Pal.accent).left().padTop(6f).row();
+                panel.label(() -> {
+                    Unit unit = selectedUnit();
+                    return unit == null ? Core.bundle.get("mode.testfeatures.modules.none")
+                        : Core.bundle.format("mode.testfeatures.modules.target", unit.type.localizedName);
+                }).color(Color.lightGray).width(mobile ? 188f : 248f).wrap().left().row();
+                panel.button("@mode.testfeatures.modules.open", () -> openTurretDialog(selectedUnit()))
+                    .width(mobile ? 188f : 248f).height(34f).padTop(4f).left()
+                    .disabled(b -> {
+                        Unit unit = selectedUnit();
+                        return unit == null || unit.type.turretSlots.isEmpty();
+                    });
+            }).pad(4f);
+        });
+    }
+
+    /** @return the first selected unit, or the unit currently controlled by the player. */
+    private @Nullable Unit selectedUnit(){
+        if(!control.input.selectedUnits.isEmpty()) return control.input.selectedUnits.first();
+        if(player != null && !player.dead() && player.unit() != null) return player.unit();
+        return null;
+    }
+
+    /** @return true if the selected unit has a dorsal bar worth showing. */
+    private boolean selectedHasTurretBar(){
+        Unit unit = selectedUnit();
+        if(unit == null) return false;
+        if(!unit.type.turretSlots.isEmpty()) return true;
+
+        for(WeaponMount mount : unit.mounts){
+            if(mount.weapon.isTurretMount()) return true;
+        }
+        return false;
+    }
+
+    /** Identity signature used to rebuild the bar only when the mount list changes. */
+    private static long turretSignature(@Nullable Unit unit){
+        if(unit == null) return Long.MIN_VALUE;
+
+        long signature = System.identityHashCode(unit);
+        for(WeaponMount mount : unit.mounts){
+            if(mount.weapon.isTurretMount()){
+                signature = signature * 31L + System.identityHashCode(mount.weapon);
+            }
+        }
+        return signature;
+    }
+
+    private void refreshTurretBar(){
+        turretBarSignature = Long.MIN_VALUE;
+        if(highlightedTurret != null){
+            Unit unit = selectedUnit();
+            boolean found = false;
+            if(unit != null){
+                for(WeaponMount mount : unit.mounts){
+                    if(mount.weapon == highlightedTurret){
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if(!found) highlightedTurret = null;
+        }
+    }
+
+    private void openTurretDialog(Unit unit){
+        if(unit == null) return;
+        if(turretDialog == null){
+            turretDialog = new TurretLoadoutDialog();
+        }
+        turretDialog.show(unit, this::refreshTurretBar);
+    }
+
+    private static String turretName(Weapon weapon){
+        if(weapon instanceof TurretWeapon turretWeapon){
+            return turretWeapon.turret.localizedName;
+        }
+        return Core.bundle.get("weapon." + weapon.name + ".name", weapon.name);
+    }
+
+    private static float reloadFraction(WeaponMount mount){
+        if(mount.weapon.reload <= 0f) return 1f;
+        return Mathf.clamp(1f - mount.reload / mount.weapon.reload);
+    }
+
+    private void rebuildTurretBar(Table table, @Nullable Unit unit){
+        table.clearChildren();
+        table.left();
+
+        if(unit == null) return;
+
+        float cellSize = mobile ? 44f : 54f;
+        float cellPad = mobile ? 1f : 2f;
+
+        for(WeaponMount mount : unit.mounts){
+            if(mount.weapon.isTurretMount()){
+                table.add(turretCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(turretTooltip(mount.weapon));
+            }
+        }
+
+        if(unit.mountedTurrets() < unit.type.turretSlots.size){
+            table.add(actionCell(unit, Icon.add, Core.bundle.get("turret.loadout.add")))
+                .size(cellSize).pad(cellPad).tooltip(Core.bundle.get("turret.loadout.add"));
+        }
+
+        table.add(actionCell(unit, Icon.hammer, Core.bundle.get("turret.loadout.title")))
+            .size(cellSize).pad(cellPad).tooltip(Core.bundle.get("turret.loadout.title"));
+    }
+
+    private Table actionCell(Unit unit, Drawable icon, String tooltip){
+        Table cell = new Table();
+        cell.background(Styles.black3);
+        cell.button(icon, Styles.clearNonei, () -> openTurretDialog(unit))
+            .size(mobile ? 34f : 44f).tooltip(tooltip);
+        return cell;
+    }
+
+    private static String turretTooltip(Weapon weapon){
+        boolean removable = weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable;
+        String state = removable ? Core.bundle.get("turret.hud.removable") : Core.bundle.get("turret.hud.native");
+        return turretName(weapon) + "\n[lightgray]" + state;
+    }
+
+    private Table turretCell(Unit unit, WeaponMount mount){
+        Weapon weapon = mount.weapon;
+        boolean removable = weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable;
+        float baseThickness = removable ? 3f : 2f;
+        float iconSize = mobile ? 34f : 44f;
+        TextureRegion region = weapon.region != null && weapon.region.found() ? weapon.region : Core.atlas.find(weapon.name);
+        if(region == null || !region.found()){
+            region = unit.type.uiIcon;
+        }
+
+        Table cell = new Table();
+        cell.background(Styles.black3);
+
+        Stack stack = new Stack();
+        BorderImage icon = new BorderImage(region, baseThickness);
+        icon.setScaling(Scaling.fit);
+        icon.border(removable ? Pal.accent : Pal.gray);
+        stack.add(icon);
+
+        if(!removable){
+            Table lock = new Table();
+            lock.top().right();
+            lock.image(Icon.lockSmall).size(mobile ? 11f : 13f).pad(1f).get().setColor(Pal.gray);
+            stack.add(lock);
+        }
+
+        cell.add(stack).size(iconSize).pad(mobile ? 1f : 2f).row();
+
+        Bar reload = new Bar(() -> "", () -> removable ? Pal.accent : Pal.gray, () -> reloadFraction(mount));
+        reload.blink(Color.white);
+        cell.add(reload).height(4f).growX().pad(0f, 2f, 1f, 2f).row();
+
+        Bar heat = new Bar(() -> "", () -> Pal.health, () -> Mathf.clamp(mount.heat));
+        cell.add(heat).height(2f).growX().pad(0f, 2f, 2f, 2f).row();
+
+        cell.clicked(() -> highlightedTurret = highlightedTurret == weapon ? null : weapon);
+        cell.update(() -> {
+            boolean selected = highlightedTurret == weapon;
+            icon.border(selected ? Color.white : removable ? Pal.accent : Pal.gray);
+            icon.thickness = selected ? baseThickness + 1.5f : baseThickness;
+            cell.background(selected ? Styles.grayPanelDark : Styles.black3);
+        });
+        return cell;
     }
 
     @Remote(targets = Loc.both, forward = true, called = Loc.both)
@@ -1244,6 +1472,16 @@ public class HudFragment{
 
             Label time = t.label(() -> "Expedição " + ExpeditionClock.formattedRemaining()).style(Styles.outlineLabel).pad(8f).get();
             time.update(() -> time.setColor(ExpeditionClock.lowTime() ? Color.scarlet : Color.white));
+
+            t.button(Icon.download, Styles.clearNonei, () -> {
+                ItemSeq collected = ExpeditionClock.collectCargo();
+                if(collected.total > 0){
+                    ui.showInfoToast("Carga recolhida: " + GlobalInventory.format(collected), 5f);
+                }else{
+                    ui.showInfoToast("Nenhuma carga no núcleo.", 3f);
+                }
+            }).size(30f).padRight(6f).tooltip("Recolher carga do núcleo para o inventário global")
+                .disabled(b -> !ExpeditionClock.hasCargo());
         }).padTop(4f);
 
         table.visible(ExpeditionClock::inExpedition);

@@ -394,10 +394,15 @@ public class Control implements ApplicationListener, Loadable{
     }
 
     public void playMap(Map map, Rules rules){
-        playMap(map, rules, false);
+        playMap(map, rules, false, true);
     }
 
     public void playMap(Map map, Rules rules, boolean playtest){
+        playMap(map, rules, playtest, !playtest);
+    }
+
+    /** Plays a map, optionally suppressing the automatic save-slot creation. */
+    public void playMap(Map map, Rules rules, boolean playtest, boolean createSave){
         ui.loadAnd(() -> {
             logic.reset();
             world.loadMap(map, rules);
@@ -409,7 +414,7 @@ public class Control implements ApplicationListener, Loadable{
             state.rules.editor = false;
             Events.fire(new RulesLoadEvent(state.rules));
             logic.play();
-            if(settings.getBool("savecreate") && !world.isInvalidMap() && !playtest){
+            if(createSave && settings.getBool("savecreate") && !world.isInvalidMap() && !playtest){
                 control.saves.addSave(map.name() + " " + new SimpleDateFormat("MMM dd h:mm", Locale.getDefault()).format(new Date()));
             }
             Events.fire(Trigger.newGame);

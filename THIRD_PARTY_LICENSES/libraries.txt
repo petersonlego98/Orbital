@@ -1,0 +1,51 @@
+THIRD-PARTY LIBRARIES USED IN ORBITAL
+================================================================================
+This file lists the main third-party components used by the distributed game.
+Always check the dependency metadata in build.gradle for the exact versions.
+
+1. Arc Framework
+   License: GNU General Public License v3.0 (GPLv3)
+   URL: https://github.com/Anuken/Arc
+
+2. Rhino (JavaScript engine, Anuken fork)
+   License: Mozilla Public License 2.0 (MPL-2.0)
+   URL: https://github.com/mozilla/rhino
+
+3. LWJGL (Lightweight Java Game Library)
+   License: BSD 3-Clause
+   URL: https://www.lwjgl.org
+
+4. FreeType
+   License: FreeType License (FTL) / GNU GPLv2
+   URL: https://www.freetype.org
+
+5. lz4-java
+   License: Apache License 2.0
+   URL: https://github.com/lz4/lz4-java
+
+6. Steamworks4j
+   License: MIT
+   URL: https://github.com/code-disaster/steamworks4j
+
+7. JLine (used by the dedicated server)
+   License: BSD 3-Clause
+   URL: https://github.com/jline/jline3
+
+8. SDL backend (Arc)
+   License: zlib
+   URL: https://www.libsdl.org
+
+9. Java runtime bundled with the desktop release
+   License: GNU GPLv2 with the Classpath Exception
+   URL: https://openjdk.org/legal/gplv2+ce.html
+
+Build- and test-only tools (not part of the distributed game):
+- JUnit 5 - Eclipse Public License 2.0
+- JavaParser - Apache License 2.0
+- JavaPoet - Apache License 2.0
+- Guava - Apache License 2.0
+
+The GPLv3 text is provided in GPL-3.0.txt. The remaining licenses are available
+from the upstream projects listed above. If you redistribute this game, keep
+this file together with the corresponding license texts and source code.
+================================================================================

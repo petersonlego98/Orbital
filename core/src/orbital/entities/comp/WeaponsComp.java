@@ -6,6 +6,7 @@ import orbital.annotations.Annotations.*;
 import orbital.entities.units.*;
 import orbital.gen.*;
 import orbital.type.*;
+import orbital.world.blocks.defense.turrets.*;
 
 @Component
 abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
@@ -30,6 +31,84 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         for(int i = 0; i < mounts.length; i++){
             mounts[i] = def.weapons.get(i).mountType.get(def.weapons.get(i));
         }
+    }
+
+    /** @return the dorsal cost of all removable turrets currently mounted on this unit. */
+    public float loadoutCost(){
+        float sum = 0f;
+        for(WeaponMount mount : mounts){
+            if(mount.weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable){
+                sum += turretWeapon.cost();
+            }
+        }
+        return sum;
+    }
+
+    /** @return how many removable turrets are currently mounted on this unit. */
+    public int mountedTurrets(){
+        int count = 0;
+        for(WeaponMount mount : mounts){
+            if(mount.weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable) count++;
+        }
+        return count;
+    }
+
+    /** @return true if the turret fits this unit's current runtime loadout. */
+    public boolean canMount(Turret turret){
+        if(turret == null || !TurretWeapon.canAdapt(turret)) return false;
+        if(!type.hasSlotFor(turret.size) || !type.fitsSilhouette(turret.size)) return false;
+        if(mountedTurrets() >= type.turretSlots.size) return false;
+
+        float p = turret.size * TurretSlot.pxTile;
+        return loadoutCost() + p * p <= type.dorsalBudget();
+    }
+
+    /**
+     * Mounts a turret at runtime, validating slot size, silhouette and dorsal budget.
+     * @return the created weapon, or null if the turret does not fit.
+     */
+    public @Nullable TurretWeapon mountTurret(Turret turret){
+        if(!canMount(turret)) return null;
+
+        TurretWeapon weapon = TurretWeapon.of(turret);
+        //runtime weapons are not covered by UnitType's content init, so load sprites and init here.
+        weapon.load();
+        weapon.init();
+        addWeapon(weapon);
+        return weapon;
+    }
+
+    /** Adds a weapon mount at runtime. Used for removable dorsal turret modules. */
+    public void addWeapon(Weapon weapon){
+        WeaponMount mount = weapon.mountType.get(weapon);
+        WeaponMount[] next = java.util.Arrays.copyOf(mounts, mounts.length + 1);
+        next[mounts.length] = mount;
+        mounts = next;
+    }
+
+    /** Removes a weapon mount at runtime. Native weapons are never removable. */
+    public boolean removeWeapon(Weapon weapon){
+        if(!(weapon instanceof TurretWeapon turretWeapon) || !turretWeapon.removable) return false;
+
+        int index = -1;
+        for(int i = 0; i < mounts.length; i++){
+            if(mounts[i].weapon == weapon){
+                index = i;
+                break;
+            }
+        }
+        if(index < 0) return false;
+
+        WeaponMount[] next = new WeaponMount[mounts.length - 1];
+        System.arraycopy(mounts, 0, next, 0, index);
+        System.arraycopy(mounts, index + 1, next, index, next.length - index);
+
+        if(mounts[index].sound != null){
+            mounts[index].sound.stop();
+        }
+
+        mounts = next;
+        return true;
     }
 
     void controlWeapons(boolean rotateShoot){

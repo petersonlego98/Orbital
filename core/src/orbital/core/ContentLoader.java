@@ -64,6 +64,7 @@ public class ContentLoader{
         Liquids.load();
         Bullets.load();
         UnitTypes.load();
+        TurretLoadouts.load();
         Blocks.load();
         Loadouts.load();
         Weathers.load();

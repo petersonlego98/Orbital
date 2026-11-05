@@ -74,7 +74,7 @@ O mapa dá acesso a dois destinos principais:
 
 No mapa estelar, o sistema inicial de Orbital usa a estrela amarela já existente (`sun`) como centro e um primeiro planeta processualmente nomeado orbitando próximo a ela: **Quatia**.
 
-Nesta etapa, Quatia é apenas um corpo visual e clicável no mapa estelar. Ele orbita a estrela normalmente, pode ser focado pelo jogador, mas não possui setor, gerador, núcleo ou opção de pouso. A visão inicial do mapa é de cima do sistema, mostrando a estrela e o planeta juntos; a câmera permite zoom, rotação e inclinação, sem arrastar os astros.
+Quatia é a primeira colônia jogável do protótipo. Ao selecioná-la, o jogador pode pousar em um setor inicial pacífico e construir uma produção local sobre um mapa próprio, com depósitos de cobre, chumbo, carvão e areia. Nesta primeira etapa há um único setor; ainda não existem outros planetas jogáveis nem uma economia interplanetária.
 
 **Serpulo e Erekir deixaram de ser campanhas jogáveis.** Os corpos continuam existindo no mapa estelar como corpos visuais, mas sem campanha, setor jogável ou lançamento. A entrada de mapa no menu chama-se agora “Mapa Estelar”.
 
@@ -117,7 +117,7 @@ O princípio confirmado é que os recursos minerados devem chegar ao **inventár
 
 O propósito da expedição é obter recursos que alimentem o progresso global. O retorno conecta o combate à produção planetária e à personalização de naves.
 
-A regra de quando a carga é considerada segura — ao ser extraída, ao embarcar ou somente quando a nave retorna — ainda precisa ser definida.
+A regra de quando a carga é considerada segura — ao ser extraída, ao embarcar ou somente quando a nave retorna — ainda precisa ser definida para o produto final. No protótipo, a carga é considerada segura quando é recolhida do núcleo de Gier para o inventário global, seja manualmente durante a expedição ou automaticamente no momento da retirada.
 
 ### 5.4 Relógio da estrela
 
@@ -151,6 +151,8 @@ As mineradoras enviadas às estrelas vermelhas coletam recursos de asteroides. O
 ### 6.3 Inventário global
 
 O inventário global conecta a coleta nas expedições ao progresso do jogador. Ele serve como destino dos recursos transportados pelas naves de mineração.
+
+No protótipo, o inventário global é um armazenamento persistente de itens, salvo nas configurações do jogo e independente do save do setor. Recolher a carga de Gier drena o núcleo e transfere os itens para esse inventário; o setor é salvo em seguida para que os recursos não sejam duplicados ao reentrar.
 
 Ainda está em aberto se os recursos fabricados nos planetas também são imediatamente globais ou se permanecem locais até serem transportados. A decisão afeta a importância das rotas e da logística entre colônias.
 
@@ -196,20 +198,36 @@ A intenção é competir com uma experiência diferente, não reproduzir nomes, 
 
 ---
 
-## 9. Primeiro protótipo recomendado
+## 9. Estado do protótipo
 
-**Proposta para validar a ideia — ainda não é escopo aprovado:**
+### Fase 1 — colônia inicial de produção
 
-- um mapa estelar simples;
-- um planeta que abre um mapa de produção;
-- uma cadeia de produção curta;
-- uma estrela vermelha com contagem em tempo real que continua fechada;
-- uma nave principal controlável;
-- pelo menos uma nave menor de mineração;
-- asteroides, algumas naves inimigas e uma forma de retornar recursos ao inventário global;
-- opções de equipamento suficientes para demonstrar que mudar a configuração altera a abordagem do combate.
+**Implementada no código; build desktop validado.** A primeira versão jogável está limitada à colônia de Quatia e preserva as campanhas antigas como referência visual, sem removê-las do conteúdo do projeto.
 
-O protótipo deve testar se a alternância entre construir no planeta e pilotar uma expedição é interessante. Não precisa começar com muitos planetas, tipos de inimigo ou armamentos.
+- Quatia pode ser selecionada no mapa estelar e aberta como uma colônia de produção.
+- O setor inicial é pacífico e tem depósitos de cobre, chumbo, carvão e areia.
+- O jogador recebe materiais iniciais e acesso às estruturas necessárias para começar a extrair, transportar e gerar energia.
+- A cadeia de demonstração usa o conteúdo existente: carvão e areia alimentam a fundição de silício, que precisa de energia.
+- O mapa e a partida continuam usando a construção e a simulação local do Mindustry.
+
+### Fase 2 — expedição de Gier e inventário global
+
+**Implementada no código; build desktop validado.** A expedição asteroidária usa o relógio em tempo real e conecta a coleta de Gier ao inventário global do jogador.
+
+- Gier pode ser iniciada pela tela de expedição e aberta pelo mapa estelar.
+- O prazo de 30 minutos continua correndo com o jogo fechado; avisos aparecem aos 10, 5 e 1 minutos restantes.
+- Ao vencer o prazo, o jogador é retirado para o mapa estelar, com a base salva para a próxima expedição.
+- O HUD mostra o tempo restante e permite recolher a carga do núcleo.
+- A tela da expedição mostra o inventário global e a carga atualmente no núcleo de Gier.
+- Recolher a carga drena o núcleo, transfere os itens para o inventário global e salva o setor imediatamente.
+- Na retirada, a carga restante no núcleo é recolhida automaticamente antes do save, evitando duplicação.
+- Finalizar a expedição fora de Gier avisa que a carga continua na base e só pode ser recolhida entrando na expedição.
+
+O inventário global ainda não é consumido por custos de construção, fabricação de naves ou preparação de expedições. A personalização da nave principal, a economia de equipamentos e as naves de apoio dedicadas continuam como etapas posteriores. A pilotagem e a mineração usam os sistemas de unidade e `MinerAI` já existentes no motor.
+
+### Próximo recorte de protótipo
+
+O próximo ciclo deve dar uso ao inventário global: custos para preparar expedições, fabricação ou melhoria de naves e uma primeira distinção entre recursos locais e globais. Também é o momento de definir a regra definitiva de perda ou preservação da carga quando o prazo vence e de transformar as naves menores em uma decisão econômica explícita durante a expedição.
 
 ---
 
@@ -239,11 +257,13 @@ O protótipo deve testar se a alternância entre construir no planeta e pilotar 
 | Duração da expedição em Gier | 30 minutos em tempo real |
 | Avisos de tempo restante | 10 min, 5 min e 1 min |
 | Base de Gier após a retirada | Continua salva para a próxima expedição |
+| Coleta da carga em Gier | Manual pelo HUD/tela da expedição; automática antes da retirada |
+| Inventário global | Persistente nas configurações, independente do save do setor |
 
 ### Ainda precisa ser decidido
 
 1. Qual é a duração final de uma estrela vermelha (os 30 minutos são só do protótipo)?
-2. O que acontece com a nave principal, as naves de apoio e a carga no instante da retirada forçada?
+2. No produto final, o que acontece com a nave principal e as naves de apoio no instante da retirada forçada? (No protótipo, a carga do núcleo é recolhida automaticamente e a partida é encerrada.)
 3. No produto final, a base do jogador permanece após o prazo, é perdida ou sofre alguma consequência?
 4. O jogador dá ordens às naves menores ou elas agem automaticamente segundo prioridades?
 5. A produção de cada planeta fica local, vai ao inventário global ou exige transporte?

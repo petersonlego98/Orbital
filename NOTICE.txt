@@ -1,0 +1,18 @@
+ORBITAL
+================================================================================
+Uma nova experiência de automação e exploração espacial.
+
+Projeto independente derivado do Mindustry.
+Original por Anuken (anukendev@gmail.com) e colaboradores da comunidade.
+Código-fonte original: https://github.com/Anuken/Mindustry
+
+Licenciado sob os termos da GNU General Public License v3.0 (GPLv3).
+Veja o arquivo LICENSE e o diretório THIRD_PARTY_LICENSES/ para detalhes.
+
+Código-fonte correspondente deste fork:
+https://github.com/petersonlego98/Orbital
+
+Este programa é distribuído na esperança de que seja útil, mas SEM NENHUMA
+GARANTIA, sem sequer a garantia implícita de COMERCIALIZAÇÃO ou ADEQUAÇÃO A UM
+DETERMINADO PROPÓSITO. Consulte a GPLv3 para mais detalhes.
+================================================================================
