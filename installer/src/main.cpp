@@ -102,6 +102,8 @@ fs::path defaultTarget(){
 
 struct Options{
     bool uninstall = false;
+    bool forceInstall = false; // --install overrides Uninstall.exe auto-detection
+    bool selfDelete = false;   // CI: exercise the hidden self-delete helper in silent mode
     bool silent = false;
     bool worker = false;   // CI: run the install on a background thread, like the GUI does
     bool shortcuts = true;
@@ -121,6 +123,8 @@ Options parseOptions(){
     for(int i = 1; i < argc; ++i){
         std::wstring a = argv[i];
         if(a == L"--uninstall") o.uninstall = true;
+        else if(a == L"--install") o.forceInstall = true;
+        else if(a == L"--self-delete") o.selfDelete = true;
         else if(a == L"--silent") o.silent = true;
         else if(a == L"--worker") o.worker = true;
         else if(a == L"--no-shortcuts") o.shortcuts = false;
@@ -334,6 +338,7 @@ void scheduleSelfDelete(const fs::path& target){
         (L"orbital-uninstall-" + std::to_wstring(GetCurrentProcessId()) + L".cmd");
 
     std::wstring script = L"@echo off\r\n"
+                          L"cd /d \"%~dp0\"\r\n"
                           L"chcp 65001 >nul\r\n"
                           L"ping -n 2 127.0.0.1 >nul\r\n"
                           L"del /f /q \"" + self.wstring() + L"\"\r\n"
@@ -360,8 +365,11 @@ void scheduleSelfDelete(const fs::path& target){
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
     PROCESS_INFORMATION pi{};
+    // Start the helper from %TEMP%. If it inherits the install directory as
+    // its working directory, Windows keeps that directory open and `rmdir`
+    // cannot remove it even after all files are gone.
     if(CreateProcessW(nullptr, commandLine.data(), nullptr, nullptr, FALSE,
-                      CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)){
+                      CREATE_NO_WINDOW, nullptr, tempDir, &si, &pi)){
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
     }
@@ -501,9 +509,15 @@ int doUninstall(const Options& o, Reporter& reporter){
     if(!removed) return 21;
 
     if(o.silent){
-        // CI mode is deterministic: keep the small Uninstall.exe so the test
-        // target can be inspected. Interactive uninstall schedules self-delete.
-        reporter.status(L"Modo silencioso: Uninstall.exe mantido para validacao.");
+        if(o.selfDelete){
+            // CI: exercise the exact hidden helper used by interactive uninstall.
+            scheduleSelfDelete(target);
+            reporter.status(L"Auto-remocao agendada em segundo plano.");
+        }else{
+            // CI mode is deterministic: keep the small Uninstall.exe so the test
+            // target can be inspected.
+            reporter.status(L"Modo silencioso: Uninstall.exe mantido para validacao.");
+        }
         return 0;
     }
 
@@ -607,7 +621,17 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int){
     // the GUI install runs on a worker thread. Do not initialize it only here.
     InitCommonControls();
 
-    const Options options = parseOptions();
+    Options options = parseOptions();
+
+    // A copy named Uninstall.exe must uninstall when double-clicked. It has no
+    // sibling payload/, so treating it as an installer produced error 11 and
+    // removed nothing. --install explicitly restores the installer behaviour.
+    const fs::path self = ownExePath();
+    if(!options.forceInstall && !options.uninstall && !self.empty() &&
+       lstrcmpiW(self.filename().c_str(), kUninstallExe) == 0){
+        options.uninstall = true;
+    }
+
     if(!options.log.empty()){
         g_log = CreateFileW(options.log.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ,
                             nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);

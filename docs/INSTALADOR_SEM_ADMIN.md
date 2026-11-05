@@ -122,12 +122,18 @@ Executar `OrbitalSetup.exe` (duplo clique, sem "Executar como administrador"):
 
 ### Desinstalar
 
-Pelo **Aplicativos e recursos**, pelo atalho da Área de Trabalho/Menu Iniciar
-(quando existir) **ou** executando `Uninstall.exe --uninstall` na pasta de
-instalação. Remove atalhos, a chave `HKCU` e todos os arquivos. Como um
-processo não pode apagar o próprio `.exe`, o desinstalador cria um `.cmd`
-oculto em `%TEMP%` (sem janela visível) que apaga `Uninstall.exe` e a pasta já
-vazia, e em seguida apaga a si mesmo.
+Basta **dar duplo clique em `Uninstall.exe`** na pasta de instalação, ou usar
+**Aplicativos e recursos**. O executável detecta o próprio nome e entra no modo
+de remoção automaticamente; `--uninstall` continua aceito. `--install` força o
+comportamento de instalador caso seja necessário reinstalar a partir dessa
+cópia.
+
+A remoção apaga atalhos, a chave `HKCU` e todos os arquivos. Como um processo
+não pode apagar o próprio `.exe`, o desinstalador cria um `.cmd` oculto em
+`%TEMP%` (sem janela visível) que apaga `Uninstall.exe` e a pasta já vazia, e
+em seguida apaga a si mesmo. O helper é iniciado com diretório de trabalho em
+`%TEMP%` e também faz `cd /d "%~dp0"`: se herdasse a pasta de instalação como
+CWD, o Windows manteria o diretório aberto e `rmdir` falharia.
 
 ---
 
@@ -135,8 +141,10 @@ vazia, e em seguida apaga a si mesmo.
 
 | Opção | Efeito |
 |---|---|
-| `--uninstall` | executa a remoção em vez da instalação. |
+| `--uninstall` | executa a remoção em vez da instalação. Implícito quando o executável se chama `Uninstall.exe`. |
+| `--install` | força o fluxo de instalação mesmo quando o arquivo se chama `Uninstall.exe`. |
 | `--silent` | sem janelas; resultado gravado via `--log`. |
+| `--self-delete` | **CI**: em `--silent`, agenda o mesmo `.cmd` oculto de auto-remoção usado no modo interativo. |
 | `--worker` | **CI**: executa a instalação em thread de trabalho, reproduzindo o modelo da GUI sem abrir janela. |
 | `--target <dir>` | substitui o destino padrão (usado em CI). |
 | `--log <arquivo>` | gravar log UTF-8 com `RESULT=<código>` e `STATUS=ok\|failed`. |
@@ -145,8 +153,9 @@ vazia, e em seguida apaga a si mesmo.
 | `--shortcut-dir <dir>` | **CI**: grava dois `.lnk` de teste nesse diretório em vez das pastas reais do shell. |
 | `--registry-key <nome>` | **CI**: usa `HKCU\...\Uninstall\<nome>` em vez de `Orbital`. |
 
-Em `--silent`, o `Uninstall.exe` é **mantido** no diretório para tornar a
-validação determinística. A remoção completa ocorre no modo interativo.
+Em `--silent` **sem** `--self-delete`, o `Uninstall.exe` é mantido no diretório
+para tornar a validação determinística. A remoção completa ocorre no modo
+interativo e, em CI, com `--self-delete`.
 
 Códigos de saída: `0` sucesso; `1` cancelado pelo usuário; `10`–`21` falhas
 específicas (payload ausente = `11`, falha de cópia = `15`,
@@ -170,7 +179,12 @@ incompleta = `21`). Falha no Menu Iniciar **não** gera código de erro.
 | Falha forçada no Menu Iniciar | diretório colocado no lugar do `.lnk`: `RESULT=0`, `WARNING=start-menu-shortcut`, atalho da Área de Trabalho criado, chave `HKCU` presente. A instalação **não** aborta. |
 | Falha forçada na Área de Trabalho | `RESULT=18` — atalho preferido continua obrigatório. |
 | Desinstalação completa com ganchos de CI | `RESULT=0`; atalhos e chave de teste removidos; restou apenas `Uninstall.exe` (modo silencioso). |
-| Efeitos colaterais reais | nenhum: chave `HKCU\...\Uninstall\Orbital` ausente e nenhum atalho real criado. |
+| Reprodução do erro de desinstalação | `Uninstall.exe` sem argumentos devolvia `RESULT=11` (`payload/Orbital.exe nao encontrado`) e não removia nada — confirmado sobre a cópia instalada no perfil. |
+| Auto-detecção corrigida | mesmo cenário agora `MODE=uninstall`, `RESULT=0`, arquivos de teste removidos. |
+| `--install` | `MODE=install`, `RESULT=11` — a detecção pode ser revertida explicitamente. |
+| Helper oculto (`--self-delete`) | pasta de teste removida em ~1,6 s, nenhum `.cmd` restante em `%TEMP%`. |
+| Ciclo completo com duplo clique simulado | instalar (`--worker`) → `Uninstall.exe` sem `--uninstall` → 376 arquivos, atalhos e chave de teste removidos, pasta apagada. |
+| Efeitos colaterais reais | nenhum nos testes: todos usaram `--shortcut-dir`/`--registry-key`; os atalhos reais existentes pertencem à instalação do usuário e não foram tocados. |
 | Janelas | nenhuma janela aberta nos testes (modo silencioso). |
 
 ### 7.1 Falha relatada e correção
@@ -196,10 +210,37 @@ Correções aplicadas:
 5. Nova opção `--worker` permite validar o modelo de threads da GUI em CI, sem
    abrir janela.
 
-**Não validado:** clique real na interface gráfica (a lógica de threads agora é
-coberta por `--worker`), fluxo de UAC em outro perfil de usuário,
-desinstalação interativa com o `.cmd` de auto-remoção e execução do jogo após a
-instalação. Esses pontos exigem sessão interativa.
+**Não validado:** clique real na interface gráfica (a lógica de threads é
+coberta por `--worker` e o helper por `--self-delete`), fluxo de UAC em outro
+perfil de usuário e execução do jogo após a instalação. Esses pontos exigem
+sessão interativa.
+
+### 7.2 Segunda falha relatada: desinstalação
+
+O usuário acionou a desinstalação por **duplo clique em `Uninstall.exe`** e
+obteve erro. O estado da máquina permaneceu intacto: 376 arquivos, chave
+`HKCU` e ambos os atalhos — ou seja, **`doUninstall` nunca chegou a rodar**.
+
+Causa raiz: `Uninstall.exe` é apenas uma cópia renomeada de
+`OrbitalSetup.exe`, mas só removia o programa quando recebia `--uninstall`.
+Sem esse argumento, entrava no fluxo de instalação e falhava com código `11`,
+pois não existe `payload/` dentro da pasta já instalada. O erro foi
+reproduzido executando a própria cópia instalada com `--silent` e um
+`--target` de teste: `RESULT=11`, nenhum arquivo alterado.
+
+Correções aplicadas:
+
+1. `wWinMain` compara o nome do executável com `Uninstall.exe` e ativa
+   `uninstall` automaticamente. `--install` desativa essa detecção.
+2. `scheduleSelfDelete` passa `%TEMP%` como `lpCurrentDirectory` de
+   `CreateProcessW` e o `.cmd` executa `cd /d "%~dp0"`. Antes, o helper
+   herdava a pasta de instalação como CWD e `rmdir` não conseguia apagá-la.
+3. Nova opção `--self-delete` permite exercitar o helper em `--silent`, sem
+   abrir janela — foi assim que a remoção completa foi validada.
+
+> A instalação existente no perfil contém o **`Uninstall.exe` antigo**. Para
+> usar a correção é necessário reinstalar com o `OrbitalSetup.exe` novo (que
+> substitui a pasta inteira e, portanto, também o desinstalador).
 
 ---
 
