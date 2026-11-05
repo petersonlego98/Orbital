@@ -32,6 +32,7 @@ Summary of obligations:
 Which license applies to which asset is listed in:
   - THIRD_PARTY_LICENSES/assets.txt
   - THIRD_PARTY_LICENSES/fonts.txt
+  - THIRD_PARTY_LICENSES/manifest.csv
 
 When redistributing the game, keep this file, the attribution notices and the
 links above together with the assets.

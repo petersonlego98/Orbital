@@ -526,6 +526,24 @@ task deployAll{
     }
 }
 
+task checkAssetLicenses{
+    group = 'verification'
+    description = 'Verifica se todos os assets possuem licenca registrada'
+
+    doLast{
+        def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+        def python = isWindows ? 'python' : 'python3'
+        def process = new ProcessBuilder(python, 'tools/audit_assets.py', '--check')
+            .directory(rootDir)
+            .inheritIO()
+            .start()
+        def exitCode = process.waitFor()
+        if(exitCode != 0){
+            throw new GradleException("Auditoria de licencas falhou (codigo ${exitCode}).")
+        }
+    }
+}
+
 task resolveDependencies{
     doLast{
         rootProject.allprojects{ project ->

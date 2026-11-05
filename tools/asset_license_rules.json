@@ -1,0 +1,228 @@
+{
+  "allowed": [
+    "GPL-3.0-or-later",
+    "CC0-1.0",
+    "CC-BY-4.0",
+    "CC-BY-SA-4.0",
+    "MIT",
+    "OFL-1.1",
+    "Public-Domain",
+    "CC-BY-SA-3.0",
+    "Aggregate"
+  ],
+  "sounds": {
+    "default": {
+      "license": "GPL-3.0-or-later",
+      "source": "Mindustry/Orbital (Anuken e colaboradores)",
+      "status": "OK"
+    },
+    "artists": [
+      {
+        "match": "rubberduck",
+        "license": "CC0-1.0",
+        "source": "OpenGameArt (rubberduck)",
+        "status": "OK"
+      },
+      {
+        "match": "qubodup",
+        "license": "CC0-1.0",
+        "source": "Freesound/OpenGameArt (Iwan 'qubodup' Gabovitch)",
+        "status": "OK"
+      },
+      {
+        "match": "Iwan Gabovitch",
+        "license": "Public-Domain",
+        "source": "Freesound (Iwan 'qubodup' Gabovitch)",
+        "status": "OK"
+      },
+      {
+        "match": "Jesus Lastra",
+        "license": "GPL-3.0-or-later",
+        "source": "Mindustry contributor (jalastram)",
+        "status": "OK"
+      },
+      {
+        "match": "jalastram",
+        "license": "GPL-3.0-or-later",
+        "source": "Mindustry contributor (jalastram)",
+        "status": "OK"
+      },
+      {
+        "match": "newlocknew",
+        "license": "GPL-3.0-or-later",
+        "source": "Mindustry contributor (newlocknew)",
+        "status": "OK"
+      },
+      {
+        "match": "dsmolenaers",
+        "license": "GPL-3.0-or-later",
+        "source": "Mindustry contributor (dsmolenaers)",
+        "status": "OK"
+      },
+      {
+        "match": "Headphaze",
+        "license": "GPL-3.0-or-later",
+        "source": "Mindustry contributor (Headphaze)",
+        "status": "OK"
+      },
+      {
+        "match": "Gregor Quendel",
+        "license": "REVISAR",
+        "source": "Designed Mecha (origem comercial)",
+        "status": "REVISAR"
+      },
+      {
+        "match": "Designed Mecha",
+        "license": "REVISAR",
+        "source": "Designed Mecha (origem comercial)",
+        "status": "REVISAR"
+      },
+      {
+        "match": "Joseph Krebs",
+        "license": "REVISAR",
+        "source": "Freesound (Joseph Krebs)",
+        "status": "REVISAR"
+      },
+      {
+        "match": "SoundJay",
+        "license": "REVISAR",
+        "source": "SoundJay.com",
+        "status": "REVISAR"
+      }
+    ],
+    "paths": {
+      "environment/rain.ogg": {
+        "license": "CC0-1.0",
+        "source": "OpenGameArt - Rain (loopable), Ylmir",
+        "status": "OK"
+      },
+      "block/coreLand.ogg": {
+        "license": "CC0-1.0",
+        "source": "OpenGameArt - 50 CC0 Sci-Fi SFX, rubberduck (explosion_01)",
+        "status": "OK"
+      },
+      "block/coreLaunch.ogg": {
+        "license": "CC0-1.0",
+        "source": "OpenGameArt - 50 CC0 Sci-Fi SFX, rubberduck (rocket_01)",
+        "status": "OK"
+      },
+      "block/drillImpact.ogg": {
+        "license": "CC0-1.0",
+        "source": "OpenGameArt - 100 CC0 SFX #2, rubberduck (stones_01)",
+        "status": "OK"
+      }
+    }
+  },
+  "music": {
+    "default": {
+      "license": "GPL-3.0-or-later",
+      "source": "Mindustry/Orbital (Anuken)",
+      "status": "OK"
+    }
+  },
+  "icons": {
+    "custom_icons": {
+      "author": "Mindustry/Orbital",
+      "license": "GPL-3.0-or-later",
+      "source": "Icones proprios do projeto",
+      "status": "OK"
+    },
+    "fontawesome": {
+      "author": "Font Awesome",
+      "license": "CC-BY-4.0",
+      "source": "Font Awesome Free (icones CC BY 4.0)",
+      "status": "OK"
+    },
+    "typicons": {
+      "author": "Stephen Hutchings",
+      "license": "CC-BY-SA-3.0",
+      "source": "Typicons",
+      "status": "OK"
+    },
+    "zocial": {
+      "author": "Sam Collins",
+      "license": "MIT",
+      "source": "Zocial",
+      "status": "OK"
+    },
+    "iconic": {
+      "author": "Waybury",
+      "license": "OFL-1.1",
+      "source": "Iconic",
+      "status": "OK"
+    },
+    "entypo": {
+      "author": "Daniel Bruce",
+      "license": "CC-BY-SA-4.0",
+      "source": "Entypo",
+      "status": "OK"
+    },
+    "elusive": {
+      "author": "Aristeides Stathopoulos",
+      "license": "OFL-1.1",
+      "source": "Elusive Icons",
+      "status": "OK"
+    },
+    "mfglabs": {
+      "author": "MFG Labs",
+      "license": "OFL-1.1",
+      "source": "MFG Labs Icons",
+      "status": "OK"
+    },
+    "brandico": {
+      "author": "Fontello/brandico",
+      "license": "Aggregate",
+      "source": "Brandico (licenca do projeto de origem)",
+      "status": "OK"
+    },
+    "modernpics": {
+      "author": "ModernPics",
+      "license": "Aggregate",
+      "source": "ModernPics (licenca do projeto de origem)",
+      "status": "OK"
+    }
+  },
+  "fonts": {
+    "font_jp.woff": {
+      "author": "Adobe",
+      "license": "OFL-1.1",
+      "source": "Noto Sans JP",
+      "status": "OK"
+    },
+    "monospace.woff": {
+      "author": "Fira Code Project",
+      "license": "OFL-1.1",
+      "source": "Fira Code",
+      "status": "OK"
+    },
+    "tech.ttf": {
+      "author": "Michal 'Neoqueto' Nowak",
+      "license": "CC-BY-SA-3.0",
+      "source": "FontStruct - Darktech LDR",
+      "status": "OK"
+    },
+    "logic.ttf": {
+      "author": "Tristan Grimmer",
+      "license": "MIT",
+      "source": "ProggyCleanTT",
+      "status": "OK"
+    },
+    "icon.ttf": {
+      "author": "Fontello e autores dos conjuntos",
+      "license": "Aggregate",
+      "source": "Fontello (ver assets.txt secao 5)",
+      "status": "OK"
+    },
+    "font.woff": {
+      "author": "Anuken/comunidade + Fontello",
+      "license": "GPL-3.0-or-later",
+      "source": "Fonte principal do Mindustry mesclada com icones Fontello",
+      "status": "OK"
+    }
+  },
+  "default": {
+    "license": "GPL-3.0-or-later",
+    "source": "Mindustry/Orbital",
+    "status": "OK"
+  }
+}

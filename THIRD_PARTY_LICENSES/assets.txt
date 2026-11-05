@@ -8,11 +8,11 @@ RESUMO
 - Codigo-fonte e recursos originais do Mindustry/Orbital: GPLv3.
 - Musica (core/assets/music): integralmente de Anuken -> GPLv3.
 - Sprites, mapas, shaders, cubemaps e traducoes: GPLv3.
-- Efeitos sonoros: parte e de terceiros (Freesound, OpenGameArt, SoundJay e
-  outros), com licencas proprias. A GPLv3 NAO relicencia esses arquivos.
+- Efeitos sonoros: parte e de terceiros (Freesound, OpenGameArt e outros), com
+  licencas proprias. A GPLv3 NAO relicencia esses arquivos.
 - Fontes: Noto Sans JP e Fira Code (SIL OFL 1.1), Darktech LDR (CC BY-SA 3.0),
-  ProggyCleanTT (licenca permissiva) e a fonte de icones Fontello (varios
-  conjuntos, cada um com sua licenca).
+  ProggyCleanTT (MIT) e a fonte de icones Fontello (varios conjuntos, cada um
+  com sua licenca).
 - Icones: Font Awesome, Typicons, Entypo, Zocial, Iconic, Elusive, MFG Labs,
   Brandico, ModernPics e icones customizados.
 
@@ -20,6 +20,10 @@ Nenhuma licenca de terceiro e substituida pela GPLv3. Quando este arquivo diz
 que um recurso e "GPLv3", isso significa que ele foi criado por Anuken ou por
 colaboradores do Mindustry/Orbital e distribuido como parte do projeto sob a
 GPLv3.
+
+O inventario completo, arquivo por arquivo, esta em
+THIRD_PARTY_LICENSES/manifest.csv. Ele e gerado e validado por
+`python tools/audit_assets.py --check`.
 
 ================================================================================
 1. MUSICA - GPLv3
@@ -53,56 +57,42 @@ Anuken/comunidade (GPLv3), mas os conjuntos abaixo vieram de terceiros e NAO
 sao relicenciados como GPLv3. Cada arquivo conserva a licenca da fonte
 original.
 
-3.1 Freesound.org
-    - jalastram (Jesus Lastra)
-    - newlocknew
-    - dsmolenaers
-    - Headphaze
-    Arquivos incluem os sons de clima (rain, wind, wind2, windHowl) e parte dos
-    lasers, explosões e loops adicionados em 2020.
-    Licenca: Creative Commons, conforme a pagina de cada som (CC0, CC BY ou
-    CC BY-SA). A licenca exata varia por arquivo e deve ser confirmada na
-    pagina original antes de qualquer redistribuicao isolada.
-    Perfis: https://freesound.org/people/jalastram/
-            https://freesound.org/people/newlocknew/
-            https://freesound.org/people/dsmolenaers/
-            https://freesound.org/people/Headphaze/
-
-3.2 OpenGameArt.org
-    - Michel Baradari
-    - Michael Klier
-    - Lee Barkovich
-    Arquivos incluem sons de torretas de Erekir (2022) e o conjunto "More
-    sounds" (2025).
-    Licenca: Creative Commons, conforme a pagina de cada envio (CC0, CC BY ou
-    CC BY-SA). Confirme na pagina original.
-    Site: https://opengameart.org
-
-3.3 Outros autores identificados nos metadados dos arquivos
-    Estes nomes aparecem nas tags dos proprios .ogg e precisam de verificacao
-    individual na fonte:
-
-    - rubberduck (OpenGameArt/Freesound) - grande parte dos sons de blocos,
-      explosoes, loops e passos. O conjunto "100 CC0 SFX" de rubberduck e CC0.
-      https://opengameart.org/content/100-cc0-sfx
+3.1 Freesound.org e OpenGameArt.org
+    - jalastram (Jesus Lastra) - sons de tiro "Shooting_Sounds_008".
+    - newlocknew, dsmolenaers, Headphaze - clima e ambiencia (Freesound).
+    - Michel Baradari, Michael Klier, Lee Barkovich - torretas e "More sounds"
+      (OpenGameArt).
+    - rubberduck - blocos, explosoes, loops e passos. Pacotes
+      "100 CC0 SFX", "100 CC0 SFX #2" e "50 CC0 Sci-Fi SFX" (CC0).
     - Iwan "qubodup" Gabovitch - "Synthetic explosion 1" (dominio publico) e
       "Dark Magic Loop" (mix de sons CC0).
-      https://freesound.org/people/qubodup/
-    - Gregor Quendel / Designed Mecha - coreLand.ogg e coreLaunch.ogg
-      ("SCIEnrg_Elements Power 02", "SCIMech_Elements Gear 01").
-      https://freesound.org/people/GregorQuendel/
-    - Joseph Krebs - "018 Falling Rocks" (drillImpact.ogg).
-    - Jesus Lastra - "Shooting_Sounds_008" (shootLaser.ogg, shootSegment.ogg).
-    - SoundJay.com - environment/rain.ogg.
-      Termos: https://www.soundjay.com/tos.html
+    A licenca exata de cada arquivo esta registrada no manifest.csv. Quando a
+    origem e Creative Commons, o link da licenca esta em creative-commons.txt.
 
-    ATENCAO: os termos do SoundJay permitem usar os sons em projetos, mas
-    proibem redistribuir os arquivos como sons isolados. Isso e incompativel
-    com a GPLv3 e com a redistribuicao do arquivo-fonte do jogo. Recomenda-se
-    substituir environment/rain.ogg por um som CC0 antes de publicar uma
-    versao que se pretenda integralmente GPLv3.
+3.2 Sons substituidos nesta auditoria
+    Os arquivos abaixo foram substituidos por equivalentes CC0 porque a origem
+    anterior era incompativel com a GPLv3 ou nao tinha licenca confirmada:
 
-3.4 Sons restantes
+    - environment/rain.ogg
+      Antes: SoundJay.com (termos proprios, redistribuicao restrita).
+      Agora: "Rain (loopable) 2", Ylmir (OpenGameArt, CC0 1.0).
+      https://opengameart.org/content/rain-loopable
+    - block/coreLand.ogg
+      Antes: Gregor Quendel / Designed Mecha (origem comercial sem concessao).
+      Agora: "explosion_01", rubberduck (OpenGameArt, CC0 1.0).
+      https://opengameart.org/content/50-cc0-sci-fi-sfx
+    - block/coreLaunch.ogg
+      Antes: Gregor Quendel / Designed Mecha (origem comercial sem concessao).
+      Agora: "rocket_01", rubberduck (OpenGameArt, CC0 1.0).
+      https://opengameart.org/content/50-cc0-sci-fi-sfx
+    - block/drillImpact.ogg
+      Antes: Joseph Krebs (licenca nao confirmada).
+      Agora: "sfx100v2_stones_01", rubberduck (OpenGameArt, CC0 1.0).
+      https://opengameart.org/content/100-cc0-sfx-2
+
+    Os metadados de autor, licenca e origem foram gravados nos proprios .ogg.
+
+3.3 Sons restantes
     Os demais arquivos foram criados por Anuken ou por colaboradores do
     Mindustry e sao distribuidos sob GPLv3.
 
@@ -115,10 +105,14 @@ Consulte tambem THIRD_PARTY_LICENSES/fonts.txt.
   monospace.woff  Fira Code Medium                     SIL OFL 1.1
   tech.ttf        Darktech LDR, Michal "Neoqueto" Nowak CC BY-SA 3.0
   logic.ttf       ProggyCleanTT, Tristan Grimmer       MIT
-  font.woff       fonte de icones gerada pelo Fontello varios conjuntos
-  icon.ttf        fonte de icones gerada pelo Fontello varios conjuntos
+  font.woff       fonte principal do Mindustry + icones Fontello
+  icon.ttf        fonte de icones gerada pelo Fontello
 
-O texto da SIL OFL 1.1 esta em THIRD_PARTY_LICENSES/OFL-1.1.txt.
+O texto da SIL OFL 1.1 esta em THIRD_PARTY_LICENSES/OFL-1.1.txt e o texto da
+MIT da ProggyCleanTT em THIRD_PARTY_LICENSES/MIT-ProggyCleanTT.txt.
+
+A fonte tech.ttf (CC BY-SA 3.0) e distribuida como obra separada. Ela nao
+relicencia o restante do jogo e deve manter a atribuicao e o link da licenca.
 
 ================================================================================
 5. ICONES - LICENCAS DE TERCEIROS
@@ -126,8 +120,8 @@ O texto da SIL OFL 1.1 esta em THIRD_PARTY_LICENSES/OFL-1.1.txt.
 core/assets-raw/fontgen/config.json gera font.woff/icon.ttf a partir de 138
 glifos. As origens declaradas sao:
 
-  custom_icons (53)  icones proprios do Mindustry/Orbital
-  fontawesome  (46)  Font Awesome - fonte OFL 1.1 / icones CC BY 4.0
+  custom_icons (53)  icones proprios do Mindustry/Orbital - GPLv3
+  fontawesome  (46)  Font Awesome Free - icones CC BY 4.0
   typicons     (27)  Typicons - CC BY-SA 3.0
   zocial        (3)  Zocial - MIT
   iconic        (2)  Iconic - SIL OFL 1.1
@@ -153,7 +147,7 @@ redistribuir o Orbital:
 
 - mantenha LICENSE, NOTICE.txt, CREDITS.md e esta pasta;
 - preserve a atribuicao de cada autor listado acima;
-- mantenha os textos de OFL 1.1 e os links das licencas Creative Commons;
+- mantenha os textos de OFL 1.1, MIT e os links das licencas Creative Commons;
 - nao remova avisos de copyright dos arquivos de terceiros.
 
 Se voce acredita que algum recurso foi creditado incorretamente, abra uma issue:

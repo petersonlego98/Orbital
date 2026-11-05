@@ -41,12 +41,12 @@ original não endossa nem mantém este fork.
 | Efeitos sonoros de clima, lasers e SFX (2020) | jalastram, newlocknew, dsmolenaers, Headphaze (Freesound.org) | Creative Commons (CC0 / CC BY / CC BY-SA, conforme o arquivo) |
 | Sons de torretas de Erekir (2022) | Michel Baradari, Michael Klier (OpenGameArt.org) | Creative Commons (conforme a página original) |
 | Conjunto "More sounds" (2025) | Lee Barkovich (OpenGameArt.org) | Creative Commons (conforme a página original) |
-| Diversos blocos, explosões e loops | rubberduck | CC0 (conjunto "100 CC0 SFX") |
+| Diversos blocos, explosões e loops | rubberduck | CC0 ("100 CC0 SFX", "100 CC0 SFX #2" e "50 CC0 Sci-Fi SFX") |
 | "Synthetic explosion 1" e "Dark Magic Loop" | Iwan "qubodup" Gabovitch | Domínio público / CC0 |
-| `coreLand.ogg`, `coreLaunch.ogg` | Gregor Quendel / Designed Mecha | Verificar na origem (Freesound) |
-| `drillImpact.ogg` ("018 Falling Rocks") | Joseph Krebs | Verificar na origem |
-| `shootLaser.ogg`, `shootSegment.ogg` ("Shooting_Sounds_008") | Jesus Lastra | Verificar na origem |
-| `environment/rain.ogg` | SoundJay.com | Termos próprios do SoundJay (não é GPLv3) |
+| `coreLand.ogg`, `coreLaunch.ogg` | rubberduck (OpenGameArt) | CC0 |
+| `drillImpact.ogg` | rubberduck (OpenGameArt) | CC0 |
+| `shootLaser.ogg`, `shootSegment.ogg` ("Shooting_Sounds_008") | Jesus Lastra | Creative Commons (conforme a origem) |
+| `environment/rain.ogg` ("Rain (loopable) 2") | Ylmir (OpenGameArt) | CC0 |
 | Fonte `font_jp.woff` | Noto Sans JP (Adobe) | SIL OFL 1.1 |
 | Fonte `monospace.woff` | Fira Code | SIL OFL 1.1 |
 | Fonte `tech.ttf` | Darktech LDR, Michał "Neoqueto" Nowak | CC BY-SA 3.0 |
@@ -59,9 +59,12 @@ Detalhes completos, arquivos afetados e links:
 - `THIRD_PARTY_LICENSES/fonts.txt`
 - `THIRD_PARTY_LICENSES/creative-commons.txt`
 - `THIRD_PARTY_LICENSES/OFL-1.1.txt`
+- `THIRD_PARTY_LICENSES/MIT-ProggyCleanTT.txt`
+- `THIRD_PARTY_LICENSES/manifest.csv` (inventário arquivo por arquivo)
 - `THIRD_PARTY_LICENSES/libraries.txt`
 
-> **Atenção:** o arquivo `core/assets/sounds/environment/rain.ogg` contém
-> metadados do SoundJay.com, cujos termos não são compatíveis com a GPLv3.
-> Recomenda-se substituí-lo por um som CC0 antes de redistribuir o jogo como
-> uma obra integralmente GPLv3.
+> **Auditoria de novembro de 2026:** os quatro sons com origem incompatível ou
+> não confirmada (`rain.ogg`, `coreLand.ogg`, `coreLaunch.ogg` e
+> `drillImpact.ogg`) foram substituídos por equivalentes CC0. O inventário
+> completo está em `manifest.csv` e pode ser validado com
+> `python tools/audit_assets.py --check`.

@@ -140,6 +140,8 @@ Os documentos de design ficam em:
 - [Sistema de setores](docs/RELATORIO_SISTEMA_DE_SETORES.md)
 - [Torres como módulos](docs/RELATORIO_TORRES_COMO_MODULOS.md)
 - [Unidades de Orbital](docs/RELATORIO_UNIDADES_ORBITAL.md)
+- [Licenciamento de assets](docs/LICENCIAMENTO_ASSETS.md)
+- [Auditoria de licenças (novembro de 2026)](docs/auditoria-licencas-2026-11.md)
 
 ---
 
@@ -184,8 +186,9 @@ Os assets também têm origens distintas:
 
 - **Música:** todas as 16 faixas são de Anuken e estão sob GPLv3.
 - **Sprites, mapas, shaders e traduções:** GPLv3.
-- **Efeitos sonoros:** em parte de terceiros (Freesound, OpenGameArt, SoundJay
-  e outros), com licenças Creative Commons ou termos próprios.
+- **Efeitos sonoros:** em parte de terceiros (Freesound, OpenGameArt e outros),
+  com licenças Creative Commons. Os sons de origem incompatível ou não
+  confirmada foram substituídos por equivalentes CC0.
 - **Fontes:** Noto Sans JP e Fira Code (SIL OFL 1.1), Darktech LDR (CC BY-SA
   3.0), ProggyCleanTT (MIT) e a fonte de ícones Fontello.
 - **Ícones:** Font Awesome, Typicons, Entypo, Zocial, Iconic, Elusive, MFG
@@ -198,6 +201,14 @@ Consulte:
 - [THIRD_PARTY_LICENSES/fonts.txt](THIRD_PARTY_LICENSES/fonts.txt)
 - [THIRD_PARTY_LICENSES/creative-commons.txt](THIRD_PARTY_LICENSES/creative-commons.txt)
 - [THIRD_PARTY_LICENSES/OFL-1.1.txt](THIRD_PARTY_LICENSES/OFL-1.1.txt)
+- [THIRD_PARTY_LICENSES/MIT-ProggyCleanTT.txt](THIRD_PARTY_LICENSES/MIT-ProggyCleanTT.txt)
+- [THIRD_PARTY_LICENSES/manifest.csv](THIRD_PARTY_LICENSES/manifest.csv)
+
+O inventário de licenças pode ser verificado com:
+
+```powershell
+python tools/audit_assets.py --check
+```
 
 ### Sem garantia
 

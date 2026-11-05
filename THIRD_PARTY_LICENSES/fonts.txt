@@ -37,12 +37,20 @@ Nenhuma delas e relicenciada como GPLv3: cada uma mantem a sua licenca.
    Texto: THIRD_PARTY_LICENSES/MIT-ProggyCleanTT.txt
    URL: http://proggyfonts.net
 
-5. font.woff e icon.ttf
-   Fonte de icones gerada pelo Fontello (http://fontello.com).
-   Copyright (C) 2026 by original authors @ fontello.com.
+5. font.woff
+   Fonte principal de texto do Mindustry (Anuken/comunidade, GPLv3), mesclada
+   com os glifos de icones do Fontello (http://fontello.com) por meio do
+   processo de merge em core/assets-raw/fontgen/merge.pe.
+   Os metadados do arquivo foram sobrescritos pelo Fontello; a origem textual
+   GPLv3 e a origem dos icones estao documentadas aqui e em assets.txt.
    Contem glifos de Font Awesome, Typicons, Zocial, Iconic, Entypo, Elusive,
    MFG Labs, Brandico, ModernPics e 53 icones customizados.
-   Cada conjunto de icones mantem a sua licenca original. Consulte
+
+6. icon.ttf
+   Fonte de icones gerada pelo Fontello (http://fontello.com).
+   Copyright (C) 2026 by original authors @ fontello.com.
+   Contem os mesmos glifos de icones do item 5.
+   Cada conjunto mantem a sua licenca original. Consulte
    THIRD_PARTY_LICENSES/assets.txt, secao 5, para a lista e as licencas.
 
 A redistribuicao do jogo deve manter este arquivo, o texto da OFL 1.1 e a

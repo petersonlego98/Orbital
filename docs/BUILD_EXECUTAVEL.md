@@ -67,6 +67,8 @@ A GPLv3 exige que a licença e os avisos acompanhem os binários. Copie os arqui
 $dest = "deploy\windows64\Orbital"
 Copy-Item LICENSE, README.md, CREDITS.md, NOTICE.txt -Destination $dest -Force
 Copy-Item THIRD_PARTY_LICENSES -Destination $dest -Recurse -Force
+New-Item -ItemType Directory -Force -Path "$dest\docs" | Out-Null
+Copy-Item docs\LICENCIAMENTO_ASSETS.md, docs\auditoria-licencas-2026-11.md, docs\BUILD_EXECUTAVEL.md -Destination "$dest\docs" -Force
 ```
 
 Resultado esperado:
@@ -82,7 +84,12 @@ Orbital/
 │   ├── fonts.txt
 │   ├── creative-commons.txt
 │   ├── OFL-1.1.txt
-│   └── MIT-ProggyCleanTT.txt
+│   ├── MIT-ProggyCleanTT.txt
+│   └── manifest.csv
+├── docs/
+│   ├── BUILD_EXECUTAVEL.md
+│   ├── LICENCIAMENTO_ASSETS.md
+│   └── auditoria-licencas-2026-11.md
 ├── CREDITS.md
 ├── NOTICE.txt
 └── Orbital.exe
@@ -110,6 +117,8 @@ jpackage --type app-image --name "Orbital" --input "desktop\build\libs" --main-j
 $dest = "deploy\windows64\Orbital"
 Copy-Item LICENSE, README.md, CREDITS.md, NOTICE.txt -Destination $dest -Force
 Copy-Item THIRD_PARTY_LICENSES -Destination $dest -Recurse -Force
+New-Item -ItemType Directory -Force -Path "$dest\docs" | Out-Null
+Copy-Item docs\LICENCIAMENTO_ASSETS.md, docs\auditoria-licencas-2026-11.md, docs\BUILD_EXECUTAVEL.md -Destination "$dest\docs" -Force
 ```
 
 ---
@@ -130,6 +139,8 @@ Antes de publicar qualquer binário, confirme que:
 - [ ] `CREDITS.md` credita Anuken, a comunidade original e os colaboradores do fork.
 - [ ] `NOTICE.txt` informa onde o código-fonte correspondente pode ser obtido.
 - [ ] `THIRD_PARTY_LICENSES/libraries.txt` e `assets.txt` acompanham a instalação.
-- [ ] `THIRD_PARTY_LICENSES/fonts.txt`, `creative-commons.txt`, `OFL-1.1.txt` e
-      `MIT-ProggyCleanTT.txt` acompanham a instalação.
+- [ ] `THIRD_PARTY_LICENSES/fonts.txt`, `creative-commons.txt`, `OFL-1.1.txt`,
+      `MIT-ProggyCleanTT.txt` e `manifest.csv` acompanham a instalação.
+- [ ] `python tools/audit_assets.py --check` retorna código 0 (ou
+      `.\gradlew.bat checkAssetLicenses`).
 - [ ] O código-fonte correspondente à versão publicada está acessível no repositório do fork.
