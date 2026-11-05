@@ -1,0 +1,30 @@
+1 24 "orbital_setup.manifest"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK  0x3fL
+ FILEFLAGS      0x0L
+ FILEOS         0x40004L
+ FILETYPE       0x1L
+ FILESUBTYPE    0x0L
+{
+    BLOCK "StringFileInfo"
+    {
+        BLOCK "040904b0"
+        {
+            VALUE "CompanyName",      "Orbital contributors\0"
+            VALUE "FileDescription",  "Orbital per-user installer\0"
+            VALUE "FileVersion",      "1.0.0.0\0"
+            VALUE "InternalName",     "OrbitalSetup\0"
+            VALUE "LegalCopyright",   "GPL-3.0-or-later\0"
+            VALUE "OriginalFilename", "OrbitalSetup.exe\0"
+            VALUE "ProductName",      "Orbital\0"
+            VALUE "ProductVersion",   "1.0.0.0\0"
+        }
+    }
+    BLOCK "VarFileInfo"
+    {
+        VALUE "Translation", 0x0409, 1200
+    }
+}

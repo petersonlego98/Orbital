@@ -145,3 +145,23 @@ Antes de publicar qualquer binário, confirme que:
 - [ ] `python tools/audit_assets.py --check` retorna código 0 (ou
       `.\gradlew.bat checkAssetLicenses`).
 - [ ] O código-fonte correspondente à versão publicada está acessível no repositório do fork.
+
+---
+
+## 6. Instalador sem administrador
+
+O `Orbital.exe` deste documento é um **app-image**, não um instalador. Para
+distribuir ao usuário final sem exigir UAC, gere o instalador por usuário:
+
+```bash
+bash installer/build.sh
+```
+
+Ele produz `build/installer/OrbitalSetup.exe` mais a pasta
+`build/installer/payload/` (cópia exata deste app-image). Os dois devem ser
+distribuídos juntos. A instalação vai para `%LOCALAPPDATA%\Programs\Orbital`,
+cria atalhos no Menu Iniciar/Área de Trabalho e registra o desinstalador em
+`HKCU` — nada em `Program Files` ou `HKLM`.
+
+Detalhes de toolchain (exceção autorizada ao `cl.exe`), opções de linha de
+comando, validação e limitações: **[Instalador por usuário](INSTALADOR_SEM_ADMIN.md)**.

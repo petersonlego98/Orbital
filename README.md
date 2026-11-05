@@ -144,6 +144,7 @@ Os documentos de design ficam em:
 - [Auditoria de licenças (novembro de 2026)](docs/auditoria-licencas-2026-11.md)
 - [Substituição de assets incompatíveis por MIT](docs/SUBSTITUICAO_ASSETS_MIT.md)
 - [Migração dos efeitos sonoros para MIT](docs/PROPOSTA_MIT_ASSETS.md)
+- [Instalador sem administrador](docs/INSTALADOR_SEM_ADMIN.md)
 
 ---
 
