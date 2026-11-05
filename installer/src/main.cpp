@@ -6,8 +6,10 @@
  *
  * Design constraints:
  *   - The embedded manifest requests "asInvoker": no UAC prompt, ever.
- *   - Writes only under %LOCALAPPDATA%, the user's Start Menu / Desktop and
+ *   - Writes only under %LOCALAPPDATA%, the user's Desktop / Start Menu and
  *     HKCU\...\Uninstall. Never touches Program Files or HKLM.
+ *   - The Desktop shortcut is mandatory; the Start Menu shortcut is
+ *     best-effort and never aborts the installation.
  *   - The payload is a sibling "payload/" directory (an unmodified jpackage
  *     app-image). No compression, no self-extraction, no external download.
  *
@@ -101,6 +103,7 @@ fs::path defaultTarget(){
 struct Options{
     bool uninstall = false;
     bool silent = false;
+    bool worker = false;   // CI: run the install on a background thread, like the GUI does
     bool shortcuts = true;
     bool registry = true;
     fs::path target;
@@ -119,6 +122,7 @@ Options parseOptions(){
         std::wstring a = argv[i];
         if(a == L"--uninstall") o.uninstall = true;
         else if(a == L"--silent") o.silent = true;
+        else if(a == L"--worker") o.worker = true;
         else if(a == L"--no-shortcuts") o.shortcuts = false;
         else if(a == L"--no-register") o.registry = false;
         else if(a == L"--target" && i + 1 < argc) o.target = argv[++i];
@@ -162,7 +166,28 @@ struct GuiReporter final : Reporter{
     }
 };
 
+/*
+ * COM is per-thread. The GUI installer runs doInstall on a worker thread, so
+ * CoCreateInstance fails with CO_E_NOTINITIALIZED unless COM is initialized on
+ * that exact thread. This scope makes createShortcut safe from any thread.
+ */
+struct ComScope{
+    bool mustUninitialize = false;
+
+    ComScope(){
+        const HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        mustUninitialize = (hr == S_OK || hr == S_FALSE);
+    }
+    ~ComScope(){
+        if(mustUninitialize) CoUninitialize();
+    }
+    ComScope(const ComScope&) = delete;
+    ComScope& operator=(const ComScope&) = delete;
+};
+
 bool createShortcut(const fs::path& lnk, const fs::path& exe, const wchar_t* description){
+    ComScope com;
+
     IShellLinkW* link = nullptr;
     HRESULT hr = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
                                   IID_IShellLinkW, reinterpret_cast<void**>(&link));
@@ -279,9 +304,13 @@ bool removeTree(const fs::path& root, Reporter& reporter){
                   return a.wstring().size() > b.wstring().size();
               });
     for(const auto& directory : directories){
+        clearReadOnly(directory);
         std::error_code ignored;
         fs::remove(directory, ignored);
     }
+    // Windows directories can inherit FILE_ATTRIBUTE_READONLY; std::filesystem
+    // then refuses to remove even an empty one.
+    clearReadOnly(root);
     std::error_code ignored;
     fs::remove(root, ignored);
 
@@ -397,19 +426,33 @@ int doInstall(const Options& o, const fs::path& payload, Reporter& reporter){
 
     if(o.shortcuts){
         reporter.status(L"Criando atalhos...");
+        const auto warnStartMenu = [&](){
+            reporter.status(L"Aviso: nao foi possivel criar o atalho no Menu Iniciar; "
+                            L"a instalacao continua com o atalho da Area de Trabalho.");
+            logLine(L"WARNING=start-menu-shortcut");
+        };
+
         if(!o.shortcutDir.empty()){
             fs::create_directories(o.shortcutDir, ec);
-            if(!createShortcut(o.shortcutDir / L"Orbital-StartMenu.lnk",
-                               target / kGameExe, L"Orbital")) return 17;
+
+            // Desktop is the preferred, mandatory shortcut.
             if(!createShortcut(o.shortcutDir / L"Orbital-Desktop.lnk",
                                target / kGameExe, L"Orbital")) return 18;
+
+            // Start Menu is best-effort only: never abort the installation.
+            if(!createShortcut(o.shortcutDir / L"Orbital-StartMenu.lnk",
+                               target / kGameExe, L"Orbital")) warnStartMenu();
         }else{
             const std::wstring programs = knownFolder(FOLDERID_Programs);
             const std::wstring desktop = knownFolder(FOLDERID_Desktop);
-            if(programs.empty() || !createShortcut(fs::path(programs) / kShortcutName,
-                                                   target / kGameExe, L"Orbital")) return 17;
-            if(!desktop.empty() && !createShortcut(fs::path(desktop) / kShortcutName,
-                                                   target / kGameExe, L"Orbital")) return 18;
+
+            // Desktop first: it is the shortcut the user actually wants.
+            if(desktop.empty() || !createShortcut(fs::path(desktop) / kShortcutName,
+                                                  target / kGameExe, L"Orbital")) return 18;
+
+            // Start Menu is best-effort only: never abort the installation.
+            if(!programs.empty() && !createShortcut(fs::path(programs) / kShortcutName,
+                                                    target / kGameExe, L"Orbital")) warnStartMenu();
         }
     }
 
@@ -548,8 +591,8 @@ std::wstring errorMessage(int code){
         case 14: return L"Instalacao cancelada.";
         case 15: return L"Falha ao copiar um arquivo.";
         case 16: return L"Falha ao copiar o desinstalador.";
-        case 17: return L"Falha ao criar o atalho no Menu Iniciar.";
-        case 18: return L"Falha ao criar o atalho na Area de Trabalho.";
+        case 17: return L"Falha ao criar um atalho adicional.";
+        case 18: return L"Falha ao criar o atalho obrigatorio na Area de Trabalho.";
         case 19: return L"Falha ao registrar o desinstalador em HKCU.";
         case 20: return L"Falha ao criar a janela do instalador.";
         case 21: return L"Alguns arquivos nao puderam ser removidos.";
@@ -560,7 +603,8 @@ std::wstring errorMessage(int code){
 } // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int){
-    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    // COM is initialized per-thread inside createShortcut (ComScope), because
+    // the GUI install runs on a worker thread. Do not initialize it only here.
     InitCommonControls();
 
     const Options options = parseOptions();
@@ -575,7 +619,17 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int){
 
     if(options.silent){
         SilentReporter reporter;
-        result = options.uninstall ? doUninstall(options, reporter) : doInstall(options, payload, reporter);
+        auto run = [&](){
+            return options.uninstall ? doUninstall(options, reporter)
+                                    : doInstall(options, payload, reporter);
+        };
+        if(options.worker){
+            // Reproduces the GUI threading model in CI: COM must work here too.
+            std::thread background([&](){ result = run(); });
+            background.join();
+        }else{
+            result = run();
+        }
         logLine(L"MODE=" + std::wstring(options.uninstall ? L"uninstall" : L"install"));
         logLine(L"RESULT=" + std::to_wstring(result));
         logLine(result == 0 ? L"STATUS=ok" : L"STATUS=failed");
@@ -636,6 +690,5 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int){
     }
 
     if(g_log != INVALID_HANDLE_VALUE) CloseHandle(g_log);
-    CoUninitialize();
     return result;
 }

@@ -15,7 +15,7 @@ administrador**.
 |---|---|
 | Manifesto do executável | `requestedExecutionLevel level="asInvoker" uiAccess="false"` embutido em `OrbitalSetup.exe`. |
 | Destino | `%LOCALAPPDATA%\Programs\Orbital` (pasta do usuário). |
-| Atalhos | Menu Iniciar e Área de Trabalho do usuário (`FOLDERID_Programs`, `FOLDERID_Desktop`). |
+| Atalhos | **Área de Trabalho** (`FOLDERID_Desktop`) — obrigatório; **Menu Iniciar** (`FOLDERID_Programs`) — melhor esforço, falha gera aviso e não aborta. |
 | Registro | apenas `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Orbital`. |
 | O que **não** é feito | nenhuma escrita em `Program Files`, `HKLM`, `System32`, serviços, drivers, PATH global ou tarefas agendadas. |
 
@@ -57,7 +57,7 @@ installer/
 
 build/installer/                   # saída, ignorada pelo Git
 ├── OrbitalSetup.exe               # ~3,4 MB, estático
-├── payload/                       # 374 arquivos / 235,8 MB
+├── payload/                       # 375 arquivos / 235,8 MB
 │   ├── Orbital.exe
 │   ├── app/Orbital.jar
 │   ├── runtime/
@@ -105,18 +105,29 @@ Executar `OrbitalSetup.exe` (duplo clique, sem "Executar como administrador"):
 1. Confirma o destino `%LOCALAPPDATA%\Programs\Orbital`.
 2. Se já existir uma instalação, remove a anterior (inclusive arquivos
    somente leitura, como o `Orbital.exe` do `jpackage`).
-3. Copia os 374 arquivos de `payload/` com barra de progresso.
+3. Copia os 375 arquivos de `payload/` com barra de progresso.
 4. Copia a si mesmo como `Uninstall.exe`.
-5. Cria `Orbital.lnk` no Menu Iniciar e na Área de Trabalho.
-6. Registra o desinstalador em `HKCU`.
+5. Cria `Orbital.lnk` na **Área de Trabalho** (obrigatório). Se falhar, a
+   instalação é interrompida com código `18`.
+6. Tenta criar `Orbital.lnk` no **Menu Iniciar**. Se falhar, registra
+   `WARNING=start-menu-shortcut` no log e continua — a Área de Trabalho é o
+   atalho preferido.
+7. Registra o desinstalador em `HKCU` (mantido, para constar em Aplicativos e
+   recursos).
+
+> **COM é por thread.** A cópia roda numa thread de trabalho para não travar a
+> janela. `CoCreateInstance` (usado para gerar `.lnk`) só funciona se COM for
+> inicializado **nessa mesma thread**; por isso `createShortcut` usa um escopo
+> RAII próprio de `CoInitializeEx`/`CoUninitialize`.
 
 ### Desinstalar
 
-Pelo **Aplicativos e recursos**, pelo atalho do Menu Iniciar **ou** executando
-`Uninstall.exe --uninstall` na pasta de instalação. Remove atalhos, a chave
-`HKCU` e todos os arquivos. Como um processo não pode apagar o próprio `.exe`,
-o desinstalador cria um `.cmd` oculto em `%TEMP%` (sem janela visível) que
-apaga `Uninstall.exe` e a pasta já vazia, e em seguida apaga a si mesmo.
+Pelo **Aplicativos e recursos**, pelo atalho da Área de Trabalho/Menu Iniciar
+(quando existir) **ou** executando `Uninstall.exe --uninstall` na pasta de
+instalação. Remove atalhos, a chave `HKCU` e todos os arquivos. Como um
+processo não pode apagar o próprio `.exe`, o desinstalador cria um `.cmd`
+oculto em `%TEMP%` (sem janela visível) que apaga `Uninstall.exe` e a pasta já
+vazia, e em seguida apaga a si mesmo.
 
 ---
 
@@ -126,6 +137,7 @@ apaga `Uninstall.exe` e a pasta já vazia, e em seguida apaga a si mesmo.
 |---|---|
 | `--uninstall` | executa a remoção em vez da instalação. |
 | `--silent` | sem janelas; resultado gravado via `--log`. |
+| `--worker` | **CI**: executa a instalação em thread de trabalho, reproduzindo o modelo da GUI sem abrir janela. |
 | `--target <dir>` | substitui o destino padrão (usado em CI). |
 | `--log <arquivo>` | gravar log UTF-8 com `RESULT=<código>` e `STATUS=ok\|failed`. |
 | `--no-shortcuts` | não cria/remove atalhos. |
@@ -137,8 +149,9 @@ Em `--silent`, o `Uninstall.exe` é **mantido** no diretório para tornar a
 validação determinística. A remoção completa ocorre no modo interativo.
 
 Códigos de saída: `0` sucesso; `1` cancelado pelo usuário; `10`–`21` falhas
-específicas (payload ausente = `11`, falha de cópia = `15`, atalho = `17/18`,
-registro = `19`, remoção incompleta = `21`).
+específicas (payload ausente = `11`, falha de cópia = `15`,
+**atalho obrigatório da Área de Trabalho = `18`**, registro = `19`, remoção
+incompleta = `21`). Falha no Menu Iniciar **não** gera código de erro.
 
 ---
 
@@ -149,17 +162,44 @@ registro = `19`, remoção incompleta = `21`).
 | `bash installer/build.sh` | concluído sem avisos do compilador/linkador. |
 | Manifesto embutido | 1 manifesto, `asInvoker`, `uiAccess="false"`, sem `requireAdministrator`. |
 | Dependências do `.exe` | somente DLLs do sistema; nenhuma `libgcc`/`libstdc++` externa. |
-| Instalação silenciosa (sem atalhos/registro) | `RESULT=0`, **374 arquivos copiados**, 0 divergências de SHA-256 contra `payload/`. |
-| Reinstalação sobre instalação anterior | `RESULT=0` — confirmou a correção do arquivo somente leitura. |
+| Instalação silenciosa (sem atalhos/registro) | `RESULT=0`, **374 arquivos copiados** na primeira medição (375 após adicionar este documento ao deploy), 0 divergências de SHA-256 contra `payload/`. |
+| Reinstalação sobre instalação anterior | `RESULT=0` — confirmou a correção do arquivo somente leitura e, depois, do diretório somente leitura. |
 | Conteúdo instalado | `Orbital.jar` com 39 WAVs / 182 OGGs e `MIT-Original-Sounds.txt` presente. |
 | Instalação completa com ganchos de CI | 2 `.lnk` válidos (magic `4C 00 00 00`, apontando para `Orbital.exe`); chave `HKCU` criada com `DisplayName=Orbital` e `UninstallString` correto. |
+| Instalação em **thread de trabalho** (`--worker`) | `RESULT=0`, **375 arquivos**, ambos os `.lnk` criados — comprova que a correção de COM cobre o caminho da GUI. |
+| Falha forçada no Menu Iniciar | diretório colocado no lugar do `.lnk`: `RESULT=0`, `WARNING=start-menu-shortcut`, atalho da Área de Trabalho criado, chave `HKCU` presente. A instalação **não** aborta. |
+| Falha forçada na Área de Trabalho | `RESULT=18` — atalho preferido continua obrigatório. |
 | Desinstalação completa com ganchos de CI | `RESULT=0`; atalhos e chave de teste removidos; restou apenas `Uninstall.exe` (modo silencioso). |
 | Efeitos colaterais reais | nenhum: chave `HKCU\...\Uninstall\Orbital` ausente e nenhum atalho real criado. |
 | Janelas | nenhuma janela aberta nos testes (modo silencioso). |
 
-**Não validado:** clique real na interface gráfica, fluxo de UAC em outro
-perfil de usuário, desinstalação interativa com o `.cmd` de auto-remoção, e
-execução do jogo após a instalação. Esses pontos exigem sessão interativa.
+### 7.1 Falha relatada e correção
+
+O usuário reportou **falha na criação do ícone no Menu Iniciar** ao executar o
+instalador gráfico. Causa raiz: `CoInitializeEx` era chamado apenas na thread
+principal de `wWinMain`, enquanto `doInstall` roda numa `std::thread`;
+`CoCreateInstance` retornava `CO_E_NOTINITIALIZED` e o código anterior
+transformava isso em erro fatal `17`. Os testes silenciosos rodavam na thread
+principal e, por isso, não reproduziam o problema.
+
+Correções aplicadas:
+
+1. `ComScope` (RAII) inicializa COM **dentro de `createShortcut`**, na thread
+   que realmente cria o `.lnk`.
+2. A Área de Trabalho passou a ser criada **primeiro** e é o único atalho
+   obrigatório (`18`).
+3. O Menu Iniciar virou **melhor esforço**: falha gera aviso no log e não
+   aborta a instalação.
+4. `removeTree` passou a limpar `FILE_ATTRIBUTE_READONLY` também dos
+   **diretórios** — descoberto porque `build/installer/` herda esse atributo e
+   `std::filesystem::remove` recusava remover até uma pasta vazia.
+5. Nova opção `--worker` permite validar o modelo de threads da GUI em CI, sem
+   abrir janela.
+
+**Não validado:** clique real na interface gráfica (a lógica de threads agora é
+coberta por `--worker`), fluxo de UAC em outro perfil de usuário,
+desinstalação interativa com o `.cmd` de auto-remoção e execução do jogo após a
+instalação. Esses pontos exigem sessão interativa.
 
 ---
 
