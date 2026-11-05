@@ -9,7 +9,7 @@ public enum DataAssetType{
     content("content", Seq.with("json", "hjson", "json5"), ContentAsset::new, true),
     bundle("bundles", Seq.with("properties"), BundleAsset::new, false),
     image("sprites", Seq.with("png"), ImageAsset::new, false),
-    sound("sounds", Seq.with("mp3", "ogg"), SoundAsset::new, false),
+    sound("sounds", Seq.with("mp3", "ogg", "wav"), SoundAsset::new, false),
     music("music", Seq.with("mp3", "ogg"), MusicAsset::new, false)
     ;
 

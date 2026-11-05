@@ -93,7 +93,7 @@ def sound_entry(rules: dict, path: Path) -> dict:
     custom = rules["sounds"]["paths"].get(relative)
     if custom:
         return {
-            "autor": artist or "-",
+            "autor": custom.get("author", artist or "-"),
             "licenca": custom["license"],
             "origem": custom["source"],
             "status": custom["status"],
@@ -279,7 +279,8 @@ def main() -> int:
 
     rules = load_rules()
     rows = collect_asset_rows(rules)
-    write_manifest(rows)
+    if not args.check:
+        write_manifest(rows)
 
     totals: dict[str, int] = {}
     for row in rows:

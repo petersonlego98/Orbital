@@ -98,16 +98,21 @@ próprio `.ogg`.
 |---|---|---|---|---|
 | `font_jp.woff` | Noto Sans JP Medium | Adobe | SIL OFL 1.1 | OK |
 | `monospace.woff` | Fira Code Medium | Fira Code Project | SIL OFL 1.1 | OK |
-| `tech.ttf` | Darktech LDR | Michał “Neoqueto” Nowak | CC BY-SA 3.0 | OK (obra separada) |
+| `tech.ttf` | Cozette Vector | Samhain e contribuidores | MIT | OK |
 | `logic.ttf` | ProggyCleanTT | Tristan Grimmer | MIT | OK |
-| `font.woff` | fonte principal do Mindustry mesclada com ícones Fontello | Anuken/comunidade + Fontello | GPLv3 + licenças dos ícones | OK (agregada) |
-| `icon.ttf` | fonte de ícones Fontello | Fontello e autores dos conjuntos | licenças por conjunto | OK (agregada) |
+| `font.woff` | fonte principal do Mindustry mesclada com ícones Fontello/Bootstrap Icons | Anuken/comunidade + Fontello/Bootstrap | GPLv3 + licenças compatíveis | OK (agregada) |
+| `icon.ttf` | fonte de ícones Fontello/Bootstrap Icons | Fontello, Bootstrap Authors e autores dos conjuntos | licenças compatíveis | OK (agregada) |
 
 Textos incluídos:
 
 - `THIRD_PARTY_LICENSES/OFL-1.1.txt`
 - `THIRD_PARTY_LICENSES/MIT-ProggyCleanTT.txt`
+- `THIRD_PARTY_LICENSES/MIT-Cozette.txt`
+- `THIRD_PARTY_LICENSES/MIT-BootstrapIcons.txt`
 - `THIRD_PARTY_LICENSES/creative-commons.txt` (links oficiais das licenças CC)
+
+A antiga `tech.ttf` (Darktech LDR, CC BY-SA 3.0) foi substituída pela Cozette
+Vector (MIT).
 
 ### 3.5 Ícones
 
@@ -117,23 +122,23 @@ Textos incluídos:
 |---|---|---|
 | `custom_icons` | 53 | GPLv3 (projeto) |
 | `fontawesome` | 46 | OFL 1.1 / CC BY 4.0 |
-| `typicons` | 27 | CC BY-SA 3.0 |
+| `bootstrap_icons` | 29 | MIT |
 | `zocial` | 3 | MIT |
 | `iconic` | 2 | OFL 1.1 |
 | `entypo` | 2 | CC BY-SA 4.0 |
 | `elusive` | 2 | OFL 1.1 |
 | `mfglabs` | 1 | OFL 1.1 |
-| `brandico` | 1 | licença do projeto de origem |
-| `modernpics` | 1 | licença do projeto de origem |
+
+Os 27 glifos Typicons (CC BY-SA 3.0), o ícone Brandico e o ícone ModernPics
+(licenças não confirmadas) foram substituídos por equivalentes do Bootstrap
+Icons (MIT). Códigos Unicode e nomes CSS foram preservados.
 
 A fonte de ícones é uma **obra agregada**: cada conjunto mantém a sua licença.
-Ela não é relicenciada como GPLv3, e a GPLv3 do jogo não remove as obrigações
-dos conjuntos originais. A atribuição completa está em
-`THIRD_PARTY_LICENSES/assets.txt`, seção 5.
+Todas as licenças restantes são compatíveis com GPLv3. A atribuição completa
+está em `THIRD_PARTY_LICENSES/assets.txt`, seção 5.
 
 **Recomendação futura:** ao adicionar novos ícones, usar apenas conjuntos
-OFL/MIT/CC0/CC BY 4.0 ou desenhar ícones próprios, reduzindo a mistura de
-licenças na fonte agregada.
+OFL/MIT/CC0/CC BY 4.0 ou desenhar ícones próprios.
 
 ---
 
@@ -146,9 +151,15 @@ licenças na fonte agregada.
 4. Criado `tools/audit_assets.py` e `tools/asset_license_rules.json`.
 5. Tarefa Gradle `checkAssetLicenses`.
 6. Substituição dos 4 sons listados na seção 3.3.
-7. Atualização de `CREDITS.md`, `NOTICE.txt`, `README.md` e
+7. Substituição da fonte `tech.ttf` (CC BY-SA 3.0) pela Cozette Vector (MIT).
+8. Substituição dos 29 ícones Typicons/Brandico/ModernPics por Bootstrap Icons
+   (MIT), com códigos e nomes preservados.
+9. Atualização de `CREDITS.md`, `NOTICE.txt`, `README.md` e
    `docs/BUILD_EXECUTAVEL.md`.
-8. Atualização do deploy em `deploy/windows64/Orbital/`.
+10. Atualização do deploy em `deploy/windows64/Orbital/`.
+
+O plano e o detalhamento das substituições MIT estão em
+`docs/SUBSTITUICAO_ASSETS_MIT.md`.
 
 ---
 
@@ -173,3 +184,25 @@ itens marcados como `REVISAR`.
   OFL/MIT.
 - A fonte de ícones Fontello é o ponto de maior complexidade por reunir vários
   conjuntos; a documentação por conjunto é a mitigação adotada.
+
+---
+
+## 7. Atualização posterior — 5 de novembro de 2026
+
+A seção 3.3 descreve o resultado da auditoria inicial, em que quatro arquivos
+foram trocados por sons CC0. Após aprovação de amostras pelo responsável do
+Orbital, a migração foi ampliada: os 39 sons que o manifesto então classificava
+como CC0 foram substituídos por sons WAV de síntese procedural original sob MIT.
+Os 165 sons GPL-3.0-or-later e o som em domínio público foram preservados. Os antigos OGGs foram movidos
+para `build/mit-sound-stage/replaced-cc0-ogg/`, caminho local ignorado pelo Git,
+não incluído na distribuição.
+
+O gerador está em `tools/generate_original_mit_sounds.py`; a licença MIT está em
+`THIRD_PARTY_LICENSES/MIT-Original-Sounds.txt`. A auditoria refeita registrou
+39 sons MIT, nenhum som CC0, 165 GPLv3 e um em domínio público;
+`tools/audit_assets.py --check` foi ajustado para
+validar sem regravar o manifesto.
+
+A execução técnica não equivale à validação de gameplay: ainda falta compilar e
+ouvir as categorias no jogo, revisar o pacote final e confirmar pelo responsável
+a titularidade declarada no aviso MIT antes da distribuição.

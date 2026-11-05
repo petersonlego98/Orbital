@@ -10,12 +10,15 @@ Licenciado sob os termos da GNU General Public License v3.0 (GPLv3).
 Veja o arquivo LICENSE e o diretório THIRD_PARTY_LICENSES/ para detalhes.
 
 O código e os recursos originais do projeto estão sob GPLv3. A trilha sonora
-também é de Anuken e está sob GPLv3. Alguns efeitos sonoros, fontes e ícones
-mantêm licenças de terceiros (Creative Commons, SIL OFL, MIT e termos próprios)
-e não são relicenciados pela GPLv3. Os quatro sons de origem incompatível ou não
-confirmada foram substituídos por equivalentes CC0. Consulte
+também é de Anuken e está sob GPLv3. Licenças de terceiros não são
+relicenciadas pela GPLv3. Os 39 sons antes declarados CC0 foram substituídos por
+novos WAV sintetizados para o Orbital sob MIT; os 165 efeitos GPL-3.0-or-later
+foram preservados. Um efeito atribuído a Iwan "qubodup" Gabovitch permanece em
+domínio público, conforme o manifesto. A fonte tech.ttf e os ícones Typicons/Brandico/ModernPics
+foram substituídos por equivalentes MIT (Cozette e Bootstrap Icons). Consulte
 THIRD_PARTY_LICENSES/assets.txt, fonts.txt, creative-commons.txt, OFL-1.1.txt,
-MIT-ProggyCleanTT.txt e manifest.csv.
+MIT-ProggyCleanTT.txt, MIT-Cozette.txt, MIT-BootstrapIcons.txt,
+MIT-Original-Sounds.txt e manifest.csv.
 
 Código-fonte correspondente deste fork:
 https://github.com/petersonlego98/Orbital

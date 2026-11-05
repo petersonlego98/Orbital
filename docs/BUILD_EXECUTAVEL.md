@@ -140,7 +140,8 @@ Antes de publicar qualquer binário, confirme que:
 - [ ] `NOTICE.txt` informa onde o código-fonte correspondente pode ser obtido.
 - [ ] `THIRD_PARTY_LICENSES/libraries.txt` e `assets.txt` acompanham a instalação.
 - [ ] `THIRD_PARTY_LICENSES/fonts.txt`, `creative-commons.txt`, `OFL-1.1.txt`,
-      `MIT-ProggyCleanTT.txt` e `manifest.csv` acompanham a instalação.
+      `MIT-ProggyCleanTT.txt`, `MIT-Original-Sounds.txt` e `manifest.csv`
+      acompanham a instalação.
 - [ ] `python tools/audit_assets.py --check` retorna código 0 (ou
       `.\gradlew.bat checkAssetLicenses`).
 - [ ] O código-fonte correspondente à versão publicada está acessível no repositório do fork.

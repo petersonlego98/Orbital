@@ -5,21 +5,19 @@ bundles,core/assets/bundles/,36,Anuken/Mindustry e colaboradores,GPL-3.0-or-late
 config,core/assets/config/,4,Anuken/Mindustry e colaboradores,GPL-3.0-or-later,Mindustry/Orbital,OK
 cubemaps,core/assets/cubemaps/,6,Anuken/Mindustry e colaboradores,GPL-3.0-or-later,Mindustry/Orbital,OK
 cursors,core/assets/cursors/,7,Anuken/Mindustry e colaboradores,GPL-3.0-or-later,Mindustry/Orbital,OK
-fonte,core/assets/fonts/font.woff,1,Anuken/comunidade + Fontello,GPL-3.0-or-later,Fonte principal do Mindustry mesclada com icones Fontello,OK
+fonte,core/assets/fonts/font.woff,1,Anuken/comunidade + Fontello/Bootstrap Icons,GPL-3.0-or-later,Fonte principal do Mindustry mesclada com icones Fontello/Bootstrap Icons,OK
 fonte,core/assets/fonts/font_jp.woff,1,Adobe,OFL-1.1,Noto Sans JP,OK
-fonte,core/assets/fonts/icon.ttf,1,Fontello e autores dos conjuntos,Aggregate,Fontello (ver assets.txt secao 5),OK
+fonte,core/assets/fonts/icon.ttf,1,"Fontello, Bootstrap Authors e autores dos conjuntos",Aggregate,Fontello + Bootstrap Icons (ver assets.txt secao 5),OK
 fonte,core/assets/fonts/logic.ttf,1,Tristan Grimmer,MIT,ProggyCleanTT,OK
 fonte,core/assets/fonts/monospace.woff,1,Fira Code Project,OFL-1.1,Fira Code,OK
-fonte,core/assets/fonts/tech.ttf,1,Michal 'Neoqueto' Nowak,CC-BY-SA-3.0,FontStruct - Darktech LDR,OK
-icone,core/assets/fonts/icon.ttf#brandico,1,Fontello/brandico,Aggregate,Brandico (licenca do projeto de origem),OK
+fonte,core/assets/fonts/tech.ttf,1,Samhain (the-moonwitch) e contribuidores,MIT,Cozette Vector,OK
+icone,core/assets/fonts/icon.ttf#bootstrap_icons,29,The Bootstrap Authors,MIT,Bootstrap Icons,OK
 icone,core/assets/fonts/icon.ttf#custom_icons,53,Mindustry/Orbital,GPL-3.0-or-later,Icones proprios do projeto,OK
 icone,core/assets/fonts/icon.ttf#elusive,2,Aristeides Stathopoulos,OFL-1.1,Elusive Icons,OK
 icone,core/assets/fonts/icon.ttf#entypo,2,Daniel Bruce,CC-BY-SA-4.0,Entypo,OK
 icone,core/assets/fonts/icon.ttf#fontawesome,46,Font Awesome,CC-BY-4.0,Font Awesome Free (icones CC BY 4.0),OK
 icone,core/assets/fonts/icon.ttf#iconic,2,Waybury,OFL-1.1,Iconic,OK
 icone,core/assets/fonts/icon.ttf#mfglabs,1,MFG Labs,OFL-1.1,MFG Labs Icons,OK
-icone,core/assets/fonts/icon.ttf#modernpics,1,ModernPics,Aggregate,ModernPics (licenca do projeto de origem),OK
-icone,core/assets/fonts/icon.ttf#typicons,27,Stephen Hutchings,CC-BY-SA-3.0,Typicons,OK
 icone,core/assets/fonts/icon.ttf#zocial,3,Sam Collins,MIT,Zocial,OK
 icones-do-jogo,core/assets/icons/,3,Anuken/Mindustry e colaboradores,GPL-3.0-or-later,Mindustry/Orbital,OK
 maps,core/assets/maps/,114,Anuken/Mindustry e colaboradores,GPL-3.0-or-later,Mindustry/Orbital,OK
@@ -53,21 +51,21 @@ som,core/assets/sounds/block/acceleratorConstruct.ogg,1,Anuken/Mindustry,GPL-3.0
 som,core/assets/sounds/block/acceleratorLaunch.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/block/acceleratorLightning1.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/block/acceleratorLightning2.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/block/blockBreak1.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/block/blockBreak2.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/block/blockBreak3.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/block/blockBreak1.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/block/blockBreak2.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/block/blockBreak3.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/block/blockHeal.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/block/blockPlace1.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/block/blockPlace2.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/block/blockPlace3.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/block/blockRepair.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/block/blockRotate.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/block/click.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/block/coreLand.ogg,1,rubberduck,CC0-1.0,"OpenGameArt - 50 CC0 Sci-Fi SFX, rubberduck (explosion_01)",OK
-som,core/assets/sounds/block/coreLaunch.ogg,1,rubberduck,CC0-1.0,"OpenGameArt - 50 CC0 Sci-Fi SFX, rubberduck (rocket_01)",OK
-som,core/assets/sounds/block/door.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/block/blockRepair.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/block/blockRotate.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/block/click.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/block/coreLand.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/block/coreLaunch.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/block/door.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/block/drillCharge.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/block/drillImpact.ogg,1,rubberduck,CC0-1.0,"OpenGameArt - 100 CC0 SFX #2, rubberduck (stones_01)",OK
+som,core/assets/sounds/block/drillImpact.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/block/healWave.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/block/massdriver.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/block/massdriverReceive.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
@@ -83,13 +81,13 @@ som,core/assets/sounds/block/shieldBreak.ogg,1,Anuken/Mindustry,GPL-3.0-or-later
 som,core/assets/sounds/block/shieldBreakSmall.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/block/shieldHit.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/block/shieldWave.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/block/shockwaveTower.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/block/unitCreate.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/block/shockwaveTower.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/block/unitCreate.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/block/unitCreateBig.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/charge/chargeCorvus.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/charge/chargeLancer.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/charge/chargeVela.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/environment/rain.ogg,1,Ylmir,CC0-1.0,"OpenGameArt - Rain (loopable), Ylmir",OK
+som,core/assets/sounds/environment/rain.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/environment/wind.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/environment/wind2.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/environment/wind3.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
@@ -101,7 +99,7 @@ som,core/assets/sounds/explosions/blockExplode2Alt.ogg,1,Anuken/Mindustry,GPL-3.
 som,core/assets/sounds/explosions/blockExplode3.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/explosions/blockExplodeElectric.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/explosions/blockExplodeElectricBig.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/explosions/blockExplodeExplosive.ogg,1,Iwan Gabovitch,Public-Domain,Freesound (Iwan 'qubodup' Gabovitch),OK
+som,core/assets/sounds/explosions/blockExplodeExplosive.ogg,1,Iwan Gabovitch,Public-Domain,Freesound (Iwan qubodup Gabovitch),OK
 som,core/assets/sounds/explosions/blockExplodeExplosiveAlt.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/explosions/blockExplodeFlammable.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/explosions/blockExplodeWall.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
@@ -124,15 +122,15 @@ som,core/assets/sounds/explosions/explosionReactor2.ogg,1,Anuken/Mindustry,GPL-3
 som,core/assets/sounds/explosions/explosionReactorNeoplasm.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/explosions/explosionTitan.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/explosions/shockBullet.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/explosions/unitExplode1.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/explosions/unitExplode2.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/explosions/unitExplode3.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/explosions/wreckFall.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/explosions/wreckFallBig.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/explosions/unitExplode1.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/explosions/unitExplode2.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/explosions/unitExplode3.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/explosions/wreckFall.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/explosions/wreckFallBig.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/loops/loopBio.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/loops/loopBuild.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/loops/loopCircuit.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/loops/loopCombustion.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/loops/loopCombustion.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/loops/loopConveyor.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/loops/loopCultivator.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/loops/loopCutter.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
@@ -144,13 +142,13 @@ som,core/assets/sounds/loops/loopFire.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mi
 som,core/assets/sounds/loops/loopFlux.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/loops/loopGlow.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/loops/loopGrind.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/loops/loopHover.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/loops/loopHover2.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/loops/loopHover.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/loops/loopHover2.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/loops/loopHum.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/loops/loopMachine.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/loops/loopMachine2.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/loops/loopMachineSpin.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/loops/loopMalign.ogg,1,qubodup,CC0-1.0,Freesound/OpenGameArt (Iwan 'qubodup' Gabovitch),OK
+som,core/assets/sounds/loops/loopMachine.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/loops/loopMachine2.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/loops/loopMachineSpin.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/loops/loopMalign.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/loops/loopMineBeam.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/loops/loopMissileTrail.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/loops/loopPulse.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
@@ -161,8 +159,8 @@ som,core/assets/sounds/loops/loopSpray.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,M
 som,core/assets/sounds/loops/loopSteam.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/loops/loopTech.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/loops/loopThoriumReactor.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/loops/loopThruster.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/loops/loopUnitBuilding.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/loops/loopThruster.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/loops/loopUnitBuilding.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/movement/mechStep.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/movement/mechStepHeavy.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/movement/mechStepSmall.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
@@ -180,10 +178,10 @@ som,core/assets/sounds/shoot/shoot.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindu
 som,core/assets/sounds/shoot/shootAfflict.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootAlpha.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootArc.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/shoot/shootArtillery.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/shoot/shootArtillerySap.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/shoot/shootArtillerySapBig.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/shoot/shootArtillerySmall.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/shoot/shootArtillery.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/shoot/shootArtillerySap.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/shoot/shootArtillerySapBig.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/shoot/shootArtillerySmall.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/shoot/shootAtrax.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootAvert.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootBeamPlasma.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
@@ -194,9 +192,9 @@ som,core/assets/sounds/shoot/shootCleroi.ogg,1,Anuken/Mindustry,GPL-3.0-or-later
 som,core/assets/sounds/shoot/shootCollaris.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootConquer.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootCorvus.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/shoot/shootCyclone.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/shoot/shootCyclone.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/shoot/shootDiffuse.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/shoot/shootDisperse.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/shoot/shootDisperse.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/shoot/shootDuo.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootEclipse.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootElude.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
@@ -205,9 +203,9 @@ som,core/assets/sounds/shoot/shootFlame.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,
 som,core/assets/sounds/shoot/shootFlamePlasma.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootForeshadow.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootFuse.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/shoot/shootHorizon.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/shoot/shootHorizon.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/shoot/shootLancer.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/shoot/shootLaser.ogg,1,Jesus Lastra,GPL-3.0-or-later,Mindustry contributor (jalastram),OK
+som,core/assets/sounds/shoot/shootLaser.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootLocus.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootMalign.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootMeltdown.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
@@ -224,16 +222,16 @@ som,core/assets/sounds/shoot/shootOmura.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,
 som,core/assets/sounds/shoot/shootPayload.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootPulsar.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootQuad.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/shoot/shootReign.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/shoot/shootReign.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/shoot/shootRetusa.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/shoot/shootRipple.ogg,1,Iwan 'qubodup' Gabovitch,CC0-1.0,Freesound/OpenGameArt (Iwan 'qubodup' Gabovitch),OK
+som,core/assets/sounds/shoot/shootRipple.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/shoot/shootSalvo.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootSap.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootScathe.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/shoot/shootScatter.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
-som,core/assets/sounds/shoot/shootScepter.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/shoot/shootScatter.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
+som,core/assets/sounds/shoot/shootScepter.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 som,core/assets/sounds/shoot/shootScepterSecondary.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/shoot/shootSegment.ogg,1,Jesus Lastra,GPL-3.0-or-later,Mindustry contributor (jalastram),OK
+som,core/assets/sounds/shoot/shootSegment.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootSmite.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootSpectre.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/shoot/shootStell.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
@@ -246,5 +244,5 @@ som,core/assets/sounds/ui/uiChat.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindust
 som,core/assets/sounds/ui/uiFavorite.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/ui/uiNotify.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
 som,core/assets/sounds/ui/uiUnlock.ogg,1,Anuken/Mindustry,GPL-3.0-or-later,Mindustry/Orbital (Anuken e colaboradores),OK
-som,core/assets/sounds/ui/waveSpawn.ogg,1,rubberduck,CC0-1.0,OpenGameArt (rubberduck),OK
+som,core/assets/sounds/ui/waveSpawn.wav,1,Orbital contributors,MIT,Original procedural synthesis in tools/generate_original_mit_sounds.py,OK
 sprites,core/assets/sprites/,28,Anuken/Mindustry e colaboradores,GPL-3.0-or-later,Mindustry/Orbital,OK

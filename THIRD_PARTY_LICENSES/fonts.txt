@@ -23,12 +23,14 @@ Nenhuma delas e relicenciada como GPLv3: cada uma mantem a sua licenca.
    URL: https://scripts.sil.org/OFL
 
 3. tech.ttf
-   Familia: Darktech LDR
-   Autor: Michal "Neoqueto" Nowak (2012)
-   Origem: http://fontstruct.com/fontstructions/show/715809
-   Licenca: Creative Commons Attribution-ShareAlike 3.0 Unported
-   (CC BY-SA 3.0)
-   URL: https://creativecommons.org/licenses/by-sa/3.0/
+   Familia: CozetteVector
+   Autor: Samhain (the-moonwitch) e contribuidores
+   Origem: https://github.com/the-moonwitch/Cozette
+   Versao: 1.30.0
+   Licenca: MIT License
+   Texto: THIRD_PARTY_LICENSES/MIT-Cozette.txt
+   Observacao: substitui a antiga Darktech LDR (CC BY-SA 3.0), que nao era
+   compativel com a distribuicao GPLv3.
 
 4. logic.ttf
    Familia: ProggyCleanTT
@@ -43,16 +45,23 @@ Nenhuma delas e relicenciada como GPLv3: cada uma mantem a sua licenca.
    processo de merge em core/assets-raw/fontgen/merge.pe.
    Os metadados do arquivo foram sobrescritos pelo Fontello; a origem textual
    GPLv3 e a origem dos icones estao documentadas aqui e em assets.txt.
-   Contem glifos de Font Awesome, Typicons, Zocial, Iconic, Entypo, Elusive,
-   MFG Labs, Brandico, ModernPics e 53 icones customizados.
+   Contem glifos de Font Awesome, Zocial, Iconic, Entypo, Elusive, MFG Labs,
+   Bootstrap Icons e 53 icones customizados. Os 27 glifos Typicons, o icone
+   Brandico e o icone ModernPics foram substituidos por equivalentes do
+   Bootstrap Icons (MIT).
 
 6. icon.ttf
-   Fonte de icones gerada pelo Fontello (http://fontello.com).
+   Fonte de icones gerada pelo Fontello (http://fontello.com) e ajustada para
+   receber os glifos substitutos do Bootstrap Icons.
    Copyright (C) 2026 by original authors @ fontello.com.
    Contem os mesmos glifos de icones do item 5.
    Cada conjunto mantem a sua licenca original. Consulte
    THIRD_PARTY_LICENSES/assets.txt, secao 5, para a lista e as licencas.
 
-A redistribuicao do jogo deve manter este arquivo, o texto da OFL 1.1 e a
+Fontes MIT adicionais:
+   THIRD_PARTY_LICENSES/MIT-Cozette.txt
+   THIRD_PARTY_LICENSES/MIT-BootstrapIcons.txt
+
+A redistribuicao do jogo deve manter este arquivo, os textos de licenca e a
 atribuicao dos autores acima.
 ================================================================================

@@ -50,7 +50,7 @@ public class FileTree implements FileHandleResolver{
     }
 
     /**
-     * Loads a sound by name from the sounds/ folder. OGG and MP3 are supported; the extension is automatically added to the end of the file name.
+     * Loads a sound by name from the sounds/ folder. OGG, MP3 and WAV are supported; the extension is automatically added to the end of the file name.
      * Results are cached; consecutive calls to this method with the same name will return the same sound instance.
      * */
     public Sound loadSound(String soundName){
@@ -92,11 +92,12 @@ public class FileTree implements FileHandleResolver{
     }
 
     public static @Nullable String getAudioPath(String name){
-        Fi ogg = Vars.tree.get(name + ".ogg"), mp3 = Vars.tree.get(name + ".mp3");
+        Fi ogg = Vars.tree.get(name + ".ogg"), mp3 = Vars.tree.get(name + ".mp3"), wav = Vars.tree.get(name + ".wav");
         if(ogg.exists()) return name + ".ogg";
         if(mp3.exists()) return name + ".mp3";
+        if(wav.exists()) return name + ".wav";
 
-        Log.warn("Audio file not found: @ (.mp3 or .ogg)", name);
+        Log.warn("Audio file not found: @ (.mp3, .ogg or .wav)", name);
         return null;
     }
 }

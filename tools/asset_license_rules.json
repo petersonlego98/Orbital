@@ -7,7 +7,6 @@
     "MIT",
     "OFL-1.1",
     "Public-Domain",
-    "CC-BY-SA-3.0",
     "Aggregate"
   ],
   "sounds": {
@@ -91,24 +90,244 @@
       }
     ],
     "paths": {
-      "environment/rain.ogg": {
-        "license": "CC0-1.0",
-        "source": "OpenGameArt - Rain (loopable), Ylmir",
+      "block/blockBreak1.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
         "status": "OK"
       },
-      "block/coreLand.ogg": {
-        "license": "CC0-1.0",
-        "source": "OpenGameArt - 50 CC0 Sci-Fi SFX, rubberduck (explosion_01)",
+      "block/blockBreak2.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
         "status": "OK"
       },
-      "block/coreLaunch.ogg": {
-        "license": "CC0-1.0",
-        "source": "OpenGameArt - 50 CC0 Sci-Fi SFX, rubberduck (rocket_01)",
+      "block/blockBreak3.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
         "status": "OK"
       },
-      "block/drillImpact.ogg": {
-        "license": "CC0-1.0",
-        "source": "OpenGameArt - 100 CC0 SFX #2, rubberduck (stones_01)",
+      "block/blockRepair.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "block/blockRotate.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "block/click.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "block/coreLand.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "block/coreLaunch.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "block/door.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "block/drillImpact.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "block/shockwaveTower.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "block/unitCreate.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "environment/rain.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "explosions/unitExplode1.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "explosions/unitExplode2.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "explosions/unitExplode3.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "explosions/wreckFall.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "explosions/wreckFallBig.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "loops/loopCombustion.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "loops/loopHover.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "loops/loopHover2.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "loops/loopMachine.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "loops/loopMachine2.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "loops/loopMachineSpin.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "loops/loopMalign.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "loops/loopThruster.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "loops/loopUnitBuilding.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootArtillery.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootArtillerySap.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootArtillerySapBig.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootArtillerySmall.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootCyclone.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootDisperse.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootHorizon.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootReign.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootRipple.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootScatter.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "shoot/shootScepter.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "ui/waveSpawn.wav": {
+        "author": "Orbital contributors",
+        "license": "MIT",
+        "source": "Original procedural synthesis in tools/generate_original_mit_sounds.py",
+        "status": "OK"
+      },
+      "explosions/blockExplodeExplosive.ogg": {
+        "author": "Iwan Gabovitch",
+        "license": "Public-Domain",
+        "source": "Freesound (Iwan qubodup Gabovitch)",
         "status": "OK"
       }
     }
@@ -131,12 +350,6 @@
       "author": "Font Awesome",
       "license": "CC-BY-4.0",
       "source": "Font Awesome Free (icones CC BY 4.0)",
-      "status": "OK"
-    },
-    "typicons": {
-      "author": "Stephen Hutchings",
-      "license": "CC-BY-SA-3.0",
-      "source": "Typicons",
       "status": "OK"
     },
     "zocial": {
@@ -169,16 +382,10 @@
       "source": "MFG Labs Icons",
       "status": "OK"
     },
-    "brandico": {
-      "author": "Fontello/brandico",
-      "license": "Aggregate",
-      "source": "Brandico (licenca do projeto de origem)",
-      "status": "OK"
-    },
-    "modernpics": {
-      "author": "ModernPics",
-      "license": "Aggregate",
-      "source": "ModernPics (licenca do projeto de origem)",
+    "bootstrap_icons": {
+      "author": "The Bootstrap Authors",
+      "license": "MIT",
+      "source": "Bootstrap Icons",
       "status": "OK"
     }
   },
@@ -196,9 +403,9 @@
       "status": "OK"
     },
     "tech.ttf": {
-      "author": "Michal 'Neoqueto' Nowak",
-      "license": "CC-BY-SA-3.0",
-      "source": "FontStruct - Darktech LDR",
+      "author": "Samhain (the-moonwitch) e contribuidores",
+      "license": "MIT",
+      "source": "Cozette Vector",
       "status": "OK"
     },
     "logic.ttf": {
@@ -208,15 +415,15 @@
       "status": "OK"
     },
     "icon.ttf": {
-      "author": "Fontello e autores dos conjuntos",
+      "author": "Fontello, Bootstrap Authors e autores dos conjuntos",
       "license": "Aggregate",
-      "source": "Fontello (ver assets.txt secao 5)",
+      "source": "Fontello + Bootstrap Icons (ver assets.txt secao 5)",
       "status": "OK"
     },
     "font.woff": {
-      "author": "Anuken/comunidade + Fontello",
+      "author": "Anuken/comunidade + Fontello/Bootstrap Icons",
       "license": "GPL-3.0-or-later",
-      "source": "Fonte principal do Mindustry mesclada com icones Fontello",
+      "source": "Fonte principal do Mindustry mesclada com icones Fontello/Bootstrap Icons",
       "status": "OK"
     }
   },

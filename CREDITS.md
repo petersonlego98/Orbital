@@ -34,24 +34,19 @@ original não endossa nem mantém este fork.
 - O código-fonte correspondente à versão distribuída está disponível no repositório
   do fork indicado acima, conforme exigido pela GPLv3.
 
-## 4. Recursos de terceiros
+## 4. Recursos de terceiros e arquivos MIT do Orbital
 
 | Recurso | Origem | Licença |
 |---|---|---|
-| Efeitos sonoros de clima, lasers e SFX (2020) | jalastram, newlocknew, dsmolenaers, Headphaze (Freesound.org) | Creative Commons (CC0 / CC BY / CC BY-SA, conforme o arquivo) |
-| Sons de torretas de Erekir (2022) | Michel Baradari, Michael Klier (OpenGameArt.org) | Creative Commons (conforme a página original) |
-| Conjunto "More sounds" (2025) | Lee Barkovich (OpenGameArt.org) | Creative Commons (conforme a página original) |
-| Diversos blocos, explosões e loops | rubberduck | CC0 ("100 CC0 SFX", "100 CC0 SFX #2" e "50 CC0 Sci-Fi SFX") |
-| "Synthetic explosion 1" e "Dark Magic Loop" | Iwan "qubodup" Gabovitch | Domínio público / CC0 |
-| `coreLand.ogg`, `coreLaunch.ogg` | rubberduck (OpenGameArt) | CC0 |
-| `drillImpact.ogg` | rubberduck (OpenGameArt) | CC0 |
-| `shootLaser.ogg`, `shootSegment.ogg` ("Shooting_Sounds_008") | Jesus Lastra | Creative Commons (conforme a origem) |
-| `environment/rain.ogg` ("Rain (loopable) 2") | Ylmir (OpenGameArt) | CC0 |
+| 39 efeitos sonoros (`core/assets/sounds/**/*.wav`) | Orbital contributors; síntese procedural original | MIT (`THIRD_PARTY_LICENSES/MIT-Original-Sounds.txt`) |
+| `sounds/explosions/blockExplodeExplosive.ogg` | Iwan "qubodup" Gabovitch | Domínio público; ver `manifest.csv` |
+| 165 efeitos sonoros herdados do Mindustry | Anuken e colaboradores; ver inventário por arquivo | GPL-3.0-or-later conforme `manifest.csv` |
 | Fonte `font_jp.woff` | Noto Sans JP (Adobe) | SIL OFL 1.1 |
 | Fonte `monospace.woff` | Fira Code | SIL OFL 1.1 |
-| Fonte `tech.ttf` | Darktech LDR, Michał "Neoqueto" Nowak | CC BY-SA 3.0 |
+| Fonte `tech.ttf` | Cozette Vector, Samhain e contribuidores | MIT |
 | Fonte `logic.ttf` | ProggyCleanTT, Tristan Grimmer | MIT |
-| Fontes de ícones `font.woff` e `icon.ttf` | Fontello (Font Awesome, Typicons, Entypo, Zocial, Iconic, Elusive, MFG Labs, Brandico, ModernPics e ícones próprios) | Cada conjunto mantém a sua licença |
+| Ícones `bootstrap_icons` (29 glifos) | Bootstrap Icons, The Bootstrap Authors | MIT |
+| Fontes de ícones `font.woff` e `icon.ttf` | Fontello (Font Awesome, Bootstrap Icons, Entypo, Zocial, Iconic, Elusive, MFG Labs e ícones próprios) | Cada conjunto mantém a sua licença |
 
 Detalhes completos, arquivos afetados e links:
 
@@ -60,11 +55,16 @@ Detalhes completos, arquivos afetados e links:
 - `THIRD_PARTY_LICENSES/creative-commons.txt`
 - `THIRD_PARTY_LICENSES/OFL-1.1.txt`
 - `THIRD_PARTY_LICENSES/MIT-ProggyCleanTT.txt`
+- `THIRD_PARTY_LICENSES/MIT-Cozette.txt`
+- `THIRD_PARTY_LICENSES/MIT-BootstrapIcons.txt`
+- `THIRD_PARTY_LICENSES/MIT-Original-Sounds.txt`
 - `THIRD_PARTY_LICENSES/manifest.csv` (inventário arquivo por arquivo)
 - `THIRD_PARTY_LICENSES/libraries.txt`
 
-> **Auditoria de novembro de 2026:** os quatro sons com origem incompatível ou
-> não confirmada (`rain.ogg`, `coreLand.ogg`, `coreLaunch.ogg` e
-> `drillImpact.ogg`) foram substituídos por equivalentes CC0. O inventário
-> completo está em `manifest.csv` e pode ser validado com
+> **Auditoria de novembro de 2026:** as 39 mídias sonoras antes declaradas CC0
+> foram substituídas por novos arquivos WAV sintetizados para o Orbital e
+> distribuídos sob MIT. Os 166 sons GPL-3.0-or-later foram preservados. A fonte
+> `tech.ttf` e os glifos de ícones incompatíveis também foram substituídos por
+> equivalentes MIT (Cozette e Bootstrap Icons). O inventário completo está em
+> `manifest.csv` e pode ser validado sem regravá-lo com
 > `python tools/audit_assets.py --check`.

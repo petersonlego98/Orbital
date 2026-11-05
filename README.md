@@ -142,6 +142,8 @@ Os documentos de design ficam em:
 - [Unidades de Orbital](docs/RELATORIO_UNIDADES_ORBITAL.md)
 - [Licenciamento de assets](docs/LICENCIAMENTO_ASSETS.md)
 - [Auditoria de licenças (novembro de 2026)](docs/auditoria-licencas-2026-11.md)
+- [Substituição de assets incompatíveis por MIT](docs/SUBSTITUICAO_ASSETS_MIT.md)
+- [Migração dos efeitos sonoros para MIT](docs/PROPOSTA_MIT_ASSETS.md)
 
 ---
 
@@ -186,13 +188,13 @@ Os assets também têm origens distintas:
 
 - **Música:** todas as 16 faixas são de Anuken e estão sob GPLv3.
 - **Sprites, mapas, shaders e traduções:** GPLv3.
-- **Efeitos sonoros:** em parte de terceiros (Freesound, OpenGameArt e outros),
-  com licenças Creative Commons. Os sons de origem incompatível ou não
-  confirmada foram substituídos por equivalentes CC0.
-- **Fontes:** Noto Sans JP e Fira Code (SIL OFL 1.1), Darktech LDR (CC BY-SA
-  3.0), ProggyCleanTT (MIT) e a fonte de ícones Fontello.
-- **Ícones:** Font Awesome, Typicons, Entypo, Zocial, Iconic, Elusive, MFG
-  Labs, Brandico, ModernPics e ícones próprios.
+- **Efeitos sonoros:** 165 arquivos GPL-3.0-or-later de Anuken e colaboradores,
+  39 WAV sintetizados para o Orbital sob MIT e um arquivo em domínio público.
+  Consulte o manifesto arquivo por arquivo.
+- **Fontes:** Noto Sans JP e Fira Code (SIL OFL 1.1), Cozette e ProggyCleanTT
+  (MIT) e a fonte de ícones Fontello/Bootstrap Icons.
+- **Ícones:** Font Awesome, Bootstrap Icons, Entypo, Zocial, Iconic, Elusive,
+  MFG Labs e ícones próprios.
 
 Consulte:
 
@@ -202,6 +204,9 @@ Consulte:
 - [THIRD_PARTY_LICENSES/creative-commons.txt](THIRD_PARTY_LICENSES/creative-commons.txt)
 - [THIRD_PARTY_LICENSES/OFL-1.1.txt](THIRD_PARTY_LICENSES/OFL-1.1.txt)
 - [THIRD_PARTY_LICENSES/MIT-ProggyCleanTT.txt](THIRD_PARTY_LICENSES/MIT-ProggyCleanTT.txt)
+- [THIRD_PARTY_LICENSES/MIT-Cozette.txt](THIRD_PARTY_LICENSES/MIT-Cozette.txt)
+- [THIRD_PARTY_LICENSES/MIT-BootstrapIcons.txt](THIRD_PARTY_LICENSES/MIT-BootstrapIcons.txt)
+- [THIRD_PARTY_LICENSES/MIT-Original-Sounds.txt](THIRD_PARTY_LICENSES/MIT-Original-Sounds.txt)
 - [THIRD_PARTY_LICENSES/manifest.csv](THIRD_PARTY_LICENSES/manifest.csv)
 
 O inventário de licenças pode ser verificado com:
