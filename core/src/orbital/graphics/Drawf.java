@@ -403,6 +403,74 @@ public class Drawf{
         Draw.reset();
     }
 
+    /** Draws a thin dashed operational range outline without changing the caller's draw layer. */
+    public static void rangeCircle(float x, float y, float radius, Color color, float alpha, float layer){
+        if(radius <= 0.001f) return;
+
+        float previousZ = Draw.z();
+        Draw.z(layer);
+        Draw.color(color, alpha);
+        Lines.stroke(0.9f);
+        Lines.dashCircle(x, y, radius);
+        Draw.reset();
+        Draw.z(previousZ);
+    }
+
+    /** Draws a faint dashed outline for a potential maximum range. */
+    public static void rangeCircleMax(float x, float y, float radius, Color color, float alpha, float layer){
+        if(radius <= 0.001f) return;
+
+        float previousZ = Draw.z();
+        Draw.z(layer);
+        Draw.color(color, alpha);
+        Lines.stroke(0.7f);
+        Lines.dashCircle(x, y, radius);
+        Draw.reset();
+        Draw.z(previousZ);
+    }
+
+    /** Draws a thin dashed square range; size is the full side length. */
+    public static void rangeSquare(float x, float y, float size, Color color, float alpha, float layer){
+        if(size <= 0.001f) return;
+
+        float half = size / 2f;
+        float x1 = x - half, y1 = y - half, x2 = x + half, y2 = y + half;
+        int segments = Math.max(1, (int)(size / tilesize * 2f));
+        float previousZ = Draw.z();
+        Draw.z(layer);
+        Draw.color(color, alpha);
+        Lines.stroke(0.9f);
+        Lines.dashLine(x1, y1, x2, y1, segments);
+        Lines.dashLine(x2, y1, x2, y2, segments);
+        Lines.dashLine(x2, y2, x1, y2, segments);
+        Lines.dashLine(x1, y2, x1, y1, segments);
+        Draw.reset();
+        Draw.z(previousZ);
+    }
+
+    /** Draws a thin dashed regular-polygon range. */
+    public static void rangePolygon(float x, float y, int sides, float radius, float rotation, Color color, float alpha, float layer, boolean dashed){
+        if(sides < 3 || radius <= 0.001f) return;
+
+        float previousZ = Draw.z();
+        Draw.z(layer);
+        Draw.color(color, alpha);
+        Lines.stroke(dashed ? 0.9f : 0.7f);
+        for(int i = 0; i < sides; i++){
+            float angle1 = rotation + i * 360f / sides;
+            float angle2 = rotation + (i + 1) * 360f / sides;
+            float x1 = x + Angles.trnsx(angle1, radius), y1 = y + Angles.trnsy(angle1, radius);
+            float x2 = x + Angles.trnsx(angle2, radius), y2 = y + Angles.trnsy(angle2, radius);
+            if(dashed){
+                Lines.dashLine(x1, y1, x2, y2, Math.max(1, (int)(Mathf.dst(x1, y1, x2, y2) / tilesize * 2f)));
+            }else{
+                Lines.line(x1, y1, x2, y2);
+            }
+        }
+        Draw.reset();
+        Draw.z(previousZ);
+    }
+
     public static void circles(float x, float y, float rad){
         circles(x, y, rad, Pal.accent);
     }

@@ -51,12 +51,23 @@ public class OverdriveProjector extends Block{
     }
 
     @Override
+    public void init(){
+        updateClipRadius(range + (hasBoost ? phaseRangeBoost : 0f) + tilesize);
+        super.init();
+    }
+
+    @Override
     public void drawPlace(int x, int y, int rotation, boolean valid){
         super.drawPlace(x, y, rotation, valid);
 
-        Drawf.dashCircle(x * tilesize + offset, y * tilesize + offset, range, baseColor);
+        float worldX = x * tilesize + offset, worldY = y * tilesize + offset;
+        Drawf.rangeCircle(worldX, worldY, range, baseColor, 0.95f, Layer.effect);
+        if(hasBoost && phaseRangeBoost > 0f){
+            Drawf.rangeCircleMax(worldX, worldY, range + phaseRangeBoost, phaseColor, 0.4f, Layer.effect);
+        }
 
-        indexer.eachBlock(player.team(), x * tilesize + offset, y * tilesize + offset, range, other -> other.block.canOverdrive, other -> Drawf.selected(other, Tmp.c1.set(baseColor).a(Mathf.absin(4f, 1f))));
+        float previewRange = range + (hasBoost ? phaseRangeBoost : 0f);
+        indexer.eachBlock(player.team(), worldX, worldY, previewRange, other -> other.block.canOverdrive, other -> Drawf.selected(other, Tmp.c1.set(baseColor).a(Mathf.absin(4f, 1f))));
     }
 
     @Override
@@ -128,14 +139,27 @@ public class OverdriveProjector extends Block{
         public void drawSelect(){
             float realRange = range + phaseHeat * phaseRangeBoost;
 
-            indexer.eachBlock(this, realRange, other -> other.block.canOverdrive, other -> Drawf.selected(other, Tmp.c1.set(baseColor).a(Mathf.absin(4f, 1f))));
+            float maximumRange = range + (hasBoost ? phaseRangeBoost : 0f);
+            indexer.eachBlock(this, maximumRange, other -> other.block.canOverdrive, other -> Drawf.selected(other, Tmp.c1.set(baseColor).a(Mathf.absin(4f, 1f))));
 
-            Drawf.dashCircle(x, y, realRange, baseColor);
+            Drawf.rangeCircle(x, y, realRange, baseColor, 0.95f, Layer.effect);
+            if(maximumRange > realRange + 0.5f){
+                Drawf.rangeCircleMax(x, y, maximumRange, phaseColor, 0.4f, Layer.effect);
+            }
         }
 
         @Override
         public void draw(){
             super.draw();
+
+            if(enabled && efficiency > 0f){
+                float activeRange = range + phaseHeat * phaseRangeBoost;
+                Drawf.rangeCircle(x, y, activeRange, baseColor, 0.78f, Layer.effect);
+                float maximumRange = range + (hasBoost ? phaseRangeBoost : 0f);
+                if(maximumRange > activeRange + 0.5f){
+                    Drawf.rangeCircleMax(x, y, maximumRange, phaseColor, 0.32f, Layer.effect);
+                }
+            }
 
             if(!Lod.l2) return;
 

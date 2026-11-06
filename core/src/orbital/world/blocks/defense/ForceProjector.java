@@ -153,13 +153,11 @@ public class ForceProjector extends Block{
     public void drawPlace(int x, int y, int rotation, boolean valid){
         super.drawPlace(x, y, rotation, valid);
 
-        Draw.color(Pal.gray);
-        Lines.stroke(3f);
-        Lines.poly(x * tilesize + offset, y * tilesize + offset, sides, radius, shieldRotation);
-        Draw.color(player.team().color);
-        Lines.stroke(1f);
-        Lines.poly(x * tilesize + offset, y * tilesize + offset, sides, radius, shieldRotation);
-        Draw.color();
+        float worldX = x * tilesize + offset, worldY = y * tilesize + offset;
+        Drawf.rangePolygon(worldX, worldY, sides, radius, shieldRotation, player.team().color, 0.95f, Layer.effect, true);
+        if(itemConsumer != null && phaseRadiusBoost > 0f){
+            Drawf.rangePolygon(worldX, worldY, sides, radius + phaseRadiusBoost, shieldRotation, player.team().color, 0.4f, Layer.effect + 0.001f, true);
+        }
     }
 
     public class ForceBuild extends Building implements Ranged, ExplosionShield{
@@ -303,6 +301,15 @@ public class ForceProjector extends Block{
             }
 
             drawShield();
+
+            float activeRadius = realRadius();
+            if(enabled && efficiency > 0f && !broken && activeRadius > 0.001f){
+                float rangeLayer = Layer.shields + 0.01f;
+                Drawf.rangePolygon(x, y, sides, activeRadius, shieldRotation, team.color, 0.9f, rangeLayer, true);
+                if(itemConsumer != null && phaseRadiusBoost > 0f){
+                    Drawf.rangePolygon(x, y, sides, radius + phaseRadiusBoost, shieldRotation, team.color, 0.3f, rangeLayer + 0.001f, true);
+                }
+            }
         }
 
         public void drawShield(){

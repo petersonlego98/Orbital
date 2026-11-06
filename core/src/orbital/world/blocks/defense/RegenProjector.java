@@ -52,6 +52,12 @@ public class RegenProjector extends Block{
     }
 
     @Override
+    public void init(){
+        updateClipRadius(range * tilesize * 0.7072f + tilesize);
+        super.init();
+    }
+
+    @Override
     public void drawPlace(int x, int y, int rotation, boolean valid){
         super.drawPlace(x, y, rotation, valid);
 
@@ -60,7 +66,7 @@ public class RegenProjector extends Block{
         x += offset;
         y += offset;
 
-        Drawf.dashSquare(baseColor, x, y, range * tilesize);
+        Drawf.rangeSquare(x, y, range * tilesize, baseColor, 0.95f, Layer.effect);
         indexer.eachBlock(player.team(), Tmp.r1.setCentered(x, y, range * tilesize), b -> true, t -> {
             Drawf.selected(t, Tmp.c1.set(baseColor).a(Mathf.absin(4f, 1f)));
         });
@@ -186,7 +192,7 @@ public class RegenProjector extends Block{
         public void drawSelect(){
             super.drawSelect();
 
-            Drawf.dashSquare(baseColor, x, y, range * tilesize);
+            Drawf.rangeSquare(x, y, range * tilesize, baseColor, 0.95f, Layer.effect);
             for(var target : targets){
                 Drawf.selected(target, Tmp.c1.set(baseColor).a(Mathf.absin(4f, 1f)));
             }
@@ -205,6 +211,10 @@ public class RegenProjector extends Block{
         @Override
         public void draw(){
             drawer.draw(this);
+
+            if(enabled && efficiency > 0f && !isHealSuppressed()){
+                Drawf.rangeSquare(x, y, range * tilesize, baseColor, 0.78f, Layer.effect);
+            }
         }
 
         @Override

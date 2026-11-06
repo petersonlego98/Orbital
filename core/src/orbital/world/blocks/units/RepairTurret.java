@@ -95,7 +95,7 @@ public class RepairTurret extends Block{
     public void drawPlace(int x, int y, int rotation, boolean valid){
         super.drawPlace(x, y, rotation, valid);
 
-        Drawf.dashCircle(x * tilesize + offset, y * tilesize + offset, repairRadius, Pal.accent);
+        Drawf.rangeCircle(x * tilesize + offset, y * tilesize + offset, repairRadius, laserColor, 0.95f, Layer.effect);
     }
 
     @Override
@@ -171,11 +171,15 @@ public class RepairTurret extends Block{
             drawBeam(x, y, rotation, length, id, target, team, strength,
                 pulseStroke, pulseRadius, beamWidth, lastEnd, offset, laserColor, laserTopColor,
                 laser, laserEnd, laserTop, laserTopEnd);
+
+            if(enabled && efficiency > 0f){
+                Drawf.rangeCircle(x, y, repairRadius, laserColor, 0.72f, Layer.effect);
+            }
         }
 
         @Override
         public void drawSelect(){
-            Drawf.dashCircle(x, y, repairRadius, Pal.accent);
+            Drawf.rangeCircle(x, y, repairRadius, laserColor, 0.95f, Layer.effect);
         }
 
         @Override

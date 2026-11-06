@@ -41,10 +41,16 @@ public class RepairTower extends Block{
     }
 
     @Override
+    public void init(){
+        updateClipRadius(range + tilesize);
+        super.init();
+    }
+
+    @Override
     public void drawPlace(int x, int y, int rotation, boolean valid){
         super.drawPlace(x, y, rotation, valid);
 
-        Drawf.dashCircle(x * tilesize + offset, y * tilesize + offset, range, Pal.placing);
+        Drawf.rangeCircle(x * tilesize + offset, y * tilesize + offset, range, circleColor, 0.95f, Layer.effect);
     }
 
     public class RepairTowerBuild extends Building implements Ranged{
@@ -94,6 +100,10 @@ public class RepairTower extends Block{
         public void draw(){
             super.draw();
 
+            if(enabled && efficiency > 0f && !isHealSuppressed()){
+                Drawf.rangeCircle(x, y, range, circleColor, 0.72f, Layer.effect);
+            }
+
             if(warmup <= 0.001f) return;
 
             Draw.z(Layer.effect);
@@ -120,7 +130,7 @@ public class RepairTower extends Block{
 
         @Override
         public void drawSelect(){
-            Drawf.dashCircle(x, y, range, Pal.placing);
+            Drawf.rangeCircle(x, y, range, circleColor, 0.95f, Layer.effect);
         }
     }
 }

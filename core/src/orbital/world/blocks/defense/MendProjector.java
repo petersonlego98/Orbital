@@ -73,12 +73,22 @@ public class MendProjector extends Block{
     }
 
     @Override
+    public void init(){
+        updateClipRadius(range + phaseRangeBoost + tilesize);
+        super.init();
+    }
+
+    @Override
     public void drawPlace(int x, int y, int rotation, boolean valid){
         super.drawPlace(x, y, rotation, valid);
 
-        Drawf.dashCircle(x * tilesize + offset, y * tilesize + offset, range, baseColor);
+        float worldX = x * tilesize + offset, worldY = y * tilesize + offset;
+        Drawf.rangeCircle(worldX, worldY, range, baseColor, 0.95f, Layer.effect);
+        if(phaseRangeBoost > 0f){
+            Drawf.rangeCircleMax(worldX, worldY, range + phaseRangeBoost, phaseColor, 0.4f, Layer.effect);
+        }
 
-        indexer.eachBlock(player.team(), x * tilesize + offset, y * tilesize + offset, range, other -> true, other -> Drawf.selected(other, Tmp.c1.set(baseColor).a(Mathf.absin(4f, 1f))));
+        indexer.eachBlock(player.team(), worldX, worldY, range + phaseRangeBoost, other -> true, other -> Drawf.selected(other, Tmp.c1.set(baseColor).a(Mathf.absin(4f, 1f))));
     }
 
     public class MendBuild extends Building implements Ranged{
@@ -132,9 +142,12 @@ public class MendProjector extends Block{
         public void drawSelect(){
             float realRange = range + phaseHeat * phaseRangeBoost;
 
-            indexer.eachBlock(this, realRange, other -> true, other -> Drawf.selected(other, Tmp.c1.set(baseColor).a(Mathf.absin(4f, 1f))));
+            indexer.eachBlock(this, range + phaseRangeBoost, other -> true, other -> Drawf.selected(other, Tmp.c1.set(baseColor).a(Mathf.absin(4f, 1f))));
 
-            Drawf.dashCircle(x, y, realRange, baseColor);
+            Drawf.rangeCircle(x, y, realRange, baseColor, 0.95f, Layer.effect);
+            if(range + phaseRangeBoost > realRange + 0.5f){
+                Drawf.rangeCircleMax(x, y, range + phaseRangeBoost, phaseColor, 0.4f, Layer.effect);
+            }
         }
 
         @Override
@@ -144,6 +157,14 @@ public class MendProjector extends Block{
 
         @Override
         public void draw(){
+            if(enabled && efficiency > 0f && !isHealSuppressed()){
+                float activeRange = range + phaseHeat * phaseRangeBoost;
+                Drawf.rangeCircle(x, y, activeRange, baseColor, 0.78f, Layer.effect);
+                if(range + phaseRangeBoost > activeRange + 0.5f){
+                    Drawf.rangeCircleMax(x, y, range + phaseRangeBoost, phaseColor, 0.32f, Layer.effect);
+                }
+            }
+
             float f = 1f - (Time.time / 100f) % 1f;
 
             if(!Lod.l2) return;
