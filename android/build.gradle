@@ -1,0 +1,166 @@
+// Orbital - Android module
+// Build debug APK:   ./gradlew :android:assembleDebug
+// Build release APK: ./gradlew :android:assembleRelease  (requires keystore or will be unsigned)
+// Install on device: ./gradlew :android:installDebug
+
+apply plugin: "com.android.application"
+
+configurations{ natives }
+
+repositories{
+    mavenCentral()
+    maven{ url = "https://maven.google.com" }
+    maven{ url = 'https://jitpack.io' }
+}
+
+android{
+    namespace = "orbital.android"
+    buildToolsVersion = '35.0.0'
+    compileSdk = 36
+
+    sourceSets{
+        main{
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            res.srcDirs = ['res']
+            assets.srcDirs = ['../core/assets']
+
+            // When building with a local Arc clone, pull .so files from source tree.
+            // Otherwise use the extracted libs/ folder (populated by copyAndroidNatives).
+            if(localArc){
+                jniLibs.srcDirs += ['../../Arc/natives/natives-android/libs', '../../Arc/natives/natives-freetype-android/libs']
+            }else{
+                jniLibs.srcDirs = ['libs']
+            }
+        }
+    }
+
+    packagingOptions{
+        // Avoid duplicate SO conflicts when merging JARs
+        pickFirst "lib/armeabi-v7a/libarc.so"
+        pickFirst "lib/arm64-v8a/libarc.so"
+        pickFirst "lib/x86/libarc.so"
+        pickFirst "lib/x86_64/libarc.so"
+        // Drop desktop-only files from transitive JARs
+        exclude 'META-INF/robovm/ios/robovm.xml'
+        exclude "**steam**"
+    }
+
+    defaultConfig{
+        applicationId "orbital.android"
+        minSdkVersion 21          // Android 5.0 Lollipop
+        targetSdkVersion 36
+        versionCode 1
+        versionName "${versionNumber}-${versionType}"
+        multiDexEnabled = true
+    }
+
+    compileOptions{
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    signingConfigs{
+        release{
+            if(project.hasProperty("RELEASE_STORE_FILE")){
+                storeFile file(RELEASE_STORE_FILE)
+                storePassword RELEASE_STORE_PASSWORD
+                keyAlias RELEASE_KEY_ALIAS
+                keyPassword RELEASE_KEY_PASSWORD
+            }else{
+                // No keystore configured — release APK will not be signed.
+                // Sign manually: apksigner sign --ks your.jks --out signed.apk app-release-unsigned.apk
+                println("WARNING: No keystore property found. Release APK will be unsigned.")
+            }
+        }
+    }
+
+    buildTypes{
+        debug{
+            minifyEnabled false
+            debuggable true
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release{
+            // Note: enabling minify/R8 requires careful ProGuard rules for Rhino/reflection.
+            // Keep disabled until rules are validated to avoid stripping mod-loading classes.
+            minifyEnabled false
+            shrinkResources false
+            debuggable false
+            if(project.hasProperty("RELEASE_STORE_FILE")){
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    lint{
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies{
+    implementation project(":core")
+
+    // Arc Android GLES2/3 backend
+    implementation arcModule("backends:backend-android")
+
+    // Native .so libraries for each ABI (unpacked to libs/ by copyAndroidNatives)
+    natives arcModule("natives:natives-android")
+    natives arcModule("natives:natives-freetype-android")
+
+    // Rhino (JavaScript / mod logic engine)
+    implementation "com.github.Anuken:rhino:$rhinoVersion"
+
+    // Dalvik DX needed for Rhino on Android
+    implementation 'com.jakewharton.android.repackaged:dalvik-dx:9.0.0_r3'
+
+    // lz4 (save-file compression)
+    implementation "at.yawk.lz4:lz4-java:1.12.0"
+}
+
+// Extracts native .so files from the Arc JAR into android/libs/ so AGP can package them.
+// Run this once before assembleDebug if not using localArc.
+task copyAndroidNatives{
+    doLast{
+        if(!localArc){
+            configurations.natives.files.each{ jar ->
+                copy{
+                    from zipTree(jar)
+                    into file("libs/")
+                    include "**/*.so"
+                }
+            }
+        }
+    }
+}
+
+// Make both assemble tasks depend on native extraction
+tasks.whenTaskAdded{ task ->
+    if(task.name in ['assembleDebug', 'assembleRelease']){
+        task.dependsOn copyAndroidNatives
+
+        if(!project.ext.hasSprites()){
+            task.dependsOn ":tools:pack"
+        }
+    }
+}
+
+// ADB shortcut to launch the app after install
+task run(type: Exec){
+    commandLine "${findSdkDir()}/platform-tools/adb", 'shell', 'am', 'start',
+        '-n', 'orbital.android/orbital.android.AndroidLauncher'
+}
+
+// Deploy task: copies the signed/unsigned release APK to deploy/android/
+task deploy(dependsOn: "assembleRelease"){
+    doLast{
+        copy{
+            from "build/outputs/apk/release/"
+            into "../deploy/android/"
+            include "*.apk"
+            rename { "Orbital-release.apk" }
+        }
+    }
+}

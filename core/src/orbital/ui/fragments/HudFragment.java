@@ -801,6 +801,7 @@ public class HudFragment{
         Unit unit = selectedUnit();
         if(unit == null) return false;
         if(!unit.type.turretSlots.isEmpty()) return true;
+        if(unit.supportMounts != null && unit.supportMounts.length > 0) return true;
 
         for(WeaponMount mount : unit.mounts){
             if(mount.weapon.isTurretMount()) return true;
@@ -808,7 +809,7 @@ public class HudFragment{
         return false;
     }
 
-    /** Identity signature used to rebuild the bar only when the mount list changes. */
+    /** Identity signature used to rebuild the bar only when the turret/support mount list changes. */
     private static long turretSignature(@Nullable Unit unit){
         if(unit == null) return Long.MIN_VALUE;
 
@@ -816,6 +817,13 @@ public class HudFragment{
         for(WeaponMount mount : unit.mounts){
             if(mount.weapon.isTurretMount()){
                 signature = signature * 31L + System.identityHashCode(mount.weapon);
+            }
+        }
+        //support cells are rebuilt when a module is installed or removed; toggling active
+        //does not need a rebuild because each cell updates its own badge/border every frame.
+        if(unit.supportMounts != null){
+            for(SupportMount mount : unit.supportMounts){
+                if(mount != null) signature = signature * 31L + System.identityHashCode(mount);
             }
         }
         return signature;
@@ -870,6 +878,15 @@ public class HudFragment{
         for(WeaponMount mount : unit.mounts){
             if(mount.weapon.isTurretMount()){
                 table.add(turretCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(turretTooltip(mount.weapon));
+            }
+        }
+
+        //support modules sit immediately beside the turrets. The badge on top of each icon
+        //shows whether its effect is running; clicking toggles it without uninstalling.
+        if(unit.supportMounts != null){
+            for(SupportMount mount : unit.supportMounts){
+                if(mount == null || mount.block == null) continue;
+                table.add(supportCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(supportTooltip(mount));
             }
         }
 
@@ -937,6 +954,63 @@ public class HudFragment{
             icon.border(selected ? Color.white : removable ? Pal.accent : Pal.gray);
             icon.thickness = selected ? baseThickness + 1.5f : baseThickness;
             cell.background(selected ? Styles.grayPanelDark : Styles.black3);
+        });
+        return cell;
+    }
+
+    /** @return the bundle key for a support module's current state. Public so headless tests can verify it. */
+    public static String supportStateKey(boolean active){
+        return active ? "support.hud.active" : "support.hud.inactive";
+    }
+
+    /** @return the tooltip of a support module cell: name, category, current state and hint. */
+    private static String supportTooltip(SupportMount mount){
+        return mount.block.localizedName
+            + "\n[lightgray]" + Core.bundle.get("support.category." + mount.category.name())
+            + " · " + Core.bundle.get(supportStateKey(mount.active))
+            + "\n" + Core.bundle.get("support.hud.toggle");
+    }
+
+    /**
+     * A support module cell in the bottom dorsal bar. It mirrors {@link #turretCell} but shows
+     * an ATIVO/INATIVO badge on top of the icon and toggles the effect on click. The module is
+     * never removed here, so its anchor, category and footprint stay reserved.
+     */
+    private Table supportCell(Unit unit, SupportMount mount){
+        float iconSize = mobile ? 34f : 44f;
+        TextureRegion region = mount.block.uiIcon;
+        if(region == null || !region.found()) region = unit.type.uiIcon;
+
+        Table cell = new Table();
+        cell.background(Styles.black3);
+
+        Stack stack = new Stack();
+        BorderImage icon = new BorderImage(region, 3f);
+        icon.setScaling(Scaling.fit);
+        stack.add(icon);
+
+        //the badge sits on top of the icon; a text supplier keeps it live after every click
+        Table overlay = new Table();
+        overlay.top();
+        //overlay.top() centers horizontally and pins vertically to the top; do not call
+        //center() on the cell, as it would override the vertical alignment.
+        Label state = overlay.label(() -> Core.bundle.get(supportStateKey(mount.active)))
+            .style(Styles.outlineLabel).fontScale(mobile ? 0.55f : 0.65f).get();
+        stack.add(overlay);
+
+        cell.add(stack).size(iconSize).pad(mobile ? 1f : 2f).row();
+
+        Bar status = new Bar(() -> "", () -> mount.active ? Pal.heal : Pal.remove,
+            () -> mount.active ? 1f : 0f);
+        cell.add(status).height(4f).growX().pad(0f, 2f, 2f, 2f).row();
+
+        cell.clicked(() -> mount.setActive(unit, !mount.active));
+        cell.update(() -> {
+            state.setColor(mount.active ? Pal.heal : Pal.remove);
+            icon.border(mount.active ? Pal.accent : Pal.gray);
+            icon.thickness = mount.active ? 3f : 2f;
+            icon.setColor(mount.active ? Color.white : Color.gray);
+            cell.background(mount.active ? Styles.black3 : Styles.black6);
         });
         return cell;
     }

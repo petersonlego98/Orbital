@@ -207,6 +207,35 @@ public class Weapon implements Cloneable{
         return shoot.shots * 60f / reload;
     }
 
+    /**
+     * Drawing-only sprite scale for this weapon on a given unit. Native hull weapons always
+     * return 1; {@link TurretWeapon} overrides it with the value {@link DorsalVisual} derives
+     * from the carrier's measured hull size. The scale never reaches gameplay or serialization.
+     */
+    public float visualScale(Unit unit){
+        return 1f;
+    }
+
+    /**
+     * Draws a weapon region at its native size, or shrunk by {@code scale}.
+     *
+     * <p>The explicit-width overload of {@code Draw.rect} does not apply {@code Draw.xscl} /
+     * {@code Draw.yscl} itself, so both are reproduced here (including the negative xscl used
+     * for flipped weapons) and then multiplied by the visual scale.</p>
+     */
+    private void drawRegion(TextureRegion region, float x, float y, float rotation, float scale){
+        if(region == null || !region.found()) return;
+
+        if(scale == 1f){
+            Draw.rect(region, x, y, rotation);
+        }else{
+            Draw.rect(region, x, y,
+                region.width * region.scl() * Draw.xscl * scale,
+                region.height * region.scl() * Draw.yscl * scale,
+                rotation);
+        }
+    }
+
     //TODO copy-pasted code
     public void drawOutline(Unit unit, WeaponMount mount){
         if(!outlineRegion.found()) return;
@@ -219,7 +248,7 @@ public class Weapon implements Cloneable{
         wy = unit.y + Angles.trnsy(rotation, x, y) + Angles.trnsy(weaponRotation, 0, -realRecoil);
 
         Draw.xscl = -Mathf.sign(flipSprite);
-        Draw.rect(outlineRegion, wx, wy, weaponRotation);
+        drawRegion(outlineRegion, wx, wy, weaponRotation, visualScale(unit));
         Draw.xscl = 1f;
     }
 
@@ -227,6 +256,8 @@ public class Weapon implements Cloneable{
         //apply layer offset, roll it back at the end
         float z = Draw.z();
         Draw.z(z + layerOffset);
+        //resolved once per frame; 1 for native weapons, hull-derived for dorsal turret modules
+        float scale = visualScale(unit);
 
         float
         rotation = unit.rotation - 90,
@@ -236,7 +267,7 @@ public class Weapon implements Cloneable{
         wy = unit.y + Angles.trnsy(rotation, x, y) + Angles.trnsy(weaponRotation, 0, -realRecoil);
 
         if(shadow > 0){
-            Drawf.shadow(wx, wy, shadow);
+            Drawf.shadow(wx, wy, shadow * scale);
         }
 
         if(top){
@@ -244,6 +275,14 @@ public class Weapon implements Cloneable{
         }
 
         if(parts.size > 0){
+            //RegionPart computes its own width from Draw.xscl/Draw.yscl, so scaling the global
+            //draw scale around the part loops keeps the barrels in proportion with the module.
+            float px0 = Draw.xscl, py0 = Draw.yscl;
+            if(scale != 1f){
+                Draw.xscl *= scale;
+                Draw.yscl *= scale;
+            }
+
             DrawPart.params.set(mount.warmup, mount.reload / reload, mount.smoothReload, mount.heat, mount.recoil, mount.charge, wx, wy, weaponRotation + 90);
             DrawPart.params.sideMultiplier = flipSprite ? -1 : 1;
 
@@ -255,6 +294,9 @@ public class Weapon implements Cloneable{
                     part.draw(DrawPart.params);
                 }
             }
+
+            Draw.xscl = px0;
+            Draw.yscl = py0;
         }
 
         float prev = Draw.xscl;
@@ -264,18 +306,18 @@ public class Weapon implements Cloneable{
         //fix color
         unit.type.applyColor(unit);
 
-        if(region.found()) Draw.rect(region, wx, wy, weaponRotation);
+        drawRegion(region, wx, wy, weaponRotation, scale);
 
         if(cellRegion.found()){
             Draw.color(unit.type.cellColor(unit));
-            Draw.rect(cellRegion, wx, wy, weaponRotation);
+            drawRegion(cellRegion, wx, wy, weaponRotation, scale);
             Draw.color();
         }
 
         if(heatRegion.found() && mount.heat > 0){
             Draw.color(heatColor, mount.heat);
             Draw.blend(Blending.additive);
-            Draw.rect(heatRegion, wx, wy, weaponRotation);
+            drawRegion(heatRegion, wx, wy, weaponRotation, scale);
             Draw.blend();
             Draw.color();
         }
@@ -284,6 +326,12 @@ public class Weapon implements Cloneable{
 
         if(parts.size > 0){
             //TODO does it need an outline?
+            float px0 = Draw.xscl, py0 = Draw.yscl;
+            if(scale != 1f){
+                Draw.xscl *= scale;
+                Draw.yscl *= scale;
+            }
+
             for(int i = 0; i < parts.size; i++){
                 var part = parts.get(i);
                 DrawPart.params.setRecoil(part.recoilIndex >= 0 && mount.recoils != null ? mount.recoils[part.recoilIndex] : mount.recoil);
@@ -292,6 +340,9 @@ public class Weapon implements Cloneable{
                     part.draw(DrawPart.params);
                 }
             }
+
+            Draw.xscl = px0;
+            Draw.yscl = py0;
         }
 
         Draw.xscl = 1f;

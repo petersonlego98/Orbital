@@ -41,7 +41,15 @@ public class MenuFragment{
 
         parent = group;
 
-        parent.fill((x, y, w, h) -> renderer.render());
+        //The key art replaces the procedural terrain as the menu backdrop. The old renderer is
+        //kept as a fallback so headless/early-startup runs without the loose textures still work.
+        parent.fill((x, y, w, h) -> {
+            if(OrbitalTheme.available()){
+                OrbitalTheme.renderBackdrop();
+            }else{
+                renderer.render();
+            }
+        });
 
         parent.fill(c -> {
             c.pane(Styles.noBarPane, cont -> {
@@ -106,13 +114,14 @@ public class MenuFragment{
                     }
                 });
             }).size(200, 60).name("becheck").update(t -> {
-                t.getLabel().setColor(becontrol.isUpdateAvailable() ? Tmp.c1.set(Color.white).lerp(Pal.accent, Mathf.absin(5f, 1f)) : Color.white);
+                t.getLabel().setColor(becontrol.isUpdateAvailable() ? Tmp.c1.set(OrbitalTheme.silver).lerp(OrbitalTheme.cyan, Mathf.absin(5f, 1f)) : OrbitalTheme.silver);
             }));
         }
 
-        String versionText = ((Version.build == -1) ? "[#fc8140aa]" : "[#ffffffba]") + Version.combined();
+        //amber for development builds, cold silver for release builds - both from the key art
+        String versionText = ((Version.build == -1) ? "[#ff8a24]" : "[#cfd8f2cc]") + Version.combined();
         parent.fill((x, y, w, h) -> {
-            TextureRegion logo = Core.atlas.find("logo");
+            TextureRegion logo = menuLogo();
             float width = Core.graphics.getWidth(), height = Core.graphics.getHeight() - Core.scene.marginTop;
             float logow = logoWidth();
             float logoh = logoHeight();
@@ -126,7 +135,7 @@ public class MenuFragment{
             Draw.color();
             Draw.rect(logo, fx, fy, logow, logoh);
 
-            Fonts.outline.setColor(Color.white);
+            Fonts.outline.setColor(OrbitalTheme.silver);
             Fonts.outline.draw(versionText, fx, fy - logoh/2f - Scl.scl(7f), Align.center);
         }).touchable = Touchable.disabled;
 
@@ -138,21 +147,22 @@ public class MenuFragment{
             float topOffset = logoh + Scl.scl(Core.graphics.isPortrait() ? 58f : 38f);
             float maxWidth = Math.min(Core.graphics.getWidth() - Scl.scl(24f), Scl.scl(620f));
 
-            t.table(banner -> {
-                banner.margin(2f);
+            t.table(OrbitalTheme.panel(), banner -> {
+                banner.margin(8f);
 
                 //Labels are created and sized up front so their wrapped height is known before the table lays out the rows.
                 Label title = new Label(Core.bundle.get("menu.attribution.title"), Styles.outlineLabel);
                 title.setFontScale(0.9f);
                 title.setWrap(true);
                 title.setAlignment(Align.center);
+                title.setColor(OrbitalTheme.silver);
                 title.setWidth(maxWidth);
 
                 Label disclaimer = new Label(Core.bundle.get("menu.attribution.disclaimer"), Styles.outlineLabel);
                 disclaimer.setFontScale(0.75f);
                 disclaimer.setWrap(true);
                 disclaimer.setAlignment(Align.center);
-                disclaimer.setColor(Color.lightGray);
+                disclaimer.setColor(OrbitalTheme.ice);
                 disclaimer.setWidth(maxWidth);
 
                 banner.add(title).width(maxWidth).center().row();
@@ -164,11 +174,18 @@ public class MenuFragment{
         });
     }
 
+    /** The wordmark cut from the key art, falling back to the atlas logo when the texture is missing. */
+    private TextureRegion menuLogo(){
+        TextureRegion themed = OrbitalTheme.wordmark();
+        return themed != null ? themed : Core.atlas.find("logo");
+    }
+
     /** Logo width in screen units, capped so the mark leaves room for the version and attribution on short windows. */
     private float logoWidth(){
-        TextureRegion logo = Core.atlas.find("logo");
+        TextureRegion logo = menuLogo();
         float width = Math.min(logo.width * Scl.scl(1) * logo.scale, Core.graphics.getWidth() - Scl.scl(20));
-        float maxHeight = (Core.graphics.getHeight() - Core.scene.marginTop) * 0.13f;
+        //the wordmark is a wide banner, so it needs a taller cap than the old compact logo
+        float maxHeight = (Core.graphics.getHeight() - Core.scene.marginTop) * (OrbitalTheme.wordmark() != null ? 0.17f : 0.13f);
         if(maxHeight > 0f){
             width = Math.min(width, maxHeight * logo.width / logo.height);
         }
@@ -176,7 +193,7 @@ public class MenuFragment{
     }
 
     private float logoHeight(){
-        TextureRegion logo = Core.atlas.find("logo");
+        TextureRegion logo = menuLogo();
         return logoWidth() * logo.height / logo.width;
     }
 
@@ -255,7 +272,7 @@ public class MenuFragment{
         container.setSize(Core.graphics.getWidth(), Core.graphics.getHeight());
 
         float width = 230f;
-        Drawable background = Styles.black6;
+        Drawable background = OrbitalTheme.panel();
 
         container.left();
         container.add().width(Core.graphics.getWidth()/10f);
@@ -327,7 +344,7 @@ public class MenuFragment{
         for(MenuButton b : buttons){
             if(b == null) continue;
             Button[] out = {null};
-            out[0] = t.button(b.text, b.icon, Styles.flatToggleMenut, () -> {
+            out[0] = t.button(b.text, b.icon, OrbitalTheme.menuButton(), () -> {
                 if(currentMenu == out[0]){
                     currentMenu = null;
                     fadeOutMenu();

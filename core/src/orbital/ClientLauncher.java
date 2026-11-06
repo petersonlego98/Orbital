@@ -144,6 +144,14 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
         });
 
         assets.load("sprites/error.png", Texture.class);
+
+        //ORBITAL key art for the themed menu and loading screen. These are loose textures outside
+        //sprites/ on purpose: the packed atlas must stay byte-identical because
+        //Fonts.mergeFontAtlas() reuses the texture page that holds the "logo" region.
+        assets.load("ui/orbital-poster.png", Texture.class);
+        assets.load("ui/orbital-wordmark.png", Texture.class);
+        assets.load("ui/orbital-mark.png", Texture.class);
+
         atlas = TextureAtlas.blankAtlas();
         Vars.net = new Net(platform.getNet());
         MapPreviewLoader.setupLoaders();

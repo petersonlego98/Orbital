@@ -23,6 +23,7 @@ buildscript{
     dependencies{
         classpath arcModule(":extensions:packer")
         classpath arcModule(":arc-core")
+        classpath "com.android.tools.build:gradle:8.6.1"
     }
 }
 
@@ -430,6 +431,15 @@ project(":server"){
         implementation project(":core")
         implementation arcModule("backends:backend-headless")
         implementation 'org.jline:jline:4.0.0'
+    }
+}
+
+project(":android"){
+    apply plugin: "com.android.application"
+
+    configurations.all{
+        // Force a consistent lz4 version across all transitive deps
+        resolutionStrategy.force "at.yawk.lz4:lz4-java:1.12.0"
     }
 }
 

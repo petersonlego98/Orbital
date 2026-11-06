@@ -66,6 +66,8 @@ public class ContentLoader{
         UnitTypes.load();
         TurretLoadouts.load();
         Blocks.load();
+        //overdrive support modules reuse the blocks' real speedBoost values as timed unit statuses
+        SupportEffects.load();
         Loadouts.load();
         Weathers.load();
         Planets.load();

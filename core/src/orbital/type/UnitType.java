@@ -291,6 +291,16 @@ public class UnitType extends UnlockableContent implements Senseable{
     public Seq<Weapon> weapons = new Seq<>();
     /** Dorsal mounting points available for removable turret modules. */
     public Seq<TurretSlot> turretSlots = new Seq<>();
+    /** Manually placed support-module anchors. Independent from the turret slot budget. */
+    public Seq<SupportAnchor> supportAnchors = new Seq<>();
+    /**
+     * Optional manual multiplier for the <b>derived</b> dorsal visual scale; 1 = fully derived
+     * from this hull's measured sprite area and its dorsal position count. Applies to removable
+     * turret modules and support modules alike. Deliberately independent from
+     * {@link SupportAnchor#maxSize} and from {@link DorsalGeometry}'s footprint: shrinking the
+     * drawing never changes which modules this unit accepts.
+     */
+    public float dorsalVisualTuning = 1f;
     /** Multiplier applied to the dorsal budget. 1.0 means the default 50% of sprite area. */
     public float loadoutBudgetMultiplier = 1f;
     /** Optional sprite area override, in px². Used for deterministic headless validation. <0 to calculate. */
@@ -686,6 +696,19 @@ public class UnitType extends UnlockableContent implements Senseable{
             if(weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable) count++;
         }
         return count;
+    }
+
+    /**
+     * @return true when this hull already provides a built-in ability equivalent to a
+     * support-module category. Such a category is shown as a fixed, non-removable module
+     * and cannot be installed again, so native and mounted effects never overlap.
+     */
+    public boolean hasNativeSupport(SupportModuleCategory category){
+        if(category == null) return false;
+        for(Ability ability : abilities){
+            if(SupportModuleCategory.ofAbility(ability) == category) return true;
+        }
+        return false;
     }
 
     /** @return true if the turret silhouette fits inside the hull's dorsal area. */
@@ -1662,6 +1685,7 @@ public class UnitType extends UnlockableContent implements Senseable{
                 Draw.reset();
                 a.draw(unit);
             }
+            drawSupportModuleEffects(unit);
         }
 
         if(mech != null){
@@ -1818,7 +1842,49 @@ public class UnitType extends UnlockableContent implements Senseable{
             mount.weapon.draw(unit, mount);
         }
 
+        //share the weapon draw state (color, scale and layer) so support sprites sit on the hull
+        drawSupportModules(unit);
+
         Draw.reset();
+    }
+
+    /**
+     * Draws the support module sprites attached at their hull-local anchors.
+     *
+     * <p>Sprites use the hull's visual scale so the pods sit on the hull instead of covering it.
+     * Only the drawing size changes: anchors, footprints, effect ranges and the compatibility
+     * list still use the full block size.</p>
+     */
+    public void drawSupportModules(Unit unit){
+        if(unit.supportMounts == null || unit.supportMounts.length == 0) return;
+
+        //same hull-local rotation convention as Weapon#draw
+        float rotation = unit.rotation - 90f;
+
+        for(SupportMount mount : unit.supportMounts){
+            if(mount == null || mount.block == null || mount.block.region == null || !mount.block.region.found()) continue;
+
+            float wx = unit.x + Angles.trnsx(rotation, mount.x, mount.y);
+            float wy = unit.y + Angles.trnsy(rotation, mount.x, mount.y);
+
+            //reproduce Draw.rect(region, x, y, rotation)'s native sizing, then shrink it.
+            //region.scl()/Draw.xscl are kept so the current flip/mirror state is honored.
+            var region = mount.block.region;
+            float w = region.width * region.scl() * Draw.xscl * mount.visualScale;
+            float h = region.height * region.scl() * Draw.yscl * mount.visualScale;
+            Draw.rect(region, wx, wy, w, h, rotation);
+        }
+    }
+
+    /** Draws the gameplay effects of installed support modules with the same convention as native abilities. */
+    public void drawSupportModuleEffects(Unit unit){
+        if(unit.supportMounts == null) return;
+
+        for(SupportMount mount : unit.supportMounts){
+            if(mount == null) continue;
+            Draw.reset();
+            mount.draw(unit);
+        }
     }
 
     public void drawWeaponOutlines(Unit unit){

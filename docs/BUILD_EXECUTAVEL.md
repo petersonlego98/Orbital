@@ -28,6 +28,33 @@ deploy/windows64/Orbital/Orbital.exe
 
 Quando houver alterações no código e for necessário atualizar o `Orbital.exe`:
 
+### Passo 0: Regenerar ícone e texturas do tema (quando necessário)
+
+A arte oficial está versionada em `core/assets-raw/keyart/orbital-keyart.jpg`.
+O diretório `deploy/` é ignorado pelo Git, portanto **`deploy/orbital.ico` não
+existe num clone novo** e o Passo 3 falharia sem ele. Regenere todos os
+derivados a partir da arte-fonte com o conversor sem dependências externas
+(JDK 17+, modo single-file):
+
+```bash
+java tools/ArtConverter.java
+```
+
+| Arquivo gerado | Uso |
+|---|---|
+| `deploy/orbital.ico` | ícone do `jpackage` e do instalador (16–256 px, 32 bpp, BMP/DIB) |
+| `core/assets/icons/icon.png` | ícone da janela em `DesktopLauncher` |
+| `core/assets/icons/icon.icns` | ícone macOS das tarefas `packr*` |
+| `core/assets/ui/orbital-poster.png` | fundo do menu e da tela de carregamento |
+| `core/assets/ui/orbital-wordmark.png` | logotipo do menu |
+| `core/assets/ui/orbital-mark.png` | emblema circular da tela de carregamento |
+
+As texturas `ui/` são propositalmente **soltas** (fora de `sprites/`): assim o
+atlas empacotado e a geração de `Fonts.mergeFontAtlas()` permanecem intactos.
+O `jpackage` incorpora o ícone dentro do `Orbital.exe`; ao atualizar apenas o
+JAR de um app-image já existente, **substitua também o `.exe`**, caso contrário
+o ícone antigo permanece no binário.
+
 ### Passo 1: Limpar builds e executáveis antigos
 No PowerShell, dentro da raiz do projeto:
 

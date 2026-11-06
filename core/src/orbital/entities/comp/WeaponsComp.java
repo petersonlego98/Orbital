@@ -1,11 +1,13 @@
 package orbital.entities.comp;
 
+import arc.Core;
 import arc.math.geom.*;
 import arc.util.*;
 import orbital.annotations.Annotations.*;
 import orbital.entities.units.*;
 import orbital.gen.*;
 import orbital.type.*;
+import orbital.world.Block;
 import orbital.world.blocks.defense.turrets.*;
 
 @Component
@@ -16,6 +18,11 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
 
     /** weapon mount array, never null */
     @SyncLocal WeaponMount[] mounts = {};
+    /**
+     * Runtime-only support mounts. Each one drives a gameplay effect derived from its block.
+     * Deliberately transient: the loadout is session-only, with no save or network serialization.
+     */
+    transient SupportMount[] supportMounts = {};
     @ReadOnly transient boolean isRotate;
     @NoSerialize float aimX, aimY;
     boolean isShooting;
@@ -53,6 +60,147 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         return count;
     }
 
+    private SupportMount[] supports(){
+        if(supportMounts == null) supportMounts = new SupportMount[0];
+        return supportMounts;
+    }
+
+    /** @return true if a support block from this category is already installed. */
+    public boolean hasSupportCategory(SupportModuleCategory category){
+        if(category == null) return false;
+        for(SupportMount mount : supports()){
+            if(mount != null && mount.category == category) return true;
+        }
+        return false;
+    }
+
+    /** @return true if this support block has a distinct, non-overlapping anchor available. */
+    public boolean canMountSupport(Block block){
+        return findSupportAnchor(block) >= 0;
+    }
+
+    /** @return the first free support anchor for this block, or -1 if it cannot be mounted. */
+    public int findSupportAnchor(Block block){
+        SupportModuleCategory category = SupportModuleCategory.of(block);
+        if(category == null || type == null || hasSupportCategory(category)) return -1;
+        //a hull with a built-in equivalent already provides this effect as a fixed module
+        if(type.hasNativeSupport(category)) return -1;
+
+        float footprint = DorsalGeometry.footprint(block.size);
+        for(int i = 0; i < type.supportAnchors.size; i++){
+            SupportAnchor anchor = type.supportAnchors.get(i);
+            if(!anchor.accepts(block)) continue;
+            if(!DorsalGeometry.fitsHull(type, anchor.offsetX, anchor.offsetY, footprint)) continue;
+            if(overlapsTurretMounts(anchor.offsetX, anchor.offsetY, footprint)) continue;
+            if(overlapsSupportMounts(anchor.offsetX, anchor.offsetY, footprint)) continue;
+            return i;
+        }
+        return -1;
+    }
+
+    /**
+     * Mounts a support block and activates its gameplay effect.
+     * Exactly one block per category is allowed; different categories may coexist if anchors are free.
+     */
+    public @Nullable SupportMount mountSupport(Block block){
+        int index = findSupportAnchor(block);
+        if(index < 0 || type == null) return null;
+
+        SupportAnchor anchor = type.supportAnchors.get(index);
+        //drawing-only: the resolved scale is never fed back into footprints or overlap checks
+        float visualScale = DorsalGeometry.supportVisualScale(type, anchor, block.size, blockRegionPx(block));
+        SupportMount mount = new SupportMount(block, anchor.category, index,
+            anchor.offsetX, anchor.offsetY, visualScale);
+        SupportMount[] current = supports();
+        SupportMount[] next = java.util.Arrays.copyOf(current, current.length + 1);
+        next[current.length] = mount;
+        supportMounts = next;
+        Unit unit = self();
+        mount.created(unit);
+        return mount;
+    }
+
+    public boolean removeSupportMount(SupportMount mount){
+        if(mount == null) return false;
+
+        SupportMount[] current = supports();
+        int index = -1;
+        for(int i = 0; i < current.length; i++){
+            if(current[i] == mount){
+                index = i;
+                break;
+            }
+        }
+        if(index < 0) return false;
+
+        SupportMount[] next = new SupportMount[current.length - 1];
+        System.arraycopy(current, 0, next, 0, index);
+        System.arraycopy(current, index + 1, next, index, next.length - index);
+        supportMounts = next;
+        //release shared state (for example the force module's shield pool) after the array
+        //has been updated, so removed() can see whether another module still owns it
+        mount.removed(self());
+        return true;
+    }
+
+    public boolean removeSupport(Block block){
+        for(SupportMount mount : supports()){
+            if(mount != null && mount.block == block) return removeSupportMount(mount);
+        }
+        return false;
+    }
+
+    /** Native sprite side in atlas pixels; falls back to the deterministic tiled size headlessly. */
+    private static float blockRegionPx(Block block){
+        if(block.region != null && block.region.found()){
+            return Math.max(1f, Math.max(block.region.width, block.region.height));
+        }
+        return Math.max(1f, block.size * TurretSlot.pxTile);
+    }
+
+    private boolean overlapsTurretMounts(float x, float y, float footprint){
+        for(WeaponMount mount : mounts){
+            if(mount != null && mount.weapon instanceof TurretWeapon turretWeapon){
+                if(DorsalGeometry.overlaps(x, y, footprint,
+                    turretWeapon.x, turretWeapon.y, DorsalGeometry.footprint(turretWeapon.turretSize))) return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean overlapsSupportMounts(float x, float y, float footprint){
+        for(SupportMount mount : supports()){
+            if(mount == null || mount.block == null) continue;
+            if(DorsalGeometry.overlaps(x, y, footprint, mount.x, mount.y, mount.footprint())) return true;
+        }
+        return false;
+    }
+
+    private boolean slotOccupied(int slotIndex){
+        if(slotIndex < 0) return false;
+        for(WeaponMount mount : mounts){
+            if(mount != null && mount.weapon instanceof TurretWeapon turretWeapon && turretWeapon.slotIndex == slotIndex) return true;
+        }
+        return false;
+    }
+
+    /** @return the first free turret slot that also avoids installed support modules. */
+    public int findTurretSlot(Turret turret){
+        if(turret == null || type == null) return -1;
+
+        float footprint = DorsalGeometry.footprint(turret.size);
+        for(int i = 0; i < type.turretSlots.size; i++){
+            TurretSlot slot = type.turretSlots.get(i);
+            if(!slot.accepts(turret)) continue;
+            if(!DorsalGeometry.fitsHull(type, slot.offsetX, slot.offsetY, footprint)) continue;
+            if(slotOccupied(i)) continue;
+            if(overlapsTurretMounts(slot.offsetX, slot.offsetY, footprint)) continue;
+            if(overlapsSupportMounts(slot.offsetX, slot.offsetY, footprint)) continue;
+            return i;
+        }
+        return -1;
+    }
+
     /** @return true if the turret fits this unit's current runtime loadout. */
     public boolean canMount(Turret turret){
         if(turret == null || !TurretWeapon.canAdapt(turret)) return false;
@@ -60,20 +208,30 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         if(mountedTurrets() >= type.turretSlots.size) return false;
 
         float p = turret.size * TurretSlot.pxTile;
-        return loadoutCost() + p * p <= type.dorsalBudget();
+        if(loadoutCost() + p * p > type.dorsalBudget()) return false;
+        return findTurretSlot(turret) >= 0;
     }
 
     /**
-     * Mounts a turret at runtime, validating slot size, silhouette and dorsal budget.
+     * Mounts a turret at runtime, validating slot size, silhouette, dorsal budget and physical placement.
      * @return the created weapon, or null if the turret does not fit.
      */
     public @Nullable TurretWeapon mountTurret(Turret turret){
         if(!canMount(turret)) return null;
+        int slotIndex = findTurretSlot(turret);
+        if(slotIndex < 0) return null;
 
         TurretWeapon weapon = TurretWeapon.of(turret);
         //runtime weapons are not covered by UnitType's content init, so load sprites and init here.
-        weapon.load();
+        //Headless runs have no Core.atlas; skip sprite lookup there and keep the deterministic
+        //size fallback instead of throwing while mounting.
+        if(Core.atlas != null) weapon.load();
         weapon.init();
+
+        TurretSlot slot = type.turretSlots.get(slotIndex);
+        weapon.x = slot.offsetX;
+        weapon.y = slot.offsetY;
+        weapon.slotIndex = slotIndex;
         addWeapon(weapon);
         return weapon;
     }
@@ -173,11 +331,17 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         }
     }
 
-    /** Update shooting and rotation for this unit. */
+    /** Update shooting, rotation and the effects of installed support modules. */
     @Override
     public void update(){
         for(WeaponMount mount : mounts){
             mount.weapon.update(self(), mount);
+        }
+
+        //support abilities are not part of UnitType.abilities, so they must be ticked here;
+        //this is inlined into every generated unit's update() by the entity processor
+        for(SupportMount mount : supports()){
+            if(mount != null) mount.update(self());
         }
     }
 }

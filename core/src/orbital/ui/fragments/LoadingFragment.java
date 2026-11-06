@@ -26,24 +26,50 @@ public class LoadingFragment{
         parent.fill(t -> {
             //rect must fill screen completely.
             t.rect((x, y, w, h) -> {
-                Draw.alpha(t.color.a);
-                Styles.black8.draw(0, 0, Core.graphics.getWidth(), Core.graphics.getHeight());
+                if(OrbitalTheme.available()){
+                    OrbitalTheme.renderLoadingBackdrop();
+                    //the theme renderer resets the batch color, so reproduce the table's fade-out
+                    //by covering the key art with deep space as the loading screen disappears
+                    Draw.color(OrbitalTheme.space.r, OrbitalTheme.space.g, OrbitalTheme.space.b, 1f - t.color.a);
+                    Fill.crect(0, 0, Core.graphics.getWidth(), Core.graphics.getHeight());
+                }else{
+                    Draw.alpha(t.color.a);
+                    Styles.black8.draw(0, 0, Core.graphics.getWidth(), Core.graphics.getHeight());
+                }
             });
             t.visible = false;
             t.touchable = Touchable.enabled;
-            t.add().height(133f).row();
-            t.add(new WarningBar()).growX().height(24f);
+
+            //round emblem cut from the key art, in place of the old empty spacer
+            t.add(new Element(){
+                @Override public void draw(){
+                    TextureRegion emblem = OrbitalTheme.mark();
+                    if(emblem == null) return;
+                    Draw.alpha(parentAlpha);
+                    float size = Scl.scl(132f);
+                    Draw.rect(emblem, x + width / 2f, y + height / 2f, size, size);
+                    Draw.reset();
+                }
+            }).size(148f, 148f).padBottom(6f).row();
+
+            t.add(warningBar()).growX().height(24f);
             t.row();
-            nameLabel = t.add("@loading").pad(10f).style(Styles.outlineLabel).get();
+            nameLabel = t.add("@loading").pad(10f).style(Styles.outlineLabel).color(OrbitalTheme.cyan).get();
             t.row();
-            t.add(new WarningBar()).growX().height(24f);
+
+            Label tagline = new Label(Core.bundle.get("loading.orbital.tagline"), Styles.outlineLabel);
+            tagline.setFontScale(0.7f);
+            tagline.setColor(OrbitalTheme.cyan);
+            t.add(tagline).padBottom(8f).row();
+
+            t.add(warningBar()).growX().height(24f);
             t.row();
 
             nameLabel.setText("@loading");
 
             bar = t.add(new Bar()).pad(3).padTop(6).size(500f, 40f).visible(false).get();
             t.row();
-            button = t.button("@cancel", () -> {
+            button = t.button("@cancel", OrbitalTheme.loadButton(), () -> {
                 if(cancelListener != null){
                     cancelListener.run();
                 }
@@ -57,6 +83,13 @@ public class LoadingFragment{
         });
     }
 
+    /** Warning stripes in the key art's electric cyan instead of the global gold accent. */
+    private static WarningBar warningBar(){
+        WarningBar bar = new WarningBar();
+        bar.setColor(OrbitalTheme.cyan);
+        return bar;
+    }
+
     public void toFront(){
         table.toFront();
     }
@@ -64,7 +97,7 @@ public class LoadingFragment{
     public void setProgress(Floatp progress){
         bar.reset(0f);
         bar.visible = true;
-        bar.set(() -> ((int)(progress.get() * 100) + "%"), progress, Pal.accent);
+        bar.set(() -> ((int)(progress.get() * 100) + "%"), progress, OrbitalTheme.cyan);
     }
 
     public void snapProgress(){
@@ -114,7 +147,7 @@ public class LoadingFragment{
         bar.visible = false;
         table.clearActions();
         table.touchable = Touchable.enabled;
-        nameLabel.setColor(Color.white);
+        nameLabel.setColor(OrbitalTheme.cyan);
         nameLabel.setText(text);
         table.visible = true;
         table.color.a = 1f;

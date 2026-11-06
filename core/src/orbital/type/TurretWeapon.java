@@ -2,6 +2,7 @@ package orbital.type;
 
 import orbital.entities.bullet.*;
 import orbital.entities.part.*;
+import orbital.gen.Unit;
 import orbital.world.*;
 import orbital.world.blocks.defense.turrets.*;
 
@@ -21,6 +22,8 @@ public class TurretWeapon extends Weapon{
     public final int turretSize;
     /** whether this module can be removed from the unit. Native weapons are never TurretWeapon. */
     public boolean removable = true;
+    /** index of the dorsal slot occupied by this turret; -1 when no slot has been assigned. */
+    public int slotIndex = -1;
 
     public TurretWeapon(Turret turret, BulletType bullet){
         super(turret.name);
@@ -78,10 +81,32 @@ public class TurretWeapon extends Weapon{
         }
     }
 
-    /** @return the dorsal footprint cost, in px². P = size * 32, C = P². */
+    /** @return the dorsal footprint cost, in px². P = size * 32, C = P². Never scaled. */
     public float cost(){
         float p = turretSize * TurretSlot.pxTile;
         return p * p;
+    }
+
+    /**
+     * @return the drawing-only scale derived from the carrier's measured hull size. The exact
+     * same {@link DorsalVisual} rule is used by support modules, so a turret and a pod of the
+     * same size have the same visual weight on any given hull.
+     *
+     * <p>Resolved at draw time rather than at mount time so content-defined removable turrets
+     * (the Duo on mono/flare) and runtime-mounted turrets follow the same path, and so a mod
+     * that adds a {@link TurretWeapon} directly does not need to know about scaling.</p>
+     */
+    @Override
+    public float visualScale(Unit unit){
+        return DorsalGeometry.turretVisualScale(unit == null ? null : unit.type, turretSize, regionPx());
+    }
+
+    /** Native sprite side in atlas pixels, with a deterministic fallback for headless runs. */
+    public float regionPx(){
+        if(region != null && region.found()){
+            return Math.max(1f, Math.max(region.width, region.height));
+        }
+        return Math.max(1f, turretSize * TurretSlot.pxTile);
     }
 
     /** @return true if this turret has a bullet type that this adapter can use. */
