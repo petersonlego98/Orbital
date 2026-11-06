@@ -267,7 +267,8 @@ public class LoadRenderer implements Disposable{
         String pct = Mathf.round(p * 100f) + "%";
         font.setColor(OrbitalTheme.silver);
         layout.setText(font, pct);
-        font.draw(pct, w / 2f - layout.width / 2f, by + barH + 12f * s);
+        //clearance above the bar: the old 12*s gap put the digits on top of the frame
+        font.draw(pct, w / 2f - layout.width / 2f, by + barH + 34f * s);
 
         layout.free();
         font.getData().setScale(1f);
