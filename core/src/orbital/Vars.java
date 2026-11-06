@@ -80,7 +80,7 @@ public class Vars implements Loadable{
     /** Github API URL. */
     public static final String ghApi = "https://api.github.com";
     /** URL for discord invite. */
-    public static final String discordURL = "https://discord.gg/orbital";
+    public static final String discordURL = "https://discord.gg/afBWUZryF";
     /** Link to the wiki's modding guide.*/
     public static final String modGuideURL = "https://orbitalgame.github.io/wiki/modding/1-modding/";
     /** Link to the wiki's patch guide.*/

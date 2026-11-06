@@ -25,7 +25,7 @@ public class Links{
 
     private static void createLinks(){
         links = new LinkEntry[]{
-        new LinkEntry("discord", "https://discord.gg/mindustry", Icon.discord, Color.valueOf("7289da")),
+        new LinkEntry("discord", Vars.discordURL, Icon.discord, Color.valueOf("7289da")),
         new LinkEntry("changelog", forkRepo + "/commits", Icon.list, Pal.accent.cpy()),
         new LinkEntry("trello", "https://trello.com/b/aE2tcUwF", Icon.trello, Color.valueOf("026aa7")),
         new LinkEntry("wiki", "https://mindustrygame.github.io/wiki/", Icon.book, Color.valueOf("0f142f")),
