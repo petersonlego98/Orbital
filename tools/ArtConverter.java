@@ -1,5 +1,6 @@
 import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.geom.*;
 import java.awt.image.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -45,13 +46,14 @@ public class ArtConverter{
         write(mark, root.resolve("core/assets/ui/orbital-mark.png"));
 
         //runtime window icon (DesktopLauncher uses icons/icon.png)
-        write(resize(src, 256, 256), root.resolve("core/assets/icons/icon.png"));
+        write(drawIcon(256), root.resolve("core/assets/icons/icon.png"));
 
-        //jpackage / installer icon: BMP-based ICO, widest Windows compatibility
-        writeIco(src, new int[]{16, 24, 32, 48, 64, 128, 256}, root.resolve("deploy/orbital.ico"));
+        //jpackage / installer icon: BMP-based ICO, widest Windows compatibility.
+        //Every entry is drawn at its own resolution (never a downscale).
+        writeIco(new int[]{16, 24, 32, 48, 64, 128, 256}, root.resolve("deploy/orbital.ico"));
 
         //macOS bundle icon (packr tasks), PNG-based ICNS
-        writeIcns(src, root.resolve("core/assets/icons/icon.icns"));
+        writeIcns(root.resolve("core/assets/icons/icon.icns"));
 
         System.out.println("done");
     }
@@ -171,11 +173,176 @@ public class ArtConverter{
         System.out.printf("wrote %-52s %dx%d %8d bytes%n", root.relativize(out), img.getWidth(), img.getHeight(), Files.size(out));
     }
 
+    // ---------- app icon ----------
+    //
+    // The previous icon was a plain downscale of the key art. Windows renders app
+    // icons at 16-48 px (taskbar, shortcut, Start Menu, title bar, Alt+Tab), and
+    // at those sizes the "ORBITAL" wordmark and the fighter became grey noise:
+    // the icon looked tiny/blurry instead of a crisp emblem.
+    //
+    // This draws the emblem procedurally at the final resolution, so every size
+    // gets its own simplified version (fewer stars, no moon, thicker strokes)
+    // instead of a resampled high-res image. Geometry lives in a 512-unit master
+    // space and is scaled by u; anything measured in device pixels goes through
+    // `1f / u` so strokes never drop below one pixel.
+
+    static final int ICON_MASTER = 512;
+    static final int SPACE_HI = 0x141440, SPACE_MID = 0x080820, SPACE_LO = 0x03030b;
+    static final int NEBULA = 0x492a89, NEBULA_DEEP = 0x241a5c, NEBULA_BLUE = 0x14305e, EMBER = 0x6a2f1e;
+    static final int CYAN = 0x4fd2ff, ICE = 0x83bff6, STEEL = 0x979bac, AMBER = 0xff8a24;
+
+    static Color argb(int rgb, float alpha){
+        return new Color((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, Math.round(clamp(alpha) * 255f));
+    }
+
+    static BufferedImage drawIcon(int size){
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        float u = size / (float)ICON_MASTER;
+        g.scale(u, u);
+
+        //full-bleed space background: the shell does not pad icons for us
+        g.setPaint(new LinearGradientPaint(0, 0, 0, ICON_MASTER,
+            new float[]{0f, 0.55f, 1f},
+            new Color[]{argb(SPACE_HI, 1f), argb(SPACE_MID, 1f), argb(SPACE_LO, 1f)}));
+        g.fillRect(0, 0, ICON_MASTER, ICON_MASTER);
+
+        nebula(g, 128, 118, 340, NEBULA, 0.55f);
+        nebula(g, 404, 166, 270, NEBULA_DEEP, 0.55f);
+        nebula(g, 232, 452, 330, NEBULA_BLUE, 0.55f);
+        if(u >= 0.15f) nebula(g, 468, 404, 190, EMBER, 0.35f);
+        stars(g, u);
+
+        final float pcx = 262f, pcy = 300f, pr = 148f, rx = 228f, ry = 78f;
+
+        //halo behind the disc
+        g.setPaint(new RadialGradientPaint(pcx, pcy, pr * 2.05f, new float[]{0f, 0.5f, 1f},
+            new Color[]{argb(CYAN, 0.32f), argb(CYAN, 0.09f), argb(CYAN, 0f)}));
+        g.fill(new Ellipse2D.Float(pcx - pr * 2.05f, pcy - pr * 2.05f, pr * 4.1f, pr * 4.1f));
+
+        //ring, far half: everything above the planet's centre passes behind it
+        Ellipse2D ring = new Ellipse2D.Float(pcx - rx, pcy - ry, rx * 2f, ry * 2f);
+        float stroke = Math.min(Math.max(pr * 0.18f, 2.4f / u), pr * 0.44f);
+        g.rotate(-0.30, pcx, pcy);
+        g.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.setPaint(new LinearGradientPaint(pcx - rx, pcy, pcx + rx, pcy,
+            new float[]{0f, 0.5f, 1f},
+            new Color[]{argb(CYAN, 0.50f), argb(0x9d8bff, 0.50f), argb(AMBER, 0.50f)}));
+        g.draw(arc(ring, 180f, 180f));
+        g.rotate(0.30, pcx, pcy);
+
+        //planet
+        Shape disc = new Ellipse2D.Float(pcx - pr, pcy - pr, pr * 2f, pr * 2f);
+        g.setPaint(new RadialGradientPaint(pcx - pr * 0.36f, pcy - pr * 0.42f, pr * 1.5f,
+            new float[]{0f, 0.34f, 0.72f, 1f},
+            new Color[]{argb(0xe9f5ff, 1f), argb(ICE, 1f), argb(0x40527a, 1f), argb(0x101731, 1f)}));
+        g.fill(disc);
+
+        Shape clip = g.getClip();
+        g.setClip(disc);
+        if(u >= 0.15f){
+            //surface: soft belts clipped to the disc, plus a violet storm
+            cloud(g, pcx - pr * 0.28f, pcy - pr * 0.42f, pr * 0.72f, pr * 0.17f, 0.16f);
+            cloud(g, pcx + pr * 0.20f, pcy - pr * 0.05f, pr * 0.62f, pr * 0.13f, 0.12f);
+            cloud(g, pcx - pr * 0.05f, pcy + pr * 0.48f, pr * 0.78f, pr * 0.15f, 0.10f);
+            g.setPaint(argb(NEBULA, 0.30f));
+            g.fill(new Ellipse2D.Float(pcx + pr * 0.18f, pcy + pr * 0.10f, pr * 0.52f, pr * 0.26f));
+        }
+        g.setPaint(new LinearGradientPaint(pcx - pr, pcy - pr, pcx + pr * 0.95f, pcy + pr,
+            new float[]{0f, 0.45f, 1f},
+            new Color[]{argb(0x02030a, 0f), argb(0x02030a, 0f), argb(0x02030a, 0.85f)}));
+        g.fill(new Ellipse2D.Float(pcx - pr, pcy - pr, pr * 2f, pr * 2f));
+        g.setClip(clip);
+
+        //limb light: reads as a bright rim at every size
+        g.setStroke(new BasicStroke(Math.max(1.6f / u, 3.4f)));
+        g.setPaint(new RadialGradientPaint(pcx - pr * 0.45f, pcy - pr * 0.5f, pr * 1.95f,
+            new float[]{0f, 0.62f, 1f},
+            new Color[]{argb(CYAN, 0f), argb(CYAN, 0.10f), argb(ICE, 0.95f)}));
+        g.draw(disc);
+
+        //ring, near half + thin inner trace
+        g.rotate(-0.30, pcx, pcy);
+        g.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.setPaint(new LinearGradientPaint(pcx - rx, pcy, pcx + rx, pcy,
+            new float[]{0f, 0.5f, 1f},
+            new Color[]{argb(CYAN, 1f), argb(0xb9c8ff, 1f), argb(AMBER, 1f)}));
+        g.draw(arc(ring, 0f, 180f));
+        if(u >= 0.15f){
+            float irx = rx * 0.82f, iry = ry * 0.82f;
+            Ellipse2D inner = new Ellipse2D.Float(pcx - irx, pcy - iry, irx * 2f, iry * 2f);
+            g.setStroke(new BasicStroke(Math.max(1.2f / u, 2.6f)));
+            g.setPaint(argb(0xffffff, 0.35f));
+            g.draw(arc(inner, 0f, 180f));
+        }
+        g.rotate(0.30, pcx, pcy);
+
+        if(u >= 0.15f){
+            float mx = 418f, my = 106f, mr = 31f;
+            Shape moon = new Ellipse2D.Float(mx - mr, my - mr, mr * 2f, mr * 2f);
+            g.setPaint(new RadialGradientPaint(mx - mr * 0.3f, my - mr * 0.35f, mr * 1.35f,
+                new float[]{0f, 0.6f, 1f},
+                new Color[]{argb(0xdde4f2, 1f), argb(STEEL, 1f), argb(0x2a3048, 1f)}));
+            g.fill(moon);
+            g.setStroke(new BasicStroke(Math.max(1.2f / u, 2.8f)));
+            g.setPaint(argb(ICE, 0.45f));
+            g.draw(moon);
+            if(u >= 0.25f){
+                g.setPaint(argb(0x22283c, 0.55f));
+                g.fill(new Ellipse2D.Float(mx - 9f, my - 5f, 13f, 10f));
+                g.fill(new Ellipse2D.Float(mx + 5f, my + 7f, 9f, 7f));
+            }
+            sparkle(g, 84f, 88f, 34f, 6.5f);
+        }
+
+        g.dispose();
+        return img;
+    }
+
+    static Arc2D arc(Ellipse2D ellipse, double start, double extent){
+        return new Arc2D.Double(ellipse.getX(), ellipse.getY(), ellipse.getWidth(), ellipse.getHeight(),
+                                start, extent, Arc2D.OPEN);
+    }
+
+    static void nebula(Graphics2D g, float cx, float cy, float radius, int color, float alpha){
+        g.setPaint(new RadialGradientPaint(cx, cy, radius, new float[]{0f, 0.55f, 1f},
+            new Color[]{argb(color, alpha), argb(color, alpha * 0.45f), argb(color, 0f)}));
+        g.fill(new Ellipse2D.Float(cx - radius, cy - radius, radius * 2f, radius * 2f));
+    }
+
+    static void cloud(Graphics2D g, float cx, float cy, float rx, float ry, float alpha){
+        g.setPaint(argb(0xffffff, alpha));
+        g.fill(new Ellipse2D.Float(cx - rx, cy - ry, rx * 2f, ry * 2f));
+    }
+
+    static void stars(Graphics2D g, float u){
+        Random rnd = new Random(20261106L);
+        int count = u >= 0.25f ? 52 : u >= 0.15f ? 30 : 14;
+        for(int i = 0; i < count; i++){
+            float x = rnd.nextFloat() * ICON_MASTER;
+            float y = rnd.nextFloat() * ICON_MASTER;
+            float r = (0.7f + rnd.nextFloat() * 1.1f) / u;
+            g.setPaint(argb(i % 4 == 0 ? ICE : 0xffffff, 0.25f + rnd.nextFloat() * 0.7f));
+            g.fill(new Ellipse2D.Float(x - r, y - r, 2f * r, 2f * r));
+        }
+    }
+
+    static void sparkle(Graphics2D g, float cx, float cy, float a, float b){
+        Path2D star = new Path2D.Float();
+        star.moveTo(cx, cy - a); star.lineTo(cx + b, cy - b); star.lineTo(cx + a, cy); star.lineTo(cx + b, cy + b);
+        star.lineTo(cx, cy + a); star.lineTo(cx - b, cy + b); star.lineTo(cx - a, cy); star.lineTo(cx - b, cy - b);
+        star.closePath();
+        g.setPaint(argb(0xffffff, 0.9f));
+        g.fill(star);
+    }
+
     // ---------- ICO (BMP/DIB entries) ----------
 
-    static void writeIco(BufferedImage src, int[] sizes, Path out) throws Exception{
+    static void writeIco(int[] sizes, Path out) throws Exception{
         ByteArrayOutputStream[] dibs = new ByteArrayOutputStream[sizes.length];
-        for(int i = 0; i < sizes.length; i++) dibs[i] = dib(resize(src, sizes[i], sizes[i]));
+        for(int i = 0; i < sizes.length; i++) dibs[i] = dib(drawIcon(sizes[i]));
 
         ByteArrayOutputStream ico = new ByteArrayOutputStream();
         le16(ico, 0); le16(ico, 1); le16(ico, sizes.length);
@@ -228,13 +395,13 @@ public class ArtConverter{
 
     // ---------- ICNS (PNG entries) ----------
 
-    static void writeIcns(BufferedImage src, Path out) throws Exception{
+    static void writeIcns(Path out) throws Exception{
         String[] types = {"ic07", "ic08", "ic09", "ic10"};
         int[] dims = {128, 256, 512, 1024};
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         for(int i = 0; i < types.length; i++){
             ByteArrayOutputStream png = new ByteArrayOutputStream();
-            ImageIO.write(resize(src, dims[i], dims[i]), "png", png);
+            ImageIO.write(drawIcon(dims[i]), "png", png);
             body.write(types[i].getBytes(StandardCharsets.US_ASCII));
             be32(body, 8 + png.size());
             png.writeTo(body);

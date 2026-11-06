@@ -52,7 +52,7 @@ installer/
 ├── build.sh                       # compila + prepara o payload (bash)
 └── src/
     ├── main.cpp                   # instala/desinstala, GPL-3.0-or-later
-    ├── app.rc                     # manifesto + VERSIONINFO
+    ├── app.rc                     # manifesto + VERSIONINFO + ICON
     └── orbital_setup.manifest     # asInvoker + Common Controls 6
 
 build/installer/                   # saída, ignorada pelo Git

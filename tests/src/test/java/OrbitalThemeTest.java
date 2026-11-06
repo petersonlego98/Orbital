@@ -2,7 +2,13 @@ import arc.graphics.*;
 import orbital.ui.*;
 import org.junit.jupiter.api.*;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
+import java.nio.file.*;
+
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.*;
 
 /** Regression tests for the key-art theme. Rendering itself needs GL, so this covers data and fallbacks. */
 public class OrbitalThemeTest{
@@ -61,5 +67,35 @@ public class OrbitalThemeTest{
             assertEquals(left[1], right[0], 1e-7f, "alpha jump at joint " + i + " would draw a line");
             assertTrue(left[0] > left[1], "falloff must be monotonic so no bright band appears");
         }
+    }
+
+    @Test
+    void appIconIsASquareOpaqueEmblem() throws Exception{
+        //Windows shows the app icon at 16-48 px (taskbar, shortcut, Start Menu, title bar),
+        //so the master art must stay a square, fully opaque emblem instead of a cropped or
+        //transparent key-art frame.
+        Path root = repoRoot();
+        assumeTrue(root != null, "assets gerados ausentes: execute java tools/ArtConverter.java");
+
+        try(InputStream in = Files.newInputStream(root.resolve("core/assets/icons/icon.png"))){
+            BufferedImage img = ImageIO.read(in);
+            assertNotNull(img);
+            assertEquals(256, img.getWidth());
+            assertEquals(256, img.getHeight());
+            for(int y = 0; y < 16; y++){
+                for(int x = 0; x < 16; x++){
+                    assertEquals(0xff, img.getRGB(x, y) >>> 24, "canto " + x + "," + y + " deve ser opaco");
+                }
+            }
+        }
+    }
+
+    static Path repoRoot(){
+        Path dir = Path.of("").toAbsolutePath();
+        for(int i = 0; i < 5 && dir != null; i++){
+            if(Files.exists(dir.resolve("core/assets/icons/icon.png"))) return dir;
+            dir = dir.getParent();
+        }
+        return null;
     }
 }

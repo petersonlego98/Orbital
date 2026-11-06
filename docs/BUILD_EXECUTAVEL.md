@@ -42,12 +42,24 @@ java tools/ArtConverter.java
 
 | Arquivo gerado | Uso |
 |---|---|
-| `deploy/orbital.ico` | ícone do `jpackage` e do instalador (16–256 px, 32 bpp, BMP/DIB) |
+| `deploy/orbital.ico` | ícone do `jpackage` e do instalador — 7 entradas 16–256 px, 32 bpp, BMP/DIB |
 | `core/assets/icons/icon.png` | ícone da janela em `DesktopLauncher` |
 | `core/assets/icons/icon.icns` | ícone macOS das tarefas `packr*` |
 | `core/assets/ui/orbital-poster.png` | fundo do menu e da tela de carregamento |
 | `core/assets/ui/orbital-wordmark.png` | logotipo do menu |
 | `core/assets/ui/orbital-mark.png` | emblema circular da tela de carregamento |
+
+O ícone do aplicativo (`icon.png`, `orbital.ico`, `icon.icns`) **não é
+redimensionado a partir da key-art**: ele é desenhado pelo próprio
+`ArtConverter` na resolução final de cada entrada, com o nível de detalhe
+caindo conforme o tamanho (16/24/32 px ficam sem lua, sem faísca e com
+traços mais grossos). O Windows exibe ícones de app em 16–48 px (barra de
+tarefas, atalho, Menu Iniciar, barra de título, Alt+Tab); redimensionar a
+key-art para esses tamanhos transformava o wordmark "ORBITAL" em ruído
+cinza. O `jpackage` incorpora o `.ico` dentro do `Orbital.exe` e o
+`windres` (instalador) dentro do `OrbitalSetup.exe`: ao trocar a arte,
+**regere o `.exe` do jogo e o instalador**, senão os binários antigos
+continuam com o ícone anterior.
 
 As texturas `ui/` são propositalmente **soltas** (fora de `sprites/`): assim o
 atlas empacotado e a geração de `Fonts.mergeFontAtlas()` permanecem intactos.
