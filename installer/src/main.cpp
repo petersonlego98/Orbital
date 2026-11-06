@@ -233,7 +233,7 @@ bool writeUninstallKey(const fs::path& target, const std::wstring& registryKey){
 
     bool ok = true;
     ok &= setString(L"DisplayName", L"Orbital");
-    ok &= setString(L"DisplayVersion", L"1.0");
+    ok &= setString(L"DisplayVersion", L"1.1");
     ok &= setString(L"Publisher", L"Orbital contributors");
     ok &= setString(L"InstallLocation", target.wstring());
     ok &= setString(L"DisplayIcon", (target / kGameExe).wstring());

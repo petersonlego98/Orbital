@@ -13,15 +13,15 @@ O projeto preserva a base de automação, construção, mapas, mods e multiplaye
 herdada do Mindustry, mas desenvolve uma identidade e uma experiência próprias.
 
 > **Estado atual:** protótipo jogável em desenvolvimento, com a **versão
-> instalável v1.0.0 para Windows** já publicada. Mecânicas, conteúdo e
+> instalável v1.1.0 para Windows** já publicada. Mecânicas, conteúdo e
 > balanceamento podem mudar sem aviso, e a build **pode conter bugs**.
 
 ---
 
 ## Versão instalável (Windows)
 
-O release **[v1.0.0](https://github.com/petersonlego98/Orbital/releases/tag/v1.0.0)**
-distribui `Orbital-1.0-win64-usuario.zip` com o instalador por usuário, que
+O release **[v1.1.0](https://github.com/petersonlego98/Orbital/releases/tag/v1.1.0)**
+distribui `Orbital-1.1.0-win64-usuario.zip` com o instalador por usuário, que
 **não exige permissão de administrador**, e o JRE 21 embutido.
 
 1. Baixe o zip e confira a integridade com o arquivo `.sha256`.
@@ -274,6 +274,7 @@ Créditos detalhados: [CREDITS.md](CREDITS.md).
 
 - **Repositório do Orbital:** https://github.com/petersonlego98/Orbital
 - **Releases e versão instalável:** https://github.com/petersonlego98/Orbital/releases
+- **Release v1.1.0 (Windows):** https://github.com/petersonlego98/Orbital/releases/tag/v1.1.0
 - **Release v1.0.0 (Windows):** https://github.com/petersonlego98/Orbital/releases/tag/v1.0.0
 - **Issues:** https://github.com/petersonlego98/Orbital/issues
 - **Repositório original do Mindustry:** https://github.com/Anuken/Mindustry
