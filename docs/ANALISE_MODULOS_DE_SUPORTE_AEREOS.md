@@ -1,10 +1,10 @@
 # Análise — módulos de suporte em unidades aéreas
 
-**Data:** 5 de novembro de 2026  
+**Data:** 6 de novembro de 2026  
 **Escopo:** Reparador (`mender`), Projetor de Reparo (`mend-projector`), Projetor de Sobrecarga (`overdrive-projector`), Domo de Sobrecarga (`overdrive-dome`) e Projetor de Campo de Força (`force-projector`).  
 **Pergunta de projeto:** em quais cascos cada módulo pode coexistir com uma torreta, ocupando posições distintas e sem sobreposição?  
 **Base consultada:** definições de blocos e unidades, sistema de slots/orçamento dorsal, adaptador de torreta, habilidades de unidade, atlas de sprites e gerador de IO de entidades.  
-**Estado atual:** fase 1 (encaixe físico), fase 2 (efeitos funcionais), fase 3 (escala visual por casco), fase 4 (proporção unificada, derivada das medidas de **todos** os cascos, para **torretas + módulos de suporte**) e fase 5 (ícones de suporte no HUD inferior com selo **ativo/inativo** e alternância por clique) implementadas e verificadas por build/testes. Péterson já revisou o resultado **em jogo** por capturas de tela (tema, linhas de fundo e tamanho dos módulos). Ainda sem persistência em saves/sync e sem commit.
+**Estado atual:** fase 1 (encaixe físico), fase 2 (efeitos funcionais), fase 3 (escala visual por casco), fase 4 (proporção unificada, derivada das medidas de **todos** os cascos, para **torretas + módulos de suporte**) e fase 5 (ícones de suporte no HUD inferior com selo **ativo/inativo** e alternância por clique) **commitadas** (`14900c021c`); fase 6 (recalibração das posições dorsais sobre a silhueta real + colisão por tamanho desenhado) implementada e verificada por build/testes, aguardando revisão visual em jogo. Persistência em saves/sync segue fora de escopo.
 
 ---
 
@@ -66,6 +66,19 @@ Pedido posterior de Péterson, após aprovar a fase 4: *"ficou muito bom, poderi
 | Remoção | Permanece **apenas no diálogo** de loadout (botão `Icon.cancel`); o HUD nunca desinstala. |
 | Efeito | Desligar bloqueia `created`/`update`/`draw` da habilidade e **libera o pool de escudo compartilhado**; religar reinicializa o pool pelos parâmetros reais do bloco. |
 | Persistência | `active` é estado de sessão, no `SupportMount` transitório — **nenhuma mudança** em IO de entidades, saves ou sync. |
+
+### 0.6 Fase 6 — posições sobre a silhueta real e colisão por tamanho desenhado (concluída)
+
+Pedido posterior de Péterson, após revisar o jogo em capturas: as torretas apareciam **soltas na borda** da silhueta — propostas geometricamente válidas, mas pousadas em espaço transparente fora do sprite.
+
+| Decisão | Valor escolhido |
+|---|---|
+| Diagnóstico | A silhueta usada em `fitsHull` é o **quadrado de área equivalente** do sprite, não a arte. Os cantos desse quadrado são transparentes na maioria dos capitais (`oct`, `quad`, `eclipse`, `antumbra`, `disrupt`), então uma âncora "dentro da silhueta" podia estar **fora do desenho**. |
+| Separação entre módulos | Passa a usar o **tamanho desenhado** (`DorsalGeometry.visualFootprint`), e não a pegada do bloco. A fase 4 encolheu os sprites: um 5×5 no `oct` é desenhado com ~16 unidades de mundo, não 40. Cobrar 40 de folga empurrava os módulos para os cantos vazios. |
+| Silhueta e orçamento | **Permanecem** com a pegada cheia do bloco (`fitsHull`, `dorsalBudget`) — a régua de aceitação não muda. |
+| o que muda na prática | `WeaponsComp.overlapsTurretMounts` / `overlapsSupportMounts` / `findTurretSlot` / `findSupportAnchor`. Nenhuma regra de aceitação, `maxSize`, alcance, cura, escudo, orçamento, UI ou serialização. |
+| Posições | Recalibradas casca a casca em `TurretLoadouts`: cada posição ** mantém a direção** relativa ao centro do casco e entra até o sprite tocar a arte. |
+| Verificação | Teste novo `noTwoDorsalModulesOverlapOnceDrawn` (22 cascos) mais snapshot de compatibilidade intacto. |
 
 Categorias:
 
@@ -869,3 +882,83 @@ A barra dorsal inferior já existia: `HudFragment.build()` cria `turret-loadout`
 ### 17.4 Verificação
 
 *Preenchido ao final da fase, após a suíte completa e o build.*
+
+---
+
+## 18. Implementação — posições sobre a silhueta real (fase 6)
+
+### 18.1 Diagnóstico
+
+As capturas de Péterson mostraram torretas e módulos **soltas na borda** do casco. A causa
+não era escala (fase 4) nem aceitação: era a **régua de posição**.
+
+`fitsHull` aprova uma posição quando ela cabe no **quadrado de área equivalente** do sprite
+(`sqrt(spriteArea())`). Para o `oct` esse quadrado tem 50 unidades de mundo de lado — mas a
+arte do `oct` é um losango alongado: nos cantos do quadrado **não há pixel pintado**. Uma
+âncora como `(34, -34)` passa em `fitsHull` e, em jogo, flutua sobre o fundo.
+
+Medindo o alpha de cada sprite em `core/assets-raw/sprites/units/`, a folga real é bem menor
+que a régua: no `oct`, um módulo 3×3 desenhado (~13,7 unidades de mundo de lado) só pousa
+inteiro na arte dentro de um raio de cerca de `±20` unidades, não `±50`.
+
+### 18.2 O que foi alterado
+
+| Arquivo | Mudança |
+|---|---|
+| `core/src/orbital/type/DorsalGeometry.java` | Novo `visualFootprint(type, blockSize, regionPx)`: o lado, em unidades de mundo, que o módulo **ocupa quando desenhado** (`turretVisualScale * regionPx / pixelsPerWorldUnit`). |
+| `core/src/orbital/entities/comp/WeaponsComp.java` | `overlapsTurretMounts` e `overlapsSupportMounts` passam a receber o **tamanho desenhado**; `findTurretSlot` e `findSupportAnchor` calculam esse tamanho para o candidato. `fitsHull` e o orçamento dorsal **continuam** com a pegada do bloco. |
+| `core/src/orbital/content/TurretLoadouts.java` | Offsets recalibrados casca a casca. Cada posição **mantém a direção** relativa ao centro do casco e entra até o sprite tocar a arte — o leiaute angular original (frente/trás/lados) foi preservado. |
+| `tests/src/test/java/SupportLoadoutTest.java` | `supportAnchorsNeverOverlapEachOther` e `everySupportAnchorHasACompatibleTurretSlot` passam a usar o tamanho desenhado; novo caso `noTwoDorsalModulesOverlapOnceDrawn` cobre os 22 cascos. |
+
+### 18.3 Regra efetiva
+
+```text
+# silhueta e orçamento (inalterados, desde a fase 1)
+fitsHull(x, y, size)   = |x| + footprint(size)/2 <= halfHull - 0.5   (idem para y)
+
+# separação entre módulos (fase 6)
+overlaps(a, b)         = |dx| < (drawn(a) + drawn(b))/2 + 1  E  |dy| < (drawn(a) + drawn(b))/2 + 1
+drawn(size)            = size * 32 * DorsalVisual.scale(casco, size) / pixelsPerWorldUnit
+```
+
+Duas consequências diretas: (1) dois módulos pequenos podem agora dividir uma região que a
+pegada do bloco considerava ocupada — é o que permite ao `oct` ter 5 slots dentro da arte; e
+(2) a régua de silhueta não foi afrouxada, então **nenhum casco ganhou categoria**.
+
+### 18.4 Posições resultantes
+
+| Casco | Slots (maxSize) | Âncoras (categoria: maxSize) |
+|---|---|---|
+| Emanate | 1, 1 | repair: 1 |
+| Horizon | 1 | repair: 1 |
+| Avert, Mega | 2 | — |
+| Zenith | 2, 1 | repair: 1 |
+| Obviate | 2, 2 | repair: 1 |
+| Quell | 3, 1 | repair: 2, overdrive: 2 |
+| Quad | 4, 2 | repair: 2, overdrive: 3, force: 3 |
+| Antumbra | 4, 2, 2 | repair: 2, overdrive: 3, force: 3 |
+| Disrupt | 4, 2 | repair: 2, overdrive: 3, force: 3 |
+| Eclipse | 5, 5, 2 | repair: 2, overdrive: 3, force: 3 |
+| Oct | 5, 4, 4, 2, 2 | repair: 2, overdrive: 3, force: 3 |
+
+Os valores numéricos estão em `TurretLoadouts.load()`; a contagem de slots/âncoras e os
+`maxSize` são **idênticos** às fases 1–5 — só os offsets mudaram.
+
+### 18.5 O que **não** mudou
+
+- `DorsalGeometry.footprint()`, `fitsHull()`, `clearance`, `edgeMargin` e o orçamento dorsal.
+- `TurretSlot.maxSize` / `SupportAnchor.maxSize`, `accepts()` e a compatibilidade dos 22 cascos.
+- Parâmetros de gameplay: alcance, recarga, cura, boost, raio/lados/vida do escudo.
+- Escala visual (`DorsalVisual`), HUD da fase 5, bundles, diálogo e serialização.
+
+### 18.6 Limitações
+
+1. **Sem inspeção visual em jogo nesta fase.** As posições foram medidas contra o alpha do
+   sprite e validadas por testes; o julgamento final (nariz, cabine, motores, recuo de cano)
+   continua dependendo de você abrir o jogo.
+2. **Silhueta ainda aproximada.** `fitsHull` segue usando o quadrado de área equivalente; a
+   arte é consultada fora do jogo (medição de alpha), não em runtime. A régulá de aceitação
+   permanece conservadora de propósito.
+3. **`obviate` e `avert`/`mega` ficaram com módulos pequenos e próximos ao centro**, porque a
+   arte desses cascos é estreita: não há espaço na borda para um módulo do tamanho aceito.
+4. **Somente na sessão:** sem save e sem sincronização, como nas fases anteriores.

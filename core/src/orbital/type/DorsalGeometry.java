@@ -77,6 +77,21 @@ public final class DorsalGeometry{
         return DorsalVisual.turretScale(type, turretSize, regionPx);
     }
 
+    /**
+     * @return the square side, in world units, that a dorsal module actually occupies once drawn.
+     *
+     * <p>Since phase 4 the module sprite is scaled down from its native block size, so the module
+     * on the hull is far smaller than {@link #footprint(int)} suggests: a 5x5 turret is drawn at
+     * 10-13% of the hull, not at its 40-unit block footprint. Module-vs-module separation
+     * ({@code WeaponsComp.overlapsTurretMounts}/{@code overlapsSupportMounts}) uses this drawn
+     * size, so modules can sit on the hull body without being pushed into the silhouette corners.
+     * Silhouette fitting and the dorsal budget keep using the full block footprint.</p>
+     */
+    public static float visualFootprint(UnitType type, int blockSize, float regionPx){
+        if(type == null || regionPx <= 0f) return footprint(blockSize);
+        return turretVisualScale(type, blockSize, regionPx) * regionPx / pixelsPerWorldUnit();
+    }
+
     /** Fallback for headless runs: block sprites are {@code size * pxTile} pixels per side. */
     public static int sizeFromRegionPx(float regionPx){
         return Math.max(1, Math.round(regionPx / TurretSlot.pxTile));

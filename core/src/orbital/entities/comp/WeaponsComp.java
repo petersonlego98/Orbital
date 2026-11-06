@@ -91,8 +91,9 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
             SupportAnchor anchor = type.supportAnchors.get(i);
             if(!anchor.accepts(block)) continue;
             if(!DorsalGeometry.fitsHull(type, anchor.offsetX, anchor.offsetY, footprint)) continue;
-            if(overlapsTurretMounts(anchor.offsetX, anchor.offsetY, footprint)) continue;
-            if(overlapsSupportMounts(anchor.offsetX, anchor.offsetY, footprint)) continue;
+            float drawn = supportVisualFootprintAt(anchor, block);
+            if(overlapsTurretMounts(anchor.offsetX, anchor.offsetY, drawn)) continue;
+            if(overlapsSupportMounts(anchor.offsetX, anchor.offsetY, drawn)) continue;
             return i;
         }
         return -1;
@@ -158,20 +159,20 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         return Math.max(1f, block.size * TurretSlot.pxTile);
     }
 
-    private boolean overlapsTurretMounts(float x, float y, float footprint){
+    private boolean overlapsTurretMounts(float x, float y, float visualFootprint){
         for(WeaponMount mount : mounts){
             if(mount != null && mount.weapon instanceof TurretWeapon turretWeapon){
-                if(DorsalGeometry.overlaps(x, y, footprint,
-                    turretWeapon.x, turretWeapon.y, DorsalGeometry.footprint(turretWeapon.turretSize))) return true;
+                if(DorsalGeometry.overlaps(x, y, visualFootprint,
+                    turretWeapon.x, turretWeapon.y, turretVisualFootprint(turretWeapon))) return true;
             }
         }
         return false;
     }
 
-    private boolean overlapsSupportMounts(float x, float y, float footprint){
+    private boolean overlapsSupportMounts(float x, float y, float visualFootprint){
         for(SupportMount mount : supports()){
             if(mount == null || mount.block == null) continue;
-            if(DorsalGeometry.overlaps(x, y, footprint, mount.x, mount.y, mount.footprint())) return true;
+            if(DorsalGeometry.overlaps(x, y, visualFootprint, mount.x, mount.y, mount.visualWidth())) return true;
         }
         return false;
     }
@@ -184,18 +185,40 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         return false;
     }
 
+    /**
+     * @return the space this mounted turret actually occupies on the hull, in world units.
+     *
+     * <p>Since phase 4 the dorsal module sprite is drawn smaller than its block footprint, so the
+     * physical module on the hull is the <b>drawn</b> sprite. Module-vs-module separation uses
+     * this drawn footprint, while silhouette fitting and the dorsal budget keep using the full
+     * block footprint.</p>
+     */
+    private float turretVisualFootprint(TurretWeapon weapon){
+        if(type == null) return DorsalGeometry.footprint(weapon.turretSize);
+        return DorsalGeometry.visualFootprint(type, weapon.turretSize, weapon.regionPx());
+    }
+
+    /** @return the drawn footprint, in world units, of a support block that would use this anchor. */
+    private float supportVisualFootprintAt(SupportAnchor anchor, Block block){
+        if(type == null || block == null) return DorsalGeometry.footprint(block == null ? 1 : block.size);
+        float regionPx = blockRegionPx(block);
+        return DorsalGeometry.supportVisualScale(type, anchor, block.size, regionPx) * regionPx
+            / DorsalGeometry.pixelsPerWorldUnit();
+    }
+
     /** @return the first free turret slot that also avoids installed support modules. */
     public int findTurretSlot(Turret turret){
         if(turret == null || type == null) return -1;
 
         float footprint = DorsalGeometry.footprint(turret.size);
+        float drawn = DorsalGeometry.visualFootprint(type, turret.size, blockRegionPx(turret));
         for(int i = 0; i < type.turretSlots.size; i++){
             TurretSlot slot = type.turretSlots.get(i);
             if(!slot.accepts(turret)) continue;
             if(!DorsalGeometry.fitsHull(type, slot.offsetX, slot.offsetY, footprint)) continue;
             if(slotOccupied(i)) continue;
-            if(overlapsTurretMounts(slot.offsetX, slot.offsetY, footprint)) continue;
-            if(overlapsSupportMounts(slot.offsetX, slot.offsetY, footprint)) continue;
+            if(overlapsTurretMounts(slot.offsetX, slot.offsetY, drawn)) continue;
+            if(overlapsSupportMounts(slot.offsetX, slot.offsetY, drawn)) continue;
             return i;
         }
         return -1;

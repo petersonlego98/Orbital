@@ -72,6 +72,13 @@ public class SupportLoadoutTest{
         }
     }
 
+    /** @return the square side, in world units, that a module of {@code size} actually occupies on this hull. */
+    private static float drawnFootprint(UnitType type, int size){
+        //headless runs have no atlas: the module sprite is size*pxTile pixels per side, exactly
+        //the fallback SupportMount.regionPx() and TurretWeapon.regionPx() use.
+        return DorsalGeometry.visualFootprint(type, size, size * TurretSlot.pxTile);
+    }
+
     @Test
     void supportAnchorsNeverOverlapEachOther(){
         for(UnitType type : air()){
@@ -80,8 +87,8 @@ public class SupportLoadoutTest{
                 for(int j = i + 1; j < type.supportAnchors.size; j++){
                     SupportAnchor b = type.supportAnchors.get(j);
                     assertFalse(DorsalGeometry.overlaps(
-                        a.offsetX, a.offsetY, DorsalGeometry.footprint(a.maxSize),
-                        b.offsetX, b.offsetY, DorsalGeometry.footprint(b.maxSize)),
+                        a.offsetX, a.offsetY, drawnFootprint(type, a.maxSize),
+                        b.offsetX, b.offsetY, drawnFootprint(type, b.maxSize)),
                         type.name + " " + a.category + " overlaps " + b.category);
                 }
             }
@@ -95,13 +102,47 @@ public class SupportLoadoutTest{
                 boolean found = false;
                 for(TurretSlot slot : type.turretSlots){
                     if(!DorsalGeometry.overlaps(
-                        anchor.offsetX, anchor.offsetY, DorsalGeometry.footprint(anchor.maxSize),
-                        slot.offsetX, slot.offsetY, DorsalGeometry.footprint(slot.maxSize))){
+                        anchor.offsetX, anchor.offsetY, drawnFootprint(type, anchor.maxSize),
+                        slot.offsetX, slot.offsetY, drawnFootprint(type, slot.maxSize))){
                         found = true;
                         break;
                     }
                 }
                 assertTrue(found, type.name + " has no turret slot free of its " + anchor.category + " anchor");
+            }
+        }
+    }
+
+    /**
+     * Phase 6: every dorsal position was recalibrated onto the hull's real sprite, and the
+     * module-vs-module separation now uses the drawn size. Two modules must therefore never
+     * overlap once drawn, on any of the 22 hulls.
+     */
+    @Test
+    void noTwoDorsalModulesOverlapOnceDrawn(){
+        for(UnitType type : air()){
+            java.util.List<float[]> points = new java.util.ArrayList<>();
+            java.util.List<Integer> sizes = new java.util.ArrayList<>();
+            java.util.List<String> names = new java.util.ArrayList<>();
+
+            for(TurretSlot slot : type.turretSlots){
+                points.add(new float[]{slot.offsetX, slot.offsetY});
+                sizes.add(slot.maxSize);
+                names.add("slot " + slot.maxSize);
+            }
+            for(SupportAnchor anchor : type.supportAnchors){
+                points.add(new float[]{anchor.offsetX, anchor.offsetY});
+                sizes.add(anchor.maxSize);
+                names.add(anchor.category.name());
+            }
+
+            for(int i = 0; i < points.size(); i++){
+                for(int j = i + 1; j < points.size(); j++){
+                    assertFalse(DorsalGeometry.overlaps(
+                        points.get(i)[0], points.get(i)[1], drawnFootprint(type, sizes.get(i)),
+                        points.get(j)[0], points.get(j)[1], drawnFootprint(type, sizes.get(j))),
+                        type.name + ": " + names.get(i) + " overlaps " + names.get(j) + " once drawn");
+                }
             }
         }
     }
@@ -143,8 +184,9 @@ public class SupportLoadoutTest{
             SupportMount a = unit.supportMounts[i];
             for(int j = i + 1; j < unit.supportMounts.length; j++){
                 SupportMount b = unit.supportMounts[j];
+                //phase 6: separation uses the drawn footprint, which is what the player sees
                 assertFalse(DorsalGeometry.overlaps(
-                    a.x, a.y, a.footprint(), b.x, b.y, b.footprint()),
+                    a.x, a.y, a.visualWidth(), b.x, b.y, b.visualWidth()),
                     a.category + " overlaps " + b.category);
             }
         }
@@ -559,6 +601,10 @@ public class SupportLoadoutTest{
     void perAnchorOverrideChangesOnlyTheDrawingScale(){
         SupportAnchor anchor = UnitTypes.quad.supportAnchors.get(0);
         float original = anchor.visualScale;
+        //capture the configured placement so the assertion does not depend on hard-coded offsets
+        float offsetX = anchor.offsetX, offsetY = anchor.offsetY;
+        int maxSize = anchor.maxSize;
+        boolean accepts = anchor.accepts(Blocks.mendProjector);
         try{
             float base = DorsalGeometry.supportVisualScale(UnitTypes.quad, anchor, 64f);
             anchor.scaled(0.30f);
@@ -567,10 +613,10 @@ public class SupportLoadoutTest{
             assertTrue(overridden > 0f && overridden < base,
                 "a per-anchor override must be able to shrink one module further");
             //placement rules are completely independent of the override
-            assertEquals(2, anchor.maxSize);
-            assertTrue(anchor.accepts(Blocks.mendProjector));
-            assertEquals(15f, anchor.offsetX, 0.001f);
-            assertEquals(-15f, anchor.offsetY, 0.001f);
+            assertEquals(maxSize, anchor.maxSize);
+            assertEquals(accepts, anchor.accepts(Blocks.mendProjector));
+            assertEquals(offsetX, anchor.offsetX, 0.001f);
+            assertEquals(offsetY, anchor.offsetY, 0.001f);
         }finally{
             anchor.visualScale = original;
         }
