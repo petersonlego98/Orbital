@@ -60,6 +60,8 @@ inventário global e para a expansão das colônias.
 - **Torres dorsais modulares** em unidades aéreas: encaixes com orçamento,
   slots e limite de cobertura. A primeira demonstração usa a torre **Duo** nas
   unidades **Mono** e **Flare**.
+- **Identidade visual própria** no tema espacial: tela de carregamento, menu e
+  ícone do aplicativo com o emblema orbital da key-art.
 - **Modo Teste Novos Recursos**, um mapa isolado para testar unidades, torres e
   balanceamento sem criar um save de campanha.
 - **Base herdada do Mindustry** para automação, transporte, defesa, editor de

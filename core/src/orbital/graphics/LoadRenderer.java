@@ -1,524 +1,258 @@
 package orbital.graphics;
 
 import arc.*;
-import arc.func.*;
-import arc.fx.*;
-import arc.fx.filters.*;
 import arc.graphics.*;
-import arc.graphics.Pixmap.*;
 import arc.graphics.g2d.*;
-import arc.graphics.g3d.*;
-import arc.graphics.gl.GLVersion.*;
-import arc.input.*;
 import arc.math.*;
 import arc.math.geom.*;
 import arc.scene.ui.layout.*;
 import arc.struct.*;
 import arc.util.*;
-import orbital.*;
-import orbital.core.*;
-import orbital.graphics.g3d.*;
+import orbital.ui.*;
 
 import static arc.Core.*;
 
+/**
+ * Boot loading screen.
+ *
+ * This replaces the previous diagnostic grid (Pal.accent squares, stencil-clipped
+ * panes with per-core bars, a bloom pass and an off-screen FxProcessor) with the
+ * ORBITAL space theme: a deep-space gradient, a nebula wash, a twinkling starfield
+ * and the orbital emblem - planet, ring, moon and sparkle - with a single progress
+ * bar below it.
+ *
+ * Everything is drawn with plain primitives, no textures: this renderer runs while
+ * the asset manager is still loading, so neither the key art nor most fonts are
+ * guaranteed to exist yet. Text appears as soon as {@link Fonts#tech} is loaded.
+ *
+ * It also removes the framebuffer entirely (no {@code FxProcessor}, no bloom, no
+ * stencil), which drops a whole class of "no rgba8888 + stencil buffer" fallbacks
+ * and the per-frame off-screen pass.
+ */
 public class LoadRenderer implements Disposable{
-    private static final Color color = new Color(Pal.accent).lerp(Color.black, 0.5f);
-    private static final Color colorRed = Pal.breakInvalid.cpy().lerp(Color.black, 0.3f);
-    private static final String red = "[#" + colorRed + "]";
-    private static final String orange = "[#" + color + "]";
-    private static final FloatSeq floats = new FloatSeq();
-    private static final boolean preview = false;
+    private static final int starCount = 130;
 
-    private float testprogress = 0f;
-    private StringBuilder assetText = new StringBuilder();
-    private Bar[] bars;
-    private Mesh mesh = MeshBuilder.buildPlanetGrid(PlanetGrid.create(2), colorRed, 1f);
-    private Camera3D cam = new Camera3D();
-    private int lastLength = -1;
-    private FxProcessor fx;
-    private WindowedMean renderTimes = new WindowedMean(20);
-    private BloomFilter bloom;
-    private boolean renderStencil = true;
-    private long lastFrameTime;
+    //screen-space time for the starfield twinkle; the engine clock is already running here
+    private float time = 0f;
 
-    {
-        //some systems don't support rgba8888 w/ a stencil buffer
-        try{
-            fx = new FxProcessor(Format.rgba8888, 2, 2, false, true);
-        }catch(Exception e){
-            try{
-                fx = new FxProcessor(Format.rgb565, 2, 2, false, true);
-            }catch(Exception awful){
-                renderStencil = false;
-                fx = new FxProcessor(Format.rgba8888, 2, 2, false, false);
-            }
-        }
-
-        //vignetting is probably too much
-        //fx.addEffect(new VignettingFilter(false));
-        fx.addEffect(bloom = new BloomFilter());
-
-        bars = new Bar[]{
-            new Bar("s_proc#", OS.cores / 16f, OS.cores < 4),
-            new Bar("c_aprog", () -> assets != null, () -> assets.getProgress(), () -> false),
-            new Bar("g_vtype", graphics.getGLVersion().type == GlType.GLES ? 0.5f : 1f, graphics.getGLVersion().type == GlType.GLES),
-            new Bar("s_mem#", () -> true, () -> Core.app.getJavaHeap() / 1024f / 1024f / 200f, () -> Core.app.getJavaHeap() > 1024 * 1024 * 110),
-            new Bar("v_ver#", () -> Version.build != 0, () -> Version.build == -1 ? 0.3f : (Version.build - 103f) / 10f, () -> !Version.modifier.equals("release")),
-            new Bar("s_osv", OS.isWindows ? 0.35f : OS.isLinux ? 0.9f : OS.isMac ? 0.5f : 0.2f, OS.isMac),
-            new Bar("v_worlds#", () -> Vars.control != null && Vars.control.saves != null, () -> Vars.control.saves.getSaveSlots().size / 30f, () -> Vars.control.saves.getSaveSlots().size > 30),
-            new Bar("c_datas#", () -> settings.keySize() > 0, () -> settings.keySize() / 50f, () -> settings.keySize() > 20),
-            new Bar("v_alterc", () -> Vars.mods != null, () -> (Vars.mods.list().size + 1) / 6f, () -> Vars.mods.list().size > 0),
-            new Bar("g_vcomp#", (graphics.getGLVersion().majorVersion + graphics.getGLVersion().minorVersion / 10f) / 4.6f, !graphics.getGLVersion().atLeast(3, 2)),
-        };
-    }
-
+    /** Nothing to dispose: no mesh, no framebuffer, no filters. Kept for ClientLauncher. */
     @Override
     public void dispose(){
-        mesh.dispose();
-        fx.dispose();
-        bloom.dispose();
     }
 
     public void draw(){
-        if(!preview){
-            if(lastFrameTime == 0){
-                lastFrameTime = Time.millis();
-            }
+        time += Time.delta;
 
-            float timespace = Time.timeSinceMillis(lastFrameTime) / 1000f;
-            renderTimes.add(timespace);
-            lastFrameTime = Time.millis();
-        }
+        float w = graphics.getWidth(), h = graphics.getHeight(), s = Scl.scl();
+        Draw.proj().setOrtho(0, 0, w, h);
+        graphics.clear(Color.black);
 
-        if(fx.getWidth() != graphics.getWidth() || fx.getHeight() != graphics.getHeight()){
-            fx.resize(graphics.getWidth(), graphics.getHeight());
-        }
-
-        fx.begin();
-
-        if(assets.getLoadedAssets() != lastLength){
-            assetText.setLength(0);
-            for(String name : assets.getAssetNames()){
-                boolean isRed = name.toLowerCase().contains("mod") || assets.getAssetType(name).getSimpleName().toLowerCase().contains("mod") || name.contains("preview");
-                assetText
-                .append(isRed ? red : orange)
-                .append(name.replace(OS.username, "<<host>>").replace("/", "::")).append(red).append("::[]")
-                .append(assets.getAssetType(name).getSimpleName()).append("\n");
-            }
-
-            lastLength = assets.getLoadedAssets();
-        }
-
-        Core.graphics.clear(Color.black);
-
-        float w = Core.graphics.getWidth(), h = Core.graphics.getHeight(), s = Scl.scl();
-        //s = 2f;
-
-        Draw.proj().setOrtho(0, 0, Core.graphics.getWidth(), Core.graphics.getHeight());
-
-        int lightVerts = 20;
-        float lightRad = Math.max(w, h)*0.6f;
-        float stroke = 5f * s;
-
-        //light
-        Fill.light(w/2, h/2, lightVerts, lightRad, Tmp.c1.set(color).a(0.15f), Color.clear);
-
-        float space = s*(60);
-        float progress = assets.getProgress();
-        int dotw = (int)(w / space)/2 + 1;
-        int doth = (int)(h / space)/2 + 1;
-
-        //preview : no frametime
-        if(preview){
-            testprogress += Time.delta / (60f * 3);
-            progress = testprogress;
-            if(input.keyTap(KeyCode.space)){
-                testprogress = 0;
-            }
-        }
-
-
-        //square matrix
-        Draw.color(Pal.accent, Color.black, 0.9f);
-
-        Lines.stroke(stroke);
-
-        for(int cx = -dotw; cx <= dotw; cx++){
-            for(int cy = -doth; cy <= doth; cy++){
-                float dx = cx * space + w/2f, dy = cy * space + h/2f;
-
-                Lines.poly(dx, dy, 4, space/2f);
-            }
-        }
-
+        drawSpace(w, h);
         Draw.flush();
 
-        float aspect = 1.94f;
-
-        Vec2 size = Scaling.fit.apply(graphics.getWidth(), graphics.getWidth() / aspect, graphics.getWidth(), graphics.getHeight());
-
-        int viewportWidth = (int)size.x, viewportHeight = (int)size.y, viewportX = (int)(graphics.getWidth()/2f - size.x/2f), viewportY = (int)(graphics.getHeight()/2f - size.y/2f);
-
-        //portrait? no viewport
-        if(graphics.getHeight() > graphics.getWidth()){
-            viewportHeight = graphics.getHeight();
-            viewportWidth = graphics.getWidth();
-            viewportX = viewportY = 0;
-        }
-
-        w = viewportWidth;
-        h = viewportHeight;
-
-        Gl.viewport(viewportX, viewportY, viewportWidth, viewportHeight);
-        Draw.proj().setOrtho(0, 0, viewportWidth, viewportHeight);
-
-        //background text and indicator
-        float rads = 110 * s;
-        float rad = Math.min(Math.min(w, h) / 3.1f, Math.min(w, h)/2f - rads);
-        float rad2 = rad + rads;
-        float epad = 60f * s;
-        float mpad = 100f * s;
-
-        Draw.color(color);
-        Lines.stroke(stroke);
-
-        Lines.poly(w/2, h/2, 4, rad);
-        Lines.poly(w/2, h/2, 4, rad2);
-
-        if(assets.isLoaded("tech") && renderStencil){
-            Font font = assets.get("tech");
-            font.getData().markupEnabled = true;
-
-            int panei = 0;
-
-            for(int sx : Mathf.signs){
-                for(int sy : Mathf.signs){
-                    float y1 = h/2f + sy*rad2, y2 = h/2f + sy*120f;
-                    //if(sy < 0) y1 = Math.min(y2, y1);
-                    floats.clear();
-
-                    if(w > h){ //non-portrait
-                        floats.add(w/2f + sx*mpad, y1);
-                        floats.add(w/2f + (w/2f-epad)*sx, y1);
-                        floats.add(w/2f + (w/2f-epad)*sx, y2);
-                        floats.add(w/2f + sx*mpad + sx*Math.abs(y2-y1), y2);
-                    }else{ //portrait
-                        float py2 = h/2f + (h/2f-epad)*sy;
-                        float testval = sy < 0 ? Math.min(y2, y1) : Math.max(y2, y1);
-
-                        if(py2*sy < testval*sy){
-                            continue;
-                        }
-
-                        floats.add(w/2f + sx*mpad, y1);
-                        floats.add(w/2f + sx*mpad, py2);
-                        floats.add(Mathf.clamp(w/2f + sx*(mpad + Math.abs(y2-y1)), stroke/2f, w - stroke/2f), py2);
-                        floats.add(Mathf.clamp(w/2f + sx*(mpad + Math.abs(y2-y1)), stroke/2f, w - stroke/2f), y2);
-                    }
-
-                    float minx = Float.MAX_VALUE, miny = Float.MAX_VALUE, maxx = 0, maxy = 0;
-                    for(int i = 0; i < floats.size; i+= 2){
-                        float x = floats.items[i], y = floats.items[i + 1];
-                        minx = Math.min(x, minx);
-                        miny = Math.min(y, miny);
-
-                        maxx = Math.max(x, maxx);
-                        maxy = Math.max(y, maxy);
-                    }
-
-                    Draw.flush();
-                    Gl.clear(Gl.stencilBufferBit);
-                    Draw.beginStencil();
-
-                    Fill.poly(floats);
-
-                    Draw.beginStenciled();
-
-                    GlyphLayout layout = GlyphLayout.obtain();
-                    float pad = 4;
-
-                    if(panei == 0){
-                        layout.setText(font, assetText);
-                        font.draw(assetText, minx + pad, maxy - pad + Math.max(0, layout.height - (maxy - miny)));
-                    }else if(panei == 1){
-                        float height = maxy - miny;
-                        float barpad = s * 8f;
-
-                        int barsUsed = Math.min((int)((height - barpad) / (font.getLineHeight() * 1.4f)), bars.length);
-
-                        float barspace = (height - barpad) / barsUsed;
-                        float barheight = barspace * 0.8f;
-
-                        for(int i = 0; i < barsUsed; i++){
-                            Bar bar = bars[i];
-                            if(bar.valid()){
-                                Draw.color(bar.red() ? colorRed : color);
-                                float y = maxy - i * barspace - barpad - barheight;
-                                float width = Mathf.clamp(bar.value());
-                                float baseWidth = Core.graphics.isPortrait() ? maxx - minx : (maxx - minx) - (maxy - y) - barpad * 2f - s * 4;
-                                float cx = minx + barpad, cy = y, topY = cy + barheight, botY = cy;
-
-                                Lines.square(cx + barheight / 2f, botY + barheight / 2f, barheight / 2f);
-
-                                Fill.quad(
-                                cx + barheight, cy,
-                                cx + barheight, topY,
-                                cx + width * baseWidth + barheight, topY,
-                                cx + width * baseWidth, botY
-                                );
-
-                                Draw.color(Color.black);
-
-                                Fill.quad(
-                                cx + width * baseWidth + barheight, topY,
-                                cx + width * baseWidth, botY,
-                                cx + baseWidth, botY,
-                                cx + baseWidth + barheight, topY);
-
-                                font.setColor(Color.black);
-                                layout.setText(font, bar.text);
-                                font.draw(bar.text, cx + barheight * 1.5f, botY + barheight / 2f + layout.height / 2f);
-                            }
-                        }
-
-                        Draw.color(color);
-                    }else if(panei == 2){
-
-                        float barw = 30f*s;
-                        float barspace = 40f*s;
-                        float barpad = 10f*s;
-                        int bars = (int)(maxx - minx / barspace) + 1;
-                        int barmax = (int)((maxy - miny) / barspace);
-
-                        for(int i = 0; i < bars; i++){
-                            int index = i % renderTimes.getWindowSize();
-                            float val = renderTimes.get(index);
-                            float scale = Mathf.clamp(!renderTimes.hasEnoughData() ? Mathf.randomSeed(i) : (val / renderTimes.mean() - 0.5f));
-
-                            Color dst = scale > 0.8f ? colorRed : color;
-                            Draw.color(dst);
-                            int height = Math.max((int)(scale * barmax), 1);
-                            float cx = maxx - barw/2f - barpad - i*barspace;
-                            for(int j = 0; j < barmax; j++){
-                                if(j >= height){
-                                    Draw.color(color, Color.black, 0.7f);
-                                }else{
-                                    Draw.color(dst);
-                                }
-                                Fill.square(cx, miny + j * barspace + barw/2f + barpad, barw/2f);
-                            }
-                        }
-                        Draw.color(color);
-
-                    }else if(panei == 3){
-                        Draw.flush();
-
-                        float vx = floats.get(6), vy = floats.get(7), vw = (maxx - vx), vh = (maxy - vy), cx = vx + vw/2f, cy = vy + vh/2f;
-                        float vpad = 30*s;
-                        float vcont = Math.min(vw, vh);
-                        float vsize = vcont - vpad*2;
-                        int rx = (int)(vx + vw/2f - vsize/2f), ry = (int)(vy + vh/2f - vsize/2f), rw = (int)vsize, rh = (int)vsize;
-
-                        float vrad = vsize/2f + vpad;
-
-                        //planet + bars
-                        if(!graphics.isPortrait()){
-
-                            String text = "<<ready>>";
-                            layout.setText(font, text);
-
-                            //draw only when text fits
-                            if(layout.width * 1.5f < vw){
-                                Lines.circle(cx, cy, vsize/2f);
-
-                                if(rw > 0 && rh > 0){
-                                    Gl.viewport(viewportX + rx, viewportY + ry, rw, rh);
-
-                                    cam.position.set(2, 0, 2);
-                                    cam.resize(rw, rh);
-                                    cam.lookAt(0, 0, 0);
-                                    cam.fov = 42f;
-                                    cam.update();
-                                    Shaders.mesh.bind();
-                                    Shaders.mesh.setUniformMatrix4("u_proj", cam.combined.val);
-                                    mesh.render(Shaders.mesh, Gl.lines);
-
-                                    //restore viewport
-                                    Gl.viewport(viewportX, viewportY, viewportWidth, viewportHeight);
-                                }
-
-                                int points = 4;
-                                for(int i = 0; i < points; i++){
-                                    float ang = i * 360f / points + 45;
-                                    Fill.poly(cx + Angles.trnsx(ang, vrad), cy + Angles.trnsy(ang, vrad), 3, 20 * s, ang);
-                                }
-
-                                Draw.color(Color.black);
-                                Fill.rect(cx, cy, layout.width + 14f * s, layout.height + 14f * s);
-
-                                font.setColor(color);
-                                font.draw(text, cx - layout.width / 2f, cy + layout.height / 2f);
-
-                                Draw.color(color);
-
-                                Lines.square(cx, cy, vcont / 2f);
-
-                                Lines.line(vx, vy, vx, vy + vh);
-
-
-                                float pspace = 70f * s;
-                                int pcount = (int)(vh / pspace / 2) + 2;
-                                float pw = (vw - vcont) / 2f;
-                                float slope = pw / 2f;
-
-                                //side bars for planet
-                                for(int i : Mathf.signs){
-
-                                    float px = cx + i * (vcont / 2f + pw / 2f);
-                                    float xleft = px - pw / 2f, xright = px + pw / 2f;
-
-                                    for(int j = -2; j < pcount * 2; j++){
-                                        float py = vy + j * pspace * 2, ybot = py - slope, ytop = py + slope;
-                                        Fill.quad(
-                                        xleft, ybot,
-                                        xleft, ybot + pspace,
-                                        xright, ytop + pspace,
-                                        xright, ytop
-                                        );
-                                    }
-                                }
-                            }else{
-                                //X
-                                Lines.line(vx, vy, vx + vw, vy + vh);
-                                Lines.line(vx, vy + vh, vx + vw, vy);
-                            }
-
-                        }
-
-                        //fill the triangle with some stuff
-                        float trispace = 70f*s, tpad = 5f*s;
-                        int tris = (int)(vh / trispace) + 1;
-                        for(int tx = 0; tx < tris; tx++){
-                            for(int ty = 0; ty < tris; ty++){
-                                float trix = vx - trispace/2f - trispace*tx - tpad, triy = vy + vh - trispace/2f - trispace*ty -tpad;
-
-                                Draw.color(Mathf.randomSeed(Pack.longInt(tx + 91, ty + 55)) < 0.5 * (preview ? 1f : 1f - progress) ? colorRed : color);
-                                Fill.square(trix, triy, trispace/2.5f, 0);
-                                Draw.color(Color.black);
-                                Fill.square(trix, triy, trispace/2.5f / Mathf.sqrt2, 0);
-                            }
-                        }
-                        Draw.color(color);
-                    }
-
-                    layout.free();
-
-
-                    Draw.endStencil();
-
-                    Lines.polyline(floats, true);
-
-                    panei ++;
-
-                }
-            }
-        }
-
-        //middle display always has correct ratio, ignores viewport
-        Draw.flush();
-        Gl.viewport(0, 0, graphics.getWidth(), graphics.getHeight());
-        Draw.proj(0, 0, graphics.getWidth(), graphics.getHeight());
-        w = graphics.getWidth();
-        h = graphics.getHeight();
-
-        //middle display
-
-        float bspace = s * 100f;
-        float bsize = s * 80f;
-        int bars = (int)(w / bspace / 2) + 1;
-        float pscale = 1f / bars;
-        float barScale = 1.5f;
-
-        Draw.color(Color.black);
-        Fill.rect(w/2, h/2, w, bsize * barScale);
-        Lines.stroke(stroke);
-        Draw.color(color);
-        Lines.rect(0, h/2 - bsize * barScale/2f, w, bsize * barScale, 10, 0);
-
-        for(int i = 1; i < bars; i++){
-            float cx = i * bspace;
-            float fract = 1f - (i - 1) / (float)(bars - 1);
-            float alpha = progress >= fract ? 1f : Mathf.clamp((pscale - (fract - progress)) / pscale);
-            Draw.color(Color.black, color, alpha);
-
-            for(int dir : Mathf.signs){
-                float width = bsize/1.7f;
-                float skew = bsize/2f;
-
-                float v = w / 2 + cx * dir - width / 2f;
-                Fill.rects(v + dir*skew, h/2f, width, bsize/2f, -dir*skew);
-                Fill.rects(v, h/2f - bsize/2f, width, bsize/2f, dir*skew);
-            }
-
-        }
-
-        //centerpiece has different rendering
-        float fract = 1f - (-1) / (float)(bars - 1);
-        float alpha = progress >= fract ? 1f : Mathf.clamp((pscale - (fract - progress)) / pscale);
-        Draw.color(Color.black, color, alpha);
-        Fill.square(w/2f, h/2f, bsize/3f, 45);
-
-        //note for translators: this text is unreadable and for debugging/show anyway, so it's not translated
-        if(assets.isLoaded("tech")){
-            String name = assets.getCurrentLoading() != null ? assets.getCurrentLoading().fileName.toLowerCase() : "system";
-
-            String key = name.contains("script") ? "scripts" : name.contains("content") ? "content" : name.contains("mod") ? "mods" : name.contains("msav") ||
-            name.contains("maps") ? "map" : name.contains("ogg") || name.contains("mp3") ? "sound" : name.contains("png") ? "image" : "system";
-
-            Font font = assets.get("tech");
-            font.getData().markupEnabled = true;
-            font.setColor(Pal.accent);
-            Draw.color(Color.black);
-            font.draw(red + "[[[[ " + key + " ]]\n" + orange + "<" + Version.modifier + "  " + (Version.build == 0 ? "[init]" : Version.buildString()) + ">", w/2f, h/2f + 110*s, Align.center);
-        }
-
+        drawEmblem(w, h, s);
         Draw.flush();
 
-        fx.end();
+        drawWordmark(w, h, s);
+        drawProgress(w, h, s);
 
-        fx.applyEffects();
-        fx.render();
+        Draw.reset();
     }
 
-    static class Bar{
-        final Floatp value;
-        final Boolp red, valid;
-        final String text;
+    // ---------- backdrop ----------
 
-        public Bar(String text, float value, boolean red){
-            this.value = () -> value;
-            this.red = () -> red;
-            this.valid = () -> true;
-            this.text = text;
+    private void drawSpace(float w, float h){
+        Draw.reset();
+
+        //vertical deep-space wash: one quad, per-vertex colours, no seams (OrbitalTheme does the same)
+        Fill.quad(
+            0, 0, Color.toFloatBits(OrbitalTheme.spaceBlue.r, OrbitalTheme.spaceBlue.g, OrbitalTheme.spaceBlue.b, 1f),
+            w, 0, Color.toFloatBits(OrbitalTheme.space.r, OrbitalTheme.space.g, OrbitalTheme.space.b, 1f),
+            w, h, Color.toFloatBits(0.020f, 0.020f, 0.058f, 1f),
+            0, h, Color.toFloatBits(0.035f, 0.039f, 0.098f, 1f)
+        );
+
+        //nebula blobs: radial light gradients, the same primitive the old screen used for its glow
+        Draw.reset();
+        light(w * 0.19f, h * 0.80f, Math.max(w, h) * 0.40f, 0.55f, OrbitalTheme.nebula);
+        light(w * 0.84f, h * 0.72f, Math.max(w, h) * 0.30f, 0.34f, OrbitalTheme.nebulaLight);
+        light(w * 0.34f, h * 0.14f, Math.max(w, h) * 0.36f, 0.30f, OrbitalTheme.cyanDeep);
+
+        //deterministic starfield: identical every launch, so it never "shifts" between runs
+        Draw.reset();
+        for(int i = 0; i < starCount; i++){
+            float sx = Mathf.randomSeed(i * 3 + 11, 0f, 1f) * w;
+            float sy = Mathf.randomSeed(i * 3 + 12, 0f, 1f) * h;
+            float size = Mathf.randomSeed(i + 41, 0.7f, 1.9f) * Scl.scl(1f);
+            //pull stars away from the centre so the emblem stays readable
+            float dist = Mathf.dst(sx, sy, w / 2f, h * 0.56f);
+            float fade = Mathf.clamp((dist - Math.min(w, h) * 0.20f) / (Math.min(w, h) * 0.18f));
+            float twinkle = Mathf.absin(time * 0.045f + i * 1.7f, 1f);
+            Draw.color(i % 5 == 0 ? OrbitalTheme.ice : OrbitalTheme.silver, (0.08f + 0.5f * twinkle) * fade);
+            Fill.circle(sx, sy, size);
+        }
+    }
+
+    /** Soft radial glow centred on (x, y); {@link Fill#light} with alpha in the inner colour. */
+    private void light(float x, float y, float radius, float alpha, Color color){
+        Tmp.c1.set(color.r, color.g, color.b, alpha);
+        Tmp.c2.set(color.r, color.g, color.b, 0f);
+        Fill.light(x, y, 24, radius, Tmp.c1, Tmp.c2);
+    }
+
+    // ---------- orbital emblem ----------
+
+    /**
+     * Planet + tilted ring + moon + sparkle, drawn in the same spirit as the app icon
+     * (tools/ArtConverter.drawIcon), but vectorised: no texture is available this early.
+     */
+    private void drawEmblem(float w, float h, float s){
+        float cx = w / 2f, cy = h * 0.56f;
+        float r = Math.min(Math.min(w, h) * 0.10f, 150f * s);
+        float rx = r * 1.62f, ry = r * 0.52f, rot = -18f;
+
+        //halo behind the disc
+        Draw.reset();
+        light(cx, cy, r * 2.3f, 0.30f, OrbitalTheme.cyan);
+
+        //ring, far half (behind the planet): dimmer, no amb
+        Draw.reset();
+        ring(cx, cy, rx, ry, rot, 184f, 178f, OrbitalTheme.cyan, 0.45f, 5f * s);
+        Draw.flush();
+
+        //planet: dark base, offset lit cap, cyan limb
+        Draw.reset();
+        Draw.color(0.078f, 0.090f, 0.180f, 1f);
+        Fill.circle(cx, cy, r);
+        Draw.color(OrbitalTheme.ice.r, OrbitalTheme.ice.g, OrbitalTheme.ice.b, 0.55f);
+        Fill.circle(cx - r * 0.22f, cy + r * 0.26f, r * 0.80f);
+        Draw.color(OrbitalTheme.cyanDeep.r, OrbitalTheme.cyanDeep.g, OrbitalTheme.cyanDeep.b, 0.55f);
+        Fill.circle(cx + r * 0.34f, cy - r * 0.30f, r * 0.72f);
+        Draw.flush();
+
+        Lines.stroke(2.4f * s);
+        Draw.color(OrbitalTheme.ice.r, OrbitalTheme.ice.g, OrbitalTheme.ice.b, 0.95f);
+        Lines.circle(cx, cy, r);
+        Draw.flush();
+
+        //ring, near half (in front of the planet): full alpha, warm tip
+        Draw.reset();
+        ring(cx, cy, rx, ry, rot, 2f, 92f, OrbitalTheme.cyan, 1f, 5.6f * s);
+        ring(cx, cy, rx, ry, rot, 94f, 34f, OrbitalTheme.amber, 0.85f, 5.2f * s);
+        ring(cx, cy, rx * 0.80f, ry * 0.80f, rot, 4f, 60f, Color.white, 0.30f, 1.4f * s);
+        Draw.flush();
+
+        //moon + sparkle, scaled with the emblem and hidden when there is no room for them
+        Draw.reset();
+        if(r > 60f * s){
+            float mx = cx + rx * 1.05f, my = cy + ry * 1.45f, mr = r * 0.22f;
+            Draw.color(OrbitalTheme.steel.r, OrbitalTheme.steel.g, OrbitalTheme.steel.b, 0.9f);
+            Fill.circle(mx, my, mr);
+            Draw.color(OrbitalTheme.space.r, OrbitalTheme.space.g, OrbitalTheme.space.b, 0.45f);
+            Fill.circle(mx + mr * 0.3f, my - mr * 0.3f, mr * 0.42f);
+
+            //four-point sparkle, mirrored below the emblem
+            Draw.color(Color.white, 0.85f);
+            float sp = r * 0.42f, sx = cx - rx * 1.15f, sy = cy + ry * 1.55f;
+            Fill.circle(sx, sy, sp * 0.22f);
+            Lines.stroke(1.8f * s);
+            Lines.line(sx - sp, sy, sx + sp, sy);
+            Lines.line(sx, sy - sp, sx, sy + sp);
+        }
+        Draw.reset();
+    }
+
+    /** Arc of a rotated ellipse, walked in small segments so it reads as one stroke of colour. */
+    private void ring(float cx, float cy, float rx, float ry, float rot, float start, float extent, Color color, float alpha, float thickness){
+        Lines.stroke(thickness);
+        Draw.color(color.r, color.g, color.b, alpha);
+
+        FloatSeq seq = new FloatSeq();
+        int steps = Math.max(12, (int)(extent / 4f));
+        float cr = Mathf.cos(rot * Mathf.degRad), sr = Mathf.sin(rot * Mathf.degRad);
+        for(int i = 0; i <= steps; i++){
+            float ang = (start + extent * (i / (float)steps)) * Mathf.degRad;
+            float ex = Mathf.cos(ang) * rx, ey = Mathf.sin(ang) * ry;
+            seq.add(cx + ex * cr - ey * sr, cy + ex * sr + ey * cr);
+        }
+        Lines.polyline(seq, false);
+    }
+
+    // ---------- text and progress ----------
+
+    private void drawWordmark(float w, float h, float s){
+        Font font = Fonts.tech;
+        if(font == null) return;
+
+        Draw.flush();
+        font.setColor(OrbitalTheme.silver);
+        font.getData().setScale(s * 2.4f);
+
+        //spaced letters read as a wordmark without needing a display typeface
+        GlyphLayout layout = GlyphLayout.obtain();
+        layout.setText(font, "O R B I T A L");
+        font.draw("O R B I T A L", w / 2f - layout.width / 2f, h * 0.40f);
+        layout.free();
+        font.getData().setScale(1f);
+        Draw.flush();
+    }
+
+    private void drawProgress(float w, float h, float s){
+        float barW = Math.min(w * 0.62f, 620f * s), barH = 22f * s;
+        float bx = w / 2f - barW / 2f, by = h * 0.30f;
+
+        Draw.reset();
+        Draw.color(OrbitalTheme.spaceBlue.r, OrbitalTheme.spaceBlue.g, OrbitalTheme.spaceBlue.b, 0.62f);
+        Fill.rect(bx + barW / 2f, by + barH / 2f, barW, barH);
+        Draw.flush();
+
+        Lines.stroke(2f * s);
+        Draw.color(OrbitalTheme.cyan.r, OrbitalTheme.cyan.g, OrbitalTheme.cyan.b, 0.85f);
+        Lines.rect(bx, by, barW, barH);
+        Draw.flush();
+
+        float p = Mathf.clamp(assets == null ? 0f : assets.getProgress());
+        float fw = barW * p;
+        if(fw > 1f){
+            Draw.reset();
+            //cyan -> ice sweep, with an amber leading edge so the fill direction is obvious
+            Fill.quad(
+                bx, by, Color.toFloatBits(OrbitalTheme.cyanDeep.r, OrbitalTheme.cyanDeep.g, OrbitalTheme.cyanDeep.b, 1f),
+                bx + fw, by, Color.toFloatBits(OrbitalTheme.ice.r, OrbitalTheme.ice.g, OrbitalTheme.ice.b, 1f),
+                bx + fw, by + barH, Color.toFloatBits(OrbitalTheme.cyan.r, OrbitalTheme.cyan.g, OrbitalTheme.cyan.b, 1f),
+                bx, by + barH, Color.toFloatBits(OrbitalTheme.cyan.r, OrbitalTheme.cyan.g, OrbitalTheme.cyan.b, 1f)
+            );
+            Draw.flush();
+
+            Draw.color(OrbitalTheme.amber.r, OrbitalTheme.amber.g, OrbitalTheme.amber.b, 0.9f);
+            Fill.rect(bx + fw, by + barH / 2f, 3f * s, barH * 1.5f);
+            Draw.flush();
         }
 
-        public Bar(String text, Boolp valid, Floatp value, Boolp red){
-            this.valid = valid;
-            this.value = value;
-            this.red = red;
-            this.text = text;
-        }
+        Font font = Fonts.tech;
+        if(font == null) return;
 
-        boolean valid(){
-            return valid.get();
-        }
+        font.setColor(OrbitalTheme.cyan);
+        font.getData().setScale(s * 1.5f);
+        GlyphLayout layout = GlyphLayout.obtain();
 
-        boolean red(){
-            return red.get();
-        }
+        //status line: the localised "loading..." label, plus what is being loaded right now
+        String status = Core.bundle.get("loading");
+        String name = assets != null && assets.getCurrentLoading() != null
+            ? assets.getCurrentLoading().fileName.toLowerCase() : null;
+        String line = name == null ? status : status + "   " + name.replace("/", "::");
 
-        float value(){
-            return Mathf.clamp(value.get());
-        }
+        font.setColor(OrbitalTheme.silver);
+        layout.setText(font, line);
+        font.draw(line, w / 2f - layout.width / 2f, by - 18f * s);
+
+        String pct = Mathf.round(p * 100f) + "%";
+        font.setColor(OrbitalTheme.silver);
+        layout.setText(font, pct);
+        font.draw(pct, w / 2f - layout.width / 2f, by + barH + 12f * s);
+
+        layout.free();
+        font.getData().setScale(1f);
+        Draw.flush();
     }
 }
