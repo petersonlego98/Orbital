@@ -25,6 +25,13 @@ import static arc.Core.*;
  * the asset manager is still loading, so neither the key art nor most fonts are
  * guaranteed to exist yet. Text appears as soon as {@link Fonts#tech} is loaded.
  *
+ * That constraint rules out {@code Fill.circle} (it does {@code atlas.find("circle")},
+ * and the atlas is only a blank atlas at this point - see the IllegalArgumentException
+ * that used to abort the launch) and {@code Draw.rect(TextureRegion...)}. Only the
+ * atlas-independent primitives are used here: {@link Fill#light} (its own mesh),
+ * {@link Fill#quad}/{@link Fill#poly} (white region of the blank atlas) and
+ * {@link Lines} (line shader).
+ *
  * It also removes the framebuffer entirely (no {@code FxProcessor}, no bloom, no
  * stencil), which drops a whole class of "no rgba8888 + stencil buffer" fallbacks
  * and the per-frame off-screen pass.
@@ -89,8 +96,24 @@ public class LoadRenderer implements Disposable{
             float fade = Mathf.clamp((dist - Math.min(w, h) * 0.20f) / (Math.min(w, h) * 0.18f));
             float twinkle = Mathf.absin(time * 0.045f + i * 1.7f, 1f);
             Draw.color(i % 5 == 0 ? OrbitalTheme.ice : OrbitalTheme.silver, (0.08f + 0.5f * twinkle) * fade);
-            Fill.circle(sx, sy, size);
+            disc(sx, sy, size);
         }
+    }
+
+    /**
+     * Filled disc built from {@link Fill#poly}: the atlas only has its blank white region
+     * this early, so {@code Fill.circle} ("circle" region) would throw.
+     */
+    private static void disc(float x, float y, float radius){
+        Fill.poly(x, y, discVertices(radius), radius);
+    }
+
+    /** Fewer sides for tiny discs: 100+ stars would otherwise cost thousands of vertices. */
+    private static int discVertices(float radius){
+        if(radius < 3f) return 5;
+        if(radius < 8f) return 8;
+        if(radius < 24f) return 20;
+        return 64;
     }
 
     /** Soft radial glow centred on (x, y); {@link Fill#light} with alpha in the inner colour. */
@@ -108,30 +131,26 @@ public class LoadRenderer implements Disposable{
      */
     private void drawEmblem(float w, float h, float s){
         float cx = w / 2f, cy = h * 0.56f;
-        float r = Math.min(Math.min(w, h) * 0.10f, 150f * s);
+        float r = Math.min(Math.min(w, h) * 0.115f, 170f * s);
         float rx = r * 1.62f, ry = r * 0.52f, rot = -18f;
 
         //halo behind the disc
         Draw.reset();
         light(cx, cy, r * 2.3f, 0.30f, OrbitalTheme.cyan);
 
-        //ring, far half (behind the planet): dimmer, no amb
+        //ring, far half (behind the planet): dimmer
         Draw.reset();
         ring(cx, cy, rx, ry, rot, 184f, 178f, OrbitalTheme.cyan, 0.45f, 5f * s);
         Draw.flush();
 
-        //planet: dark base, offset lit cap, cyan limb
+        //planet: one radial light instead of stacked discs, so it reads as a shaded sphere
+        //(overlapping circles looked like three stickers, not a body)
         Draw.reset();
-        Draw.color(0.078f, 0.090f, 0.180f, 1f);
-        Fill.circle(cx, cy, r);
-        Draw.color(OrbitalTheme.ice.r, OrbitalTheme.ice.g, OrbitalTheme.ice.b, 0.55f);
-        Fill.circle(cx - r * 0.22f, cy + r * 0.26f, r * 0.80f);
-        Draw.color(OrbitalTheme.cyanDeep.r, OrbitalTheme.cyanDeep.g, OrbitalTheme.cyanDeep.b, 0.55f);
-        Fill.circle(cx + r * 0.34f, cy - r * 0.30f, r * 0.72f);
+        Fill.light(cx, cy, 48, r, 0.60f, Tmp.c1.set(OrbitalTheme.ice).a(1f), Tmp.c2.set(0.043f, 0.051f, 0.106f, 1f));
         Draw.flush();
 
         Lines.stroke(2.4f * s);
-        Draw.color(OrbitalTheme.ice.r, OrbitalTheme.ice.g, OrbitalTheme.ice.b, 0.95f);
+        Draw.color(OrbitalTheme.ice.r, OrbitalTheme.ice.g, OrbitalTheme.ice.b, 0.85f);
         Lines.circle(cx, cy, r);
         Draw.flush();
 
@@ -146,15 +165,14 @@ public class LoadRenderer implements Disposable{
         Draw.reset();
         if(r > 60f * s){
             float mx = cx + rx * 1.05f, my = cy + ry * 1.45f, mr = r * 0.22f;
-            Draw.color(OrbitalTheme.steel.r, OrbitalTheme.steel.g, OrbitalTheme.steel.b, 0.9f);
-            Fill.circle(mx, my, mr);
-            Draw.color(OrbitalTheme.space.r, OrbitalTheme.space.g, OrbitalTheme.space.b, 0.45f);
-            Fill.circle(mx + mr * 0.3f, my - mr * 0.3f, mr * 0.42f);
+            //same radial-light treatment as the planet
+            Fill.light(mx, my, 24, mr, 0.55f, Tmp.c1.set(OrbitalTheme.steel).a(1f), Tmp.c2.set(0.086f, 0.098f, 0.157f, 1f));
+            Draw.flush();
 
             //four-point sparkle, mirrored below the emblem
             Draw.color(Color.white, 0.85f);
             float sp = r * 0.42f, sx = cx - rx * 1.15f, sy = cy + ry * 1.55f;
-            Fill.circle(sx, sy, sp * 0.22f);
+            disc(sx, sy, sp * 0.22f);
             Lines.stroke(1.8f * s);
             Lines.line(sx - sp, sy, sx + sp, sy);
             Lines.line(sx, sy - sp, sx, sy + sp);
@@ -186,7 +204,7 @@ public class LoadRenderer implements Disposable{
 
         Draw.flush();
         font.setColor(OrbitalTheme.silver);
-        font.getData().setScale(s * 2.4f);
+        font.getData().setScale(s * 2.6f);
 
         //spaced letters read as a wordmark without needing a display typeface
         GlyphLayout layout = GlyphLayout.obtain();
