@@ -162,6 +162,35 @@ Copy-Item docs\LICENCIAMENTO_ASSETS.md, docs\auditoria-licencas-2026-11.md, docs
 
 ---
 
+## 5. Release no GitHub
+
+O texto do release **fica versionado** em `docs/RELEASE_NOTES_<tag>.md` (ex.:
+`docs/RELEASE_NOTES_v1.1.0.md`). Assim o release não depende de sessão de terminal e
+tag, binário e notas não divergem.
+
+1. Escreva/atualize `docs/RELEASE_NOTES_v<versao>.md` e faça commit.
+2. Regenere o instalador (`bash installer/build.sh`) e compacte o zip de distribuição:
+
+   ```powershell
+   tar -a -cf build\installer\Orbital-<versao>-win64-usuario.zip -C build\installer OrbitalSetup.exe payload
+   (Get-FileHash build\installer\Orbital-<versao>-win64-usuario.zip -Algorithm SHA256).Hash.ToLower()
+   ```
+
+   Guarde o SHA-256 dentro das notas.
+3. Publique (ou atualize) o release a partir do arquivo:
+
+   ```powershell
+   .\tools\publish-release.ps1 -Version <versao> -Assets build\installer\Orbital-<versao>-win64-usuario.zip -Latest
+   ```
+
+O script lê as notas com `[System.IO.File]::ReadAllText` e envia o JSON como **bytes
+UTF-8**. São duas regras que já quebraram release: `Get-Content` do PowerShell 5.1 lê
+UTF-8 como ANSI (estragava os acentos) e passar uma `string` no `-Body` faz o
+`Invoke-WebRequest` recodificar com o code page do console (e, se o valor vier de um
+comando, serializa o objeto do provider no lugar do texto).
+
+---
+
 ## 4. Cuidados com Aplicativos de Nuvem (ex.: TeraBox / OneDrive)
 
 Arquivos temporários e pastas de build como `.gradle/`, `build/` e `deploy/windows64/` sofrem constantes escritas e exclusões. Certifique-se de que softwares de sincronização estejam pausados ou com exclusão de pastas configurada para evitar bloqueios de arquivo durante a compilação.
