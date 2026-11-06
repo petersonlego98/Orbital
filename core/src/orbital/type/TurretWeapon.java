@@ -20,16 +20,17 @@ public class TurretWeapon extends Weapon{
     public final Turret turret;
     /** the size of the original turret, in blocks. */
     public final int turretSize;
-    /** whether this module can be removed from the unit. Native weapons are never TurretWeapon. */
-    public boolean removable = true;
-    /** index of the dorsal slot occupied by this turret; -1 when no slot has been assigned. */
-    public int slotIndex = -1;
 
     public TurretWeapon(Turret turret, BulletType bullet){
         super(turret.name);
         this.turret = turret;
         this.turretSize = turret.size;
         this.bullet = bullet;
+
+        removable = true;
+        dorsalSize = turret.size;
+        float p = turretSize * TurretSlot.pxTile;
+        dorsalCost = p * p;
 
         //a dorsal module is a single weapon; it must not be mirrored like a hull weapon.
         mirror = false;
@@ -83,8 +84,7 @@ public class TurretWeapon extends Weapon{
 
     /** @return the dorsal footprint cost, in px². P = size * 32, C = P². Never scaled. */
     public float cost(){
-        float p = turretSize * TurretSlot.pxTile;
-        return p * p;
+        return dorsalCost;
     }
 
     /**
@@ -99,14 +99,6 @@ public class TurretWeapon extends Weapon{
     @Override
     public float visualScale(Unit unit){
         return DorsalGeometry.turretVisualScale(unit == null ? null : unit.type, turretSize, regionPx());
-    }
-
-    /** Native sprite side in atlas pixels, with a deterministic fallback for headless runs. */
-    public float regionPx(){
-        if(region != null && region.found()){
-            return Math.max(1f, Math.max(region.width, region.height));
-        }
-        return Math.max(1f, turretSize * TurretSlot.pxTile);
     }
 
     /** @return true if this turret has a bullet type that this adapter can use. */

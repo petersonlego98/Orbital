@@ -4,6 +4,7 @@ import arc.Core;
 import arc.math.geom.*;
 import arc.util.*;
 import orbital.annotations.Annotations.*;
+import orbital.content.*;
 import orbital.entities.units.*;
 import orbital.gen.*;
 import orbital.type.*;
@@ -40,22 +41,22 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         }
     }
 
-    /** @return the dorsal cost of all removable turrets currently mounted on this unit. */
+    /** @return the dorsal cost of all removable modules currently mounted on this unit. */
     public float loadoutCost(){
         float sum = 0f;
         for(WeaponMount mount : mounts){
-            if(mount.weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable){
-                sum += turretWeapon.cost();
+            if(mount.weapon.removable){
+                sum += mount.weapon.dorsalCost;
             }
         }
         return sum;
     }
 
-    /** @return how many removable turrets are currently mounted on this unit. */
+    /** @return how many removable modules are currently mounted on this unit. */
     public int mountedTurrets(){
         int count = 0;
         for(WeaponMount mount : mounts){
-            if(mount.weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable) count++;
+            if(mount.weapon.removable) count++;
         }
         return count;
     }
@@ -161,9 +162,9 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
 
     private boolean overlapsTurretMounts(float x, float y, float visualFootprint){
         for(WeaponMount mount : mounts){
-            if(mount != null && mount.weapon instanceof TurretWeapon turretWeapon){
+            if(mount != null && mount.weapon.removable){
                 if(DorsalGeometry.overlaps(x, y, visualFootprint,
-                    turretWeapon.x, turretWeapon.y, turretVisualFootprint(turretWeapon))) return true;
+                    mount.weapon.x, mount.weapon.y, turretVisualFootprint(mount.weapon))) return true;
             }
         }
         return false;
@@ -180,7 +181,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     private boolean slotOccupied(int slotIndex){
         if(slotIndex < 0) return false;
         for(WeaponMount mount : mounts){
-            if(mount != null && mount.weapon instanceof TurretWeapon turretWeapon && turretWeapon.slotIndex == slotIndex) return true;
+            if(mount != null && mount.weapon.slotIndex == slotIndex && mount.weapon.removable) return true;
         }
         return false;
     }
@@ -193,9 +194,10 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * this drawn footprint, while silhouette fitting and the dorsal budget keep using the full
      * block footprint.</p>
      */
-    private float turretVisualFootprint(TurretWeapon weapon){
-        if(type == null) return DorsalGeometry.footprint(weapon.turretSize);
-        return DorsalGeometry.visualFootprint(type, weapon.turretSize, weapon.regionPx());
+    private float turretVisualFootprint(Weapon weapon){
+        int size = Math.max(1, weapon.dorsalSize);
+        if(type == null) return DorsalGeometry.footprint(size);
+        return DorsalGeometry.visualFootprint(type, size, weapon.regionPx());
     }
 
     /** @return the drawn footprint, in world units, of a support block that would use this anchor. */
@@ -209,12 +211,17 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     /** @return the first free turret slot that also avoids installed support modules. */
     public int findTurretSlot(Turret turret){
         if(turret == null || type == null) return -1;
+        return findSlot(turret.size, blockRegionPx(turret));
+    }
 
-        float footprint = DorsalGeometry.footprint(turret.size);
-        float drawn = DorsalGeometry.visualFootprint(type, turret.size, blockRegionPx(turret));
+    private int findSlot(int size, float regionPx){
+        if(type == null) return -1;
+
+        float footprint = DorsalGeometry.footprint(size);
+        float drawn = DorsalGeometry.visualFootprint(type, size, regionPx);
         for(int i = 0; i < type.turretSlots.size; i++){
             TurretSlot slot = type.turretSlots.get(i);
-            if(!slot.accepts(turret)) continue;
+            if(slot.maxSize < size) continue;
             if(!DorsalGeometry.fitsHull(type, slot.offsetX, slot.offsetY, footprint)) continue;
             if(slotOccupied(i)) continue;
             if(overlapsTurretMounts(slot.offsetX, slot.offsetY, drawn)) continue;
@@ -259,6 +266,46 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         return weapon;
     }
 
+    /** @return true if a native unit weapon fits this unit's current runtime loadout. */
+    public boolean canMountWeaponModule(WeaponModules.Definition module){
+        if(module == null || module.weapon == null || type == null) return false;
+        if(!type.hasSlotFor(module.size) || !type.fitsSilhouette(module.size)) return false;
+        if(mountedTurrets() >= type.turretSlots.size) return false;
+        if(loadoutCost() + module.cost > type.dorsalBudget()) return false;
+        return findSlot(module.size, module.regionPx()) >= 0;
+    }
+
+    /**
+     * Mounts a native unit weapon as a dorsal combat module.
+     * @return the created weapon, or null when the weapon does not fit.
+     */
+    public @Nullable Weapon mountWeaponModule(WeaponModules.Definition module){
+        if(module == null || type == null || !canMountWeaponModule(module)) return null;
+
+        int slotIndex = findSlot(module.size, module.regionPx());
+        if(slotIndex < 0) return null;
+
+        Weapon weapon = module.copy();
+        //runtime weapons are not covered by UnitType's content init, so load sprites and init here.
+        //Headless runs have no Core.atlas; skip sprite lookup there and keep the deterministic
+        //size fallback instead of throwing while mounting.
+        if(Core.atlas != null) weapon.load();
+        weapon.init();
+
+        //a dorsal module is a single weapon centered on its mount point.
+        weapon.mirror = false;
+        weapon.rotate = true;
+        weapon.controllable = true;
+        weapon.aiControllable = true;
+
+        TurretSlot slot = type.turretSlots.get(slotIndex);
+        weapon.x = slot.offsetX;
+        weapon.y = slot.offsetY;
+        weapon.slotIndex = slotIndex;
+        addWeapon(weapon);
+        return weapon;
+    }
+
     /** Adds a weapon mount at runtime. Used for removable dorsal turret modules. */
     public void addWeapon(Weapon weapon){
         WeaponMount mount = weapon.mountType.get(weapon);
@@ -269,7 +316,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
 
     /** Removes a weapon mount at runtime. Native weapons are never removable. */
     public boolean removeWeapon(Weapon weapon){
-        if(!(weapon instanceof TurretWeapon turretWeapon) || !turretWeapon.removable) return false;
+        if(weapon == null || !weapon.removable) return false;
 
         int index = -1;
         for(int i = 0; i < mounts.length; i++){

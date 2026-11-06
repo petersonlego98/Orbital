@@ -2,12 +2,14 @@ package orbital.ui.dialogs;
 
 import arc.*;
 import arc.graphics.*;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.*;
 import arc.scene.style.*;
 import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
 import arc.util.*;
 import orbital.content.Blocks;
+import orbital.content.WeaponModules;
 import orbital.ctype.*;
 import orbital.entities.units.*;
 import orbital.gen.*;
@@ -68,7 +70,7 @@ public class TurretLoadoutDialog extends BaseDialog{
             if(!weapon.isTurretMount()) continue;
 
             installed++;
-            boolean removable = weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable;
+            boolean removable = weapon.removable;
 
             list.table(Styles.grayPanel, row -> {
                 row.left().margin(6f);
@@ -134,6 +136,48 @@ public class TurretLoadoutDialog extends BaseDialog{
 
         if(count == 0){
             list.add("@turret.loadout.noavailable").color(Color.lightGray).left().row();
+        }
+
+        list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
+
+        list.add("@weapon.module.available").style(Styles.outlineLabel).left().padBottom(4f).row();
+        list.add("@weapon.module.hint").color(Color.lightGray).left().wrap().padBottom(6f).row();
+
+        Table weaponGrid = new Table();
+        weaponGrid.left();
+        list.add(weaponGrid).growX().row();
+
+        int weaponOptions = 0;
+        for(WeaponModules.Definition module : WeaponModules.all()){
+            if(module == null || module.weapon == null) continue;
+            if(!unit.canMountWeaponModule(module)) continue;
+
+            weaponOptions++;
+            TextureRegion icon = module.weapon.region != null && module.weapon.region.found()
+                ? module.weapon.region : module.unit.uiIcon;
+
+            weaponGrid.table(Tex.pane, cell -> {
+                cell.margin(6f).top();
+                var btn = cell.button(new TextureRegionDrawable(icon), Styles.selecti, () -> {
+                    if(unit.mountWeaponModule(module) != null){
+                        changed.run();
+                        rebuild();
+                    }
+                }).size(btnSize).tooltip(module.name).padBottom(4f).get();
+                btn.resizeImage(imgSize);
+                cell.row();
+                cell.add(module.name).width(cardWidth - 8f).height(24f)
+                    .ellipsis(true).center().padTop(2f).row();
+                float cost = module.size * TurretSlot.pxTile;
+                cell.add(Core.bundle.format("turret.loadout.size", module.size, module.size, (int)(cost * cost)))
+                    .color(Color.lightGray).fontScale(0.85f).center();
+            }).width(cardWidth).minHeight(mobile ? 124 : 130).pad(4f);
+
+            if(weaponOptions % columns == 0) weaponGrid.row();
+        }
+
+        if(weaponOptions == 0){
+            list.add("@weapon.module.noavailable").color(Color.lightGray).left().padBottom(4f).row();
         }
 
         list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();

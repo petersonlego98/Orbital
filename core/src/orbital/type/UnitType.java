@@ -678,22 +678,22 @@ public class UnitType extends UnlockableContent implements Senseable{
         return spriteArea() * 0.5f * loadoutBudgetMultiplier;
     }
 
-    /** @return the dorsal cost of all removable turrets currently defined on this type. */
+    /** @return the dorsal cost of all removable modules currently defined on this type. */
     public float loadoutCost(){
         float sum = 0f;
         for(Weapon weapon : weapons){
-            if(weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable){
-                sum += turretWeapon.cost();
+            if(weapon.removable){
+                sum += weapon.dorsalCost;
             }
         }
         return sum;
     }
 
-    /** @return the number of removable turrets currently defined on this type. */
+    /** @return the number of removable modules currently defined on this type. */
     public int mountedTurrets(){
         int count = 0;
         for(Weapon weapon : weapons){
-            if(weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable) count++;
+            if(weapon.removable) count++;
         }
         return count;
     }

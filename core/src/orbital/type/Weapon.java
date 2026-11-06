@@ -29,6 +29,18 @@ import static orbital.Vars.*;
 public class Weapon implements Cloneable{
     /** displayed weapon region */
     public String name;
+    /** true when this weapon was created at runtime as a removable dorsal module. */
+    public boolean removable = false;
+    /** index of the dorsal slot occupied by this module; -1 when no slot has been assigned. */
+    public int slotIndex = -1;
+    /** dorsal footprint size in blocks for a module weapon; native weapons use 0. */
+    public int dorsalSize = 0;
+    /** dorsal footprint cost in px² for a module weapon; native weapons use 0. */
+    public float dorsalCost = 0f;
+    /** source unit type of a weapon module, or null. */
+    public @Nullable UnitType dorsalSource;
+    /** source weapon definition of a weapon module, or null. */
+    public @Nullable Weapon dorsalSourceWeapon;
     /** bullet shot */
     public BulletType bullet = Bullets.placeholder;
     /** shell ejection effect */
@@ -641,6 +653,14 @@ public class Weapon implements Cloneable{
             part.turretShading = false;
             part.load(name);
         }
+    }
+
+    /** @return native sprite side in atlas pixels, with a deterministic fallback for headless runs. */
+    public float regionPx(){
+        if(region != null && region.found()){
+            return Math.max(1f, Math.max(region.width, region.height));
+        }
+        return Math.max(1f, dorsalSize * TurretSlot.pxTile);
     }
 
     @Override

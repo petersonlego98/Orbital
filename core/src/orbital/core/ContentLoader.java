@@ -115,6 +115,9 @@ public class ContentLoader{
     public void load(){
         initialize(Content::loadIcon);
         initialize(Content::load);
+
+        //weapon modules are derived from unit weapon sprites, so build the list after load()
+        WeaponModules.reload();
     }
 
     /** Initializes all content with the specified function. */

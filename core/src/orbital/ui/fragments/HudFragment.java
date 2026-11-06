@@ -908,14 +908,14 @@ public class HudFragment{
     }
 
     private static String turretTooltip(Weapon weapon){
-        boolean removable = weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable;
+        boolean removable = weapon.removable;
         String state = removable ? Core.bundle.get("turret.hud.removable") : Core.bundle.get("turret.hud.native");
         return turretName(weapon) + "\n[lightgray]" + state;
     }
 
     private Table turretCell(Unit unit, WeaponMount mount){
         Weapon weapon = mount.weapon;
-        boolean removable = weapon instanceof TurretWeapon turretWeapon && turretWeapon.removable;
+        boolean removable = weapon.removable;
         float baseThickness = removable ? 3f : 2f;
         float iconSize = mobile ? 34f : 44f;
         TextureRegion region = weapon.region != null && weapon.region.found() ? weapon.region : Core.atlas.find(weapon.name);
