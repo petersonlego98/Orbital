@@ -56,6 +56,25 @@ public final class WeaponModules{
             copy.dorsalSourceWeapon = weapon;
             copy.dorsalSize = size;
             copy.dorsalCost = cost;
+
+            //A mirrored hull weapon is one of a pair whose two entries alternate fire, and
+            //UnitType.init() doubles reload AND recoilTime on both of them so the pair keeps
+            //the authored rate. A dorsal module is a single mount: without undoing that
+            //compensation every module taken from a mirrored weapon would fire at half speed.
+            if(weapon.mirror){
+                copy.reload = weapon.reload / 2f;
+                copy.recoilTime = weapon.recoilTime / 2f;
+            }
+
+            //Alternation also gates the shot: Weapon#update only fires a mount when
+            //wasFlipped == flipSprite, so a copy that kept the mirrored arm's flags
+            //(alternate = true, flipSprite = true) never fired at all. otherSide pointed
+            //into the *carrier's* mount array too, flipping an unrelated weapon's side.
+            //A module is a single weapon, so none of that applies.
+            copy.alternate = false;
+            copy.otherSide = -1;
+            copy.flipSprite = false;
+            copy.mirror = false;
             return copy;
         }
     }
@@ -69,6 +88,7 @@ public final class WeaponModules{
         if(cached != null) return cached;
 
         Seq<Definition> list = new Seq<>();
+        ObjectSet<String> seen = new ObjectSet<>();
         if(content != null){
             for(UnitType type : content.units()){
                 if(type == null || type.name == null || type.internal || type.hidden) continue;
@@ -77,6 +97,14 @@ public final class WeaponModules{
                 for(Weapon weapon : type.weapons){
                     index++;
                     if(!usable(weapon)) continue;
+                    //UnitType.init() appends a flipped copy of every mirrored weapon, so a hull
+                    //that carries the weapon in both arms lists it twice - once per arm. A
+                    //dorsal module is a single mount, and it is the flipped half that could
+                    //never fire (see Definition.copy()), so only the authored entry is kept.
+                    if(weapon.flipSprite) continue;
+                    //the same weapon defined twice on one hull (mods copying a weapon into both
+                    //arms, or two entries sharing a name) is still one module
+                    if(!seen.add(type.name + "#" + weapon.name)) continue;
                     list.add(create(type, weapon, index));
                 }
             }

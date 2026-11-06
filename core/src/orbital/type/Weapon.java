@@ -251,6 +251,9 @@ public class Weapon implements Cloneable{
     //TODO copy-pasted code
     public void drawOutline(Unit unit, WeaponMount mount){
         if(!outlineRegion.found()) return;
+        //a paired module draws both halves at once; a single centered outline would sit
+        //between them instead of under either sprite
+        if(pairedModule()) return;
 
         float
         rotation = unit.rotation - 90,
@@ -262,6 +265,14 @@ public class Weapon implements Cloneable{
         Draw.xscl = -Mathf.sign(flipSprite);
         drawRegion(outlineRegion, wx, wy, weaponRotation, visualScale(unit));
         Draw.xscl = 1f;
+    }
+
+    /**
+     * @return true when this module came from a mirrored hull weapon and therefore has to
+     * show the pair of arms as one joined drawing instead of one lone arm.
+     */
+    public boolean pairedModule(){
+        return removable && dorsalSourceWeapon != null && dorsalSourceWeapon.mirror;
     }
 
     public void draw(Unit unit, WeaponMount mount){
@@ -286,80 +297,84 @@ public class Weapon implements Cloneable{
             drawOutline(unit, mount);
         }
 
-        if(parts.size > 0){
-            //RegionPart computes its own width from Draw.xscl/Draw.yscl, so scaling the global
-            //draw scale around the part loops keeps the barrels in proportion with the module.
-            float px0 = Draw.xscl, py0 = Draw.yscl;
-            if(scale != 1f){
-                Draw.xscl *= scale;
-                Draw.yscl *= scale;
-            }
-
-            DrawPart.params.set(mount.warmup, mount.reload / reload, mount.smoothReload, mount.heat, mount.recoil, mount.charge, wx, wy, weaponRotation + 90);
-            DrawPart.params.sideMultiplier = flipSprite ? -1 : 1;
-
-            for(int i = 0; i < parts.size; i++){
-                var part = parts.get(i);
-                DrawPart.params.setRecoil(part.recoilIndex >= 0 && mount.recoils != null ? mount.recoils[part.recoilIndex] : mount.recoil);
-                if(part.under){
-                    unit.type.applyColor(unit);
-                    part.draw(DrawPart.params);
-                }
-            }
-
-            Draw.xscl = px0;
-            Draw.yscl = py0;
-        }
-
+        //A module taken from a mirrored hull weapon shows both arms as one joined drawing.
+        //Each copy is drawn at half the module scale, offset a quarter of a sprite to either
+        //side, so the pair still occupies exactly the footprint of the single sprite it
+        //replaces: it never pokes out of the hull or of its dorsal slot.
+        boolean paired = pairedModule() && region != null && region.found();
         float prev = Draw.xscl;
+        float sideScale = paired ? scale * 0.5f : scale;
+        float lateral = paired ? region.width * region.scl() * sideScale * 0.5f : 0f;
 
-        Draw.xscl *= -Mathf.sign(flipSprite);
+        for(int side = 0; side < (paired ? 2 : 1); side++){
+            boolean mirrored = paired && side == 1;
+            float ox = lateral == 0f ? 0f : Angles.trnsx(weaponRotation, mirrored ? lateral : -lateral, 0f);
+            float oy = lateral == 0f ? 0f : Angles.trnsy(weaponRotation, mirrored ? lateral : -lateral, 0f);
 
-        //fix color
-        unit.type.applyColor(unit);
+            Draw.xscl = mirrored ? -prev : prev * -Mathf.sign(flipSprite);
 
-        drawRegion(region, wx, wy, weaponRotation, scale);
+            drawParts(unit, mount, wx + ox, wy + oy, weaponRotation, sideScale, mirrored, true);
 
-        if(cellRegion.found()){
-            Draw.color(unit.type.cellColor(unit));
-            drawRegion(cellRegion, wx, wy, weaponRotation, scale);
-            Draw.color();
-        }
+            //fix color
+            unit.type.applyColor(unit);
 
-        if(heatRegion.found() && mount.heat > 0){
-            Draw.color(heatColor, mount.heat);
-            Draw.blend(Blending.additive);
-            drawRegion(heatRegion, wx, wy, weaponRotation, scale);
-            Draw.blend();
-            Draw.color();
+            drawRegion(region, wx + ox, wy + oy, weaponRotation, sideScale);
+
+            if(cellRegion.found()){
+                Draw.color(unit.type.cellColor(unit));
+                drawRegion(cellRegion, wx + ox, wy + oy, weaponRotation, sideScale);
+                Draw.color();
+            }
+
+            if(heatRegion.found() && mount.heat > 0){
+                Draw.color(heatColor, mount.heat);
+                Draw.blend(Blending.additive);
+                drawRegion(heatRegion, wx + ox, wy + oy, weaponRotation, sideScale);
+                Draw.blend();
+                Draw.color();
+            }
+
+            drawParts(unit, mount, wx + ox, wy + oy, weaponRotation, sideScale, mirrored, false);
         }
 
         Draw.xscl = prev;
 
-        if(parts.size > 0){
-            //TODO does it need an outline?
-            float px0 = Draw.xscl, py0 = Draw.yscl;
-            if(scale != 1f){
-                Draw.xscl *= scale;
-                Draw.yscl *= scale;
-            }
-
-            for(int i = 0; i < parts.size; i++){
-                var part = parts.get(i);
-                DrawPart.params.setRecoil(part.recoilIndex >= 0 && mount.recoils != null ? mount.recoils[part.recoilIndex] : mount.recoil);
-                if(!part.under){
-                    unit.type.applyColor(unit);
-                    part.draw(DrawPart.params);
-                }
-            }
-
-            Draw.xscl = px0;
-            Draw.yscl = py0;
-        }
-
         Draw.xscl = 1f;
 
         Draw.z(z);
+    }
+
+    /**
+     * Draws this weapon's animated parts (recoiling barrels, covers) for one side of a paired
+     * module, or once for a single weapon. Called from {@link #draw} before the sprite (under
+     * parts) and after it (over parts).
+     *
+     * <p>RegionPart computes its own width from Draw.xscl/Draw.yscl, so the global draw scale is
+     * set around the loop, exactly as before, to keep the barrels in proportion with the module.</p>
+     */
+    private void drawParts(Unit unit, WeaponMount mount, float x, float y, float weaponRotation, float scale, boolean mirrored, boolean under){
+        if(parts.size == 0) return;
+
+        float px0 = Draw.xscl, py0 = Draw.yscl;
+        if(scale != 1f){
+            Draw.xscl *= scale;
+            Draw.yscl *= scale;
+        }
+
+        DrawPart.params.set(mount.warmup, mount.reload / reload, mount.smoothReload, mount.heat, mount.recoil, mount.charge, x, y, weaponRotation + 90);
+        DrawPart.params.sideMultiplier = mirrored ? -1 : (flipSprite ? -1 : 1);
+
+        for(int i = 0; i < parts.size; i++){
+            var part = parts.get(i);
+            DrawPart.params.setRecoil(part.recoilIndex >= 0 && mount.recoils != null ? mount.recoils[part.recoilIndex] : mount.recoil);
+            if(part.under == under){
+                unit.type.applyColor(unit);
+                part.draw(DrawPart.params);
+            }
+        }
+
+        Draw.xscl = px0;
+        Draw.yscl = py0;
     }
 
     public float range(){
