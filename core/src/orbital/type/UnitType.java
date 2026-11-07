@@ -725,6 +725,11 @@ public class UnitType extends UnlockableContent implements Senseable{
         return turretSlots.contains(slot -> slot.maxSize >= turretSize);
     }
 
+    /** @return true if this unit has a support anchor of a category, large enough for a block. */
+    public boolean hasAnchorFor(SupportModuleCategory category, int blockSize){
+        return supportAnchors.contains(anchor -> anchor.category == category && anchor.maxSize >= blockSize);
+    }
+
     /** @return true if a removable turret can be mounted on this unit right now. */
     public boolean canMount(Turret turret){
         if(turret == null) return false;

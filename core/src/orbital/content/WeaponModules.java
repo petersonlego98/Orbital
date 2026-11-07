@@ -4,6 +4,7 @@ import arc.*;
 import arc.math.*;
 import arc.struct.*;
 import arc.util.*;
+import orbital.entities.bullet.*;
 import orbital.type.*;
 import orbital.type.weapons.*;
 
@@ -28,15 +29,24 @@ public final class WeaponModules{
         public final int size;
         /** dorsal footprint cost in px²; {@code size * TurretSlot.pxTile} squared. */
         public final float cost;
-        /** bundle-less display name; {@code unit} plus weapon label. */
+        /** display name: ship name, tier suffix and shot type, e.g. "Risso T1 · Missile". */
         public final String name;
+        /** hull name with its tier suffix, e.g. {@code "Risso T1"}; plain hull name without a tier. */
+        public final String ship;
+        /** localized shot type of the weapon, e.g. {@code "Missile"}. */
+        public final String shot;
+        /** research tier of the hull, {@code 1-5}; {@code 0} when the hull has none. */
+        public final int tier;
 
-        Definition(UnitType unit, Weapon weapon, int size, float cost, String name){
-            this.unit = unit;
+        Definition(UnitType type, Weapon weapon, int size, float cost, String name, String ship, String shot, int tier){
+            this.unit = type;
             this.weapon = weapon;
             this.size = size;
             this.cost = cost;
             this.name = name;
+            this.ship = ship;
+            this.shot = shot;
+            this.tier = tier;
         }
 
         /** @return the weapon's native sprite side in atlas pixels. */
@@ -51,6 +61,7 @@ public final class WeaponModules{
         public Weapon copy(){
             Weapon copy = weapon.copy();
             copy.name = weapon.name;
+            copy.moduleDisplayName = name;
             copy.removable = true;
             copy.dorsalSource = unit;
             copy.dorsalSourceWeapon = weapon;
@@ -81,7 +92,45 @@ public final class WeaponModules{
 
     private static @Nullable Seq<Definition> cached;
 
+    /**
+     * Tier suffix for the hulls whose weapons become modules.
+     *
+     * <p>Ground and naval hulls use the T1-T5 research tiers documented in
+     * {@code docs/RELATORIO_ARMAS_TERRESTRES_NAVAIS.md}. Air hulls use the N0-N4 hull
+     * levels of {@code docs/RELATORIO_TORRES_COMO_MODULOS.md}, shifted to T1-T5.
+     * Internal, hidden and special hulls are absent from both tables and get no suffix.</p>
+     */
+    private static final ObjectMap<String, Integer> unitTiers = new ObjectMap<>();
+
+    static{
+        //Serpulo/Erekir research tiers: mecha, walker, naval and tank lines.
+        setTier(1, "dagger", "nova", "crawler", "risso", "retusa", "stell", "merui", "elude");
+        setTier(2, "mace", "pulsar", "atrax", "minke", "oxynoe", "locus", "cleroi");
+        setTier(3, "fortress", "quasar", "spiroct", "bryde", "cyerce", "precept", "anthicus");
+        setTier(4, "scepter", "vela", "arkyid", "sei", "aegires", "vanquish", "tecta");
+        setTier(5, "reign", "corvus", "toxopid", "omura", "navanax", "conquer", "collaris");
+
+        //Air hull levels: N0 -> T1 ... N4 -> T5.
+        setTier(1, "mono", "flare", "poly");
+        setTier(2, "alpha", "beta", "gamma", "evoke", "incite", "emanate");
+        setTier(3, "horizon", "avert", "mega", "zenith");
+        setTier(4, "obviate", "quell", "quad");
+        setTier(5, "antumbra", "disrupt", "eclipse", "oct");
+    }
+
+    private static void setTier(int tier, String... names){
+        for(String name : names) unitTiers.put(name, tier);
+    }
+
     private WeaponModules(){}
+
+    /**
+     * @return the research tier of a hull, {@code 1-5}; {@code 0} when it has none.
+     * Used to order the module grids in the loadout dialog.
+     */
+    public static int tierOf(UnitType type){
+        return type == null || type.name == null ? 0 : unitTiers.get(type.name, 0);
+    }
 
     /** @return every combat-capable unit weapon that can become a module. */
     public static Seq<Definition> all(){
@@ -111,7 +160,7 @@ public final class WeaponModules{
         }
 
         cached = list;
-        return cached;
+        return list;
     }
 
     /**
@@ -137,13 +186,73 @@ public final class WeaponModules{
         float regionPx = spritePx(weapon);
         int size = (int)Mathf.clamp(Math.round(regionPx / TurretSlot.pxTile), 1, 5);
         float cost = size * TurretSlot.pxTile;
-        return new Definition(type, weapon, size, cost * cost,
-            (type.localizedName == null ? type.name : type.localizedName) + " · " + label(weapon));
+        int tier = tierOf(type);
+        String hull = type.localizedName == null ? type.name : type.localizedName;
+        String ship = tier == 0 ? hull : hull + " T" + tier;
+        String shot = shotLabel(weapon);
+        return new Definition(type, weapon, size, cost * cost, ship + " · " + shot, ship, shot, tier);
     }
 
-    private static String label(Weapon weapon){
-        if(Core.bundle == null) return weapon.name;
-        return Core.bundle.get("weapon." + weapon.name + ".name", weapon.name);
+    /**
+     * Classifies a weapon by its bullet type. Subclasses of {@link BasicBulletType} are
+     * checked before the generic case, so a missile or an artillery shell is never reduced
+     * to "bullet". Generic bullets have no distinguishing class; burning and healing flags
+     * separate flame shots and healing plasma from ordinary rounds.
+     */
+    private static String shotKey(Weapon weapon){
+        BulletType bullet = weapon.bullet;
+        if(bullet == null) return "bullet";
+
+        if(bullet instanceof MissileBulletType) return "missile";
+        if(bullet instanceof BombBulletType) return "bomb";
+        if(bullet instanceof ShrapnelBulletType) return "shrapnel";
+        if(bullet instanceof EmpBulletType) return "emp";
+        if(bullet instanceof FlakBulletType) return "flak";
+        if(bullet instanceof ArtilleryBulletType) return "artillery";
+        if(bullet instanceof LaserBoltBulletType) return "laser";
+        if(bullet instanceof ContinuousLaserBulletType || bullet instanceof LaserBulletType ||
+            bullet instanceof PointLaserBulletType) return "laser";
+        if(bullet instanceof ContinuousFlameBulletType || bullet instanceof FireBulletType) return "flame";
+        if(bullet instanceof RailBulletType) return "railgun";
+        if(bullet instanceof LightningBulletType) return "lightning";
+        if(bullet instanceof SapBulletType) return "sap";
+        if(bullet instanceof LiquidBulletType || bullet instanceof SpaceLiquidBulletType) return "liquid";
+        if(bullet instanceof ExplosionBulletType) return "explosion";
+        if(bullet instanceof InterceptorBulletType) return "interceptor";
+        if(bullet instanceof ContinuousBulletType) return "continuous";
+        if(bullet.status == StatusEffects.burning) return "flame";
+        if(bullet.healPercent > 0f) return "plasma";
+        return "bullet";
+    }
+
+    /** English fallbacks, used when the bundle has no key for the shot type. */
+    private static String shotFallback(String key){
+        return switch(key){
+            case "missile" -> "Missile";
+            case "laser" -> "Laser";
+            case "artillery" -> "Artillery";
+            case "flak" -> "Flak";
+            case "shrapnel" -> "Shrapnel";
+            case "railgun" -> "Railgun";
+            case "lightning" -> "Lightning";
+            case "emp" -> "EMP";
+            case "bomb" -> "Bomb";
+            case "sap" -> "Sap";
+            case "liquid" -> "Liquid";
+            case "flame" -> "Flame";
+            case "plasma" -> "Plasma";
+            case "explosion" -> "Explosion";
+            case "interceptor" -> "Interceptor";
+            case "continuous" -> "Continuous";
+            default -> "Bullet";
+        };
+    }
+
+    /** @return the localized shot type of any weapon, including native hull weapons. */
+    public static String shotLabel(Weapon weapon){
+        String key = shotKey(weapon);
+        String fallback = shotFallback(key);
+        return Core.bundle == null ? fallback : Core.bundle.get("weapon.module.shot." + key, fallback);
     }
 
     static float spritePx(Weapon weapon){

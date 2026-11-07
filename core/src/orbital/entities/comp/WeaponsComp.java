@@ -248,8 +248,17 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      */
     public @Nullable TurretWeapon mountTurret(Turret turret){
         if(!canMount(turret)) return null;
-        int slotIndex = findTurretSlot(turret);
-        if(slotIndex < 0) return null;
+        return mountTurret(turret, findTurretSlot(turret));
+    }
+
+    /**
+     * Mounts a turret into one specific dorsal slot - the target of the slot grid in the
+     * loadout dialog, where the player picks the slot first and the module second.
+     *
+     * @return the created weapon, or null if that slot does not accept the turret.
+     */
+    public @Nullable TurretWeapon mountTurret(Turret turret, int slotIndex){
+        if(!canMountAt(turret, slotIndex)) return null;
 
         TurretWeapon weapon = TurretWeapon.of(turret);
         //runtime weapons are not covered by UnitType's content init, so load sprites and init here.
@@ -266,6 +275,19 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         return weapon;
     }
 
+    /** @return true if this exact dorsal slot accepts the turret right now. */
+    public boolean canMountAt(Turret turret, int slotIndex){
+        if(turret == null || !TurretWeapon.canAdapt(turret) || type == null) return false;
+        if(slotIndex < 0 || slotIndex >= type.turretSlots.size) return false;
+        if(!type.hasSlotFor(turret.size) || !type.fitsSilhouette(turret.size)) return false;
+        if(loadoutCost() + turret.size * TurretSlot.pxTile * turret.size * TurretSlot.pxTile > type.dorsalBudget()) return false;
+
+        TurretSlot slot = type.turretSlots.get(slotIndex);
+        return slot.maxSize >= turret.size
+            && !slotOccupied(slotIndex)
+            && DorsalGeometry.fitsHull(type, slot.offsetX, slot.offsetY, DorsalGeometry.footprint(turret.size));
+    }
+
     /** @return true if a native unit weapon fits this unit's current runtime loadout. */
     public boolean canMountWeaponModule(WeaponModules.Definition module){
         if(module == null || module.weapon == null || type == null) return false;
@@ -280,10 +302,17 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * @return the created weapon, or null when the weapon does not fit.
      */
     public @Nullable Weapon mountWeaponModule(WeaponModules.Definition module){
-        if(module == null || type == null || !canMountWeaponModule(module)) return null;
+        if(!canMountWeaponModule(module)) return null;
+        return mountWeaponModule(module, findSlot(module.size, module.regionPx()));
+    }
 
-        int slotIndex = findSlot(module.size, module.regionPx());
-        if(slotIndex < 0) return null;
+    /**
+     * Mounts a native unit weapon into one specific dorsal slot.
+     *
+     * @return the created weapon, or null when that slot does not accept the module.
+     */
+    public @Nullable Weapon mountWeaponModule(WeaponModules.Definition module, int slotIndex){
+        if(!canMountWeaponModuleAt(module, slotIndex)) return null;
 
         Weapon weapon = module.copy();
         //runtime weapons are not covered by UnitType's content init, so load sprites and init here.
@@ -304,6 +333,19 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         weapon.slotIndex = slotIndex;
         addWeapon(weapon);
         return weapon;
+    }
+
+    /** @return true if this exact dorsal slot accepts the combat module right now. */
+    public boolean canMountWeaponModuleAt(WeaponModules.Definition module, int slotIndex){
+        if(module == null || module.weapon == null || type == null) return false;
+        if(slotIndex < 0 || slotIndex >= type.turretSlots.size) return false;
+        if(!type.hasSlotFor(module.size) || !type.fitsSilhouette(module.size)) return false;
+        if(loadoutCost() + module.cost > type.dorsalBudget()) return false;
+
+        TurretSlot slot = type.turretSlots.get(slotIndex);
+        return slot.maxSize >= module.size
+            && !slotOccupied(slotIndex)
+            && DorsalGeometry.fitsHull(type, slot.offsetX, slot.offsetY, DorsalGeometry.footprint(module.size));
     }
 
     /** Adds a weapon mount at runtime. Used for removable dorsal turret modules. */

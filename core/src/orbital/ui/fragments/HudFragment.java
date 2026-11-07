@@ -858,6 +858,9 @@ public class HudFragment{
         if(weapon instanceof TurretWeapon turretWeapon){
             return turretWeapon.turret.localizedName;
         }
+        if(weapon.moduleDisplayName != null && !weapon.moduleDisplayName.isEmpty()){
+            return weapon.moduleDisplayName;
+        }
         return Core.bundle.get("weapon." + weapon.name + ".name", weapon.name);
     }
 

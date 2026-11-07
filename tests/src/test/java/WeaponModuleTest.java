@@ -1,10 +1,13 @@
+import arc.Core;
 import orbital.content.*;
+import orbital.entities.bullet.BulletType;
 import orbital.game.*;
 import orbital.type.*;
 import orbital.type.weapons.*;
 import org.junit.jupiter.api.*;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -143,6 +146,162 @@ public class WeaponModuleTest{
         }
         assumeTrue(plain != null, "the content set has no single-sided weapon");
         assertFalse(plain.copy().pairedModule(), "a non-mirrored weapon must stay a single sprite");
+    }
+
+    @Test
+    void moduleNamesUseShipNameTierAndShotType(){
+        //Ground/naval hulls use the research tiers T1-T5; air hulls use N0-N4 shifted to T1-T5.
+        Map<String, String> tiers = Map.ofEntries(
+            Map.entry("dagger", "T1"), Map.entry("nova", "T1"), Map.entry("crawler", "T1"),
+            Map.entry("risso", "T1"), Map.entry("retusa", "T1"), Map.entry("stell", "T1"),
+            Map.entry("merui", "T1"), Map.entry("elude", "T1"),
+            Map.entry("mace", "T2"), Map.entry("pulsar", "T2"), Map.entry("atrax", "T2"),
+            Map.entry("minke", "T2"), Map.entry("oxynoe", "T2"), Map.entry("locus", "T2"),
+            Map.entry("cleroi", "T2"),
+            Map.entry("fortress", "T3"), Map.entry("quasar", "T3"), Map.entry("spiroct", "T3"),
+            Map.entry("bryde", "T3"), Map.entry("cyerce", "T3"), Map.entry("precept", "T3"),
+            Map.entry("anthicus", "T3"),
+            Map.entry("scepter", "T4"), Map.entry("vela", "T4"), Map.entry("arkyid", "T4"),
+            Map.entry("sei", "T4"), Map.entry("aegires", "T4"), Map.entry("vanquish", "T4"),
+            Map.entry("tecta", "T4"),
+            Map.entry("reign", "T5"), Map.entry("corvus", "T5"), Map.entry("toxopid", "T5"),
+            Map.entry("omura", "T5"), Map.entry("navanax", "T5"), Map.entry("conquer", "T5"),
+            Map.entry("collaris", "T5"),
+            Map.entry("mono", "T1"), Map.entry("flare", "T1"), Map.entry("poly", "T1"),
+            Map.entry("alpha", "T2"), Map.entry("beta", "T2"), Map.entry("gamma", "T2"),
+            Map.entry("evoke", "T2"), Map.entry("incite", "T2"), Map.entry("emanate", "T2"),
+            Map.entry("horizon", "T3"), Map.entry("avert", "T3"), Map.entry("mega", "T3"),
+            Map.entry("zenith", "T3"),
+            Map.entry("obviate", "T4"), Map.entry("quell", "T4"), Map.entry("quad", "T4"),
+            Map.entry("antumbra", "T5"), Map.entry("disrupt", "T5"),
+            Map.entry("eclipse", "T5"), Map.entry("oct", "T5")
+        );
+
+        int checked = 0;
+        boolean sawT1 = false, sawT5 = false;
+        for(WeaponModules.Definition module : WeaponModules.all()){
+            String base = module.unit.localizedName == null ? module.unit.name : module.unit.localizedName;
+            String suffix = tiers.get(module.unit.name);
+            String prefix = suffix == null ? base : base + " " + suffix;
+
+            assertTrue(module.name.startsWith(prefix + " · "),
+                module.unit.name + "#" + module.weapon.name + " -> " + module.name);
+            String shot = module.name.substring(prefix.length() + 3);
+            assertFalse(shot.isEmpty(), "a module must name its shot type");
+            assertFalse(shot.contains(" · "), "the shot label must be a single segment");
+            assertEquals(module.name, module.copy().moduleDisplayName,
+                "an installed module must carry the same display name");
+            sawT1 |= "T1".equals(suffix);
+            sawT5 |= "T5".equals(suffix);
+            checked++;
+        }
+
+        assertTrue(checked > 0, "the catalog is empty");
+        assertTrue(sawT1 && sawT5, "both ends of the tier table must be exercised");
+    }
+
+    @Test
+    void shotSuffixDistinguishesWeaponsOfOneHull(){
+        Map<String, Map<String, String>> names = new HashMap<>();
+        for(WeaponModules.Definition module : WeaponModules.all()){
+            names.computeIfAbsent(module.unit.name, k -> new HashMap<>())
+                .put(module.weapon.name, module.name);
+        }
+
+        boolean multi = false, distinct = false;
+        for(Map<String, String> group : names.values()){
+            if(group.size() < 2) continue;
+            multi = true;
+            if(new HashSet<>(group.values()).size() > 1) distinct = true;
+        }
+        assumeTrue(multi, "no hull offers two weapon modules in this content set");
+        assertTrue(distinct, "the shot suffix must give different weapons on one hull different names");
+    }
+
+    /**
+     * Checks the catalog's classification against an independent, class-name based mapping.
+     * Weapon names are mod-prefixed at runtime (e.g. "allure-missiles-mount"), so no
+     * assertion here depends on a weapon's internal name.
+     */
+    @Test
+    void shotTypesFollowBulletClasses(){
+        int checked = 0;
+        boolean missile = false, laser = false, bullet = false;
+        for(WeaponModules.Definition module : WeaponModules.all()){
+            String key = expectedShotKey(module.weapon.bullet);
+            if(key.equals("unknown")) continue; //custom bullet class from a loaded mod
+
+            String fallback = shotDefaults.getOrDefault(key, "Bullet");
+            assertEquals(shotLabel(key, fallback), suffix(module.name),
+                module.unit.name + "#" + module.weapon.name + " -> " + key);
+            missile |= key.equals("missile");
+            laser |= key.equals("laser");
+            bullet |= key.equals("bullet");
+            checked++;
+        }
+
+        assertTrue(checked > 0, "the catalog is empty");
+        assertTrue(missile && laser && bullet,
+            "the catalog must exercise missile, laser and bullet shots");
+    }
+
+    private static String suffix(String name){
+        int sep = name.lastIndexOf(" · ");
+        assertTrue(sep >= 0, "module name has no shot segment: " + name);
+        return name.substring(sep + 3);
+    }
+
+    /** @return the same localized label the catalog resolves for a shot key. */
+    private static String shotLabel(String key, String fallback){
+        return Core.bundle == null ? fallback : Core.bundle.get("weapon.module.shot." + key, fallback);
+    }
+
+    private static final Map<String, String> shotDefaults = Map.ofEntries(
+        Map.entry("bullet", "Bullet"), Map.entry("missile", "Missile"),
+        Map.entry("laser", "Laser"), Map.entry("artillery", "Artillery"),
+        Map.entry("flak", "Flak"), Map.entry("shrapnel", "Shrapnel"),
+        Map.entry("railgun", "Railgun"), Map.entry("lightning", "Lightning"),
+        Map.entry("emp", "EMP"), Map.entry("bomb", "Bomb"),
+        Map.entry("sap", "Sap"), Map.entry("liquid", "Liquid"),
+        Map.entry("flame", "Flame"), Map.entry("plasma", "Plasma"),
+        Map.entry("explosion", "Explosion"), Map.entry("interceptor", "Interceptor"),
+        Map.entry("continuous", "Continuous")
+    );
+
+    /** Independent classification by class name, so the catalog's instanceof chain is checked. */
+    private static String expectedShotKey(BulletType bullet){
+        if(bullet == null) return "bullet";
+        Class<?> type = bullet.getClass();
+        while(type.getSimpleName().isEmpty() && type.getSuperclass() != null){
+            type = type.getSuperclass();
+        }
+        String name = type.getSimpleName();
+
+        return switch(name){
+            case "MissileBulletType" -> "missile";
+            case "BombBulletType" -> "bomb";
+            case "ShrapnelBulletType" -> "shrapnel";
+            case "EmpBulletType" -> "emp";
+            case "FlakBulletType" -> "flak";
+            case "ArtilleryBulletType" -> "artillery";
+            case "LaserBoltBulletType", "LaserBulletType", "ContinuousLaserBulletType",
+                "PointLaserBulletType" -> "laser";
+            case "ContinuousFlameBulletType", "FireBulletType" -> "flame";
+            case "RailBulletType" -> "railgun";
+            case "LightningBulletType" -> "lightning";
+            case "SapBulletType" -> "sap";
+            case "LiquidBulletType", "SpaceLiquidBulletType" -> "liquid";
+            case "ExplosionBulletType" -> "explosion";
+            case "InterceptorBulletType" -> "interceptor";
+            case "ContinuousBulletType" -> "continuous";
+            case "BulletType", "BasicBulletType", "MassDriverBolt", "MultiBulletType",
+                "PointBulletType", "EmptyBulletType" -> {
+                if(bullet.status == StatusEffects.burning) yield "flame";
+                if(bullet.healPercent > 0f) yield "plasma";
+                yield "bullet";
+            }
+            default -> "unknown";
+        };
     }
 
     @Test
