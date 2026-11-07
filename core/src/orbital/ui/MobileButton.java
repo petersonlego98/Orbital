@@ -10,6 +10,10 @@ public class MobileButton extends ImageButton{
         super(icon);
         clicked(listener);
         row();
-        add(text).growX().wrap().center().get().setAlignment(Align.center, Align.center);
+        //The label must fit inside the fixed-size button. Long names such as
+        //"Teste Novos Recursos" would otherwise wrap to three lines and spill
+        //past the bottom edge, so scale the text down a little.
+        Label label = add(text).growX().wrap().center().fontScale(0.85f).get();
+        label.setAlignment(Align.center, Align.center);
     }
 }

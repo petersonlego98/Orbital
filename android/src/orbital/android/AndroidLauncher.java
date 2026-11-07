@@ -197,7 +197,9 @@ public class AndroidLauncher extends AndroidApplication{
 
             @Override
             public void endForceLandscape(){
-                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
+                //The app is landscape-only (see AndroidManifest), so restoring "user" here
+                //would wrongly allow the UI to rotate to portrait.
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             }
 
         }, new AndroidApplicationConfiguration(){{

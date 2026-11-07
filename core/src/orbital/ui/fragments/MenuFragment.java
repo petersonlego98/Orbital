@@ -208,7 +208,7 @@ public class MenuFragment{
         MobileButton
             play = new MobileButton(Icon.play, "@starmap", () -> checkPlay(ui.planet::show)),
             expedition = new MobileButton(Icon.terrain, "Expedição", () -> checkPlay(ui.expedition::show)),
-            testFeatures = new MobileButton(Icon.terrain, "@mode.testfeatures.name", () -> checkPlay(TestNewFeaturesMode::start)),
+            testFeatures = new MobileButton(Icon.terrain, "Novidades", () -> checkPlay(TestNewFeaturesMode::start)),
             custom = new MobileButton(Icon.rightOpenOut, "@customgame", () -> checkPlay(ui.custom::show)),
             maps = new MobileButton(Icon.download, "@loadgame", () -> checkPlay(ui.load::show)),
             join = new MobileButton(Icon.add, "@joingame", () -> checkPlay(ui.join::show)),

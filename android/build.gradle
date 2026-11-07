@@ -2,6 +2,8 @@
 // Build debug APK:   ./gradlew :android:assembleDebug
 // Build release APK: ./gradlew :android:assembleRelease  (requires keystore or will be unsigned)
 // Install on device: ./gradlew :android:installDebug
+// Launcher icons:    java tools/ArtConverter.java android
+//                    (writes res/mipmap-* and store/ic_launcher-playstore.png)
 
 apply plugin: "com.android.application"
 
@@ -77,16 +79,20 @@ android{
 
     buildTypes{
         debug{
-            minifyEnabled false
+            // R8 is required even for debug: it desugars default interface methods
+            // for precompiled Arc classes (AndroidApplication), avoiding
+            // AbstractMethodError at runtime. Names stay readable (-dontobfuscate).
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles("proguard-rules.pro")
             debuggable true
             applicationIdSuffix ".debug"
             versionNameSuffix "-debug"
         }
         release{
-            // Note: enabling minify/R8 requires careful ProGuard rules for Rhino/reflection.
-            // Keep disabled until rules are validated to avoid stripping mod-loading classes.
-            minifyEnabled false
-            shrinkResources false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles("proguard-rules.pro")
             debuggable false
             if(project.hasProperty("RELEASE_STORE_FILE")){
                 signingConfig signingConfigs.release

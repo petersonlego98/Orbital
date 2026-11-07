@@ -10,6 +10,7 @@ import java.util.*;
 /**
  * Generates the ORBITAL key-art assets from the versioned poster.
  * Run from the repository root: java tools/ArtConverter.java
+ * Android launcher icons only:   java tools/ArtConverter.java android
  * No external libraries are required (JDK 17+ single-file source mode).
  */
 public class ArtConverter{
@@ -17,6 +18,12 @@ public class ArtConverter{
     static final Path source = root.resolve("core/assets-raw/keyart/orbital-keyart.jpg");
 
     public static void main(String[] args) throws Exception{
+        if(args.length > 0 && args[0].equals("android")){
+            writeAndroidIcons();
+            System.out.println("done");
+            return;
+        }
+
         BufferedImage raw = ImageIO.read(source.toFile());
         if(raw == null) throw new IllegalStateException("cannot decode " + source);
 
@@ -198,11 +205,25 @@ public class ArtConverter{
     static BufferedImage drawIcon(int size){
         BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
+        prepare(g, size);
+        float u = size / (float)ICON_MASTER;
+
+        drawBackground(g, u);
+        drawEmblem(g, u);
+
+        g.dispose();
+        return img;
+    }
+
+    static Graphics2D prepare(Graphics2D g, int size){
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         float u = size / (float)ICON_MASTER;
         g.scale(u, u);
+        return g;
+    }
 
+    static void drawBackground(Graphics2D g, float u){
         //full-bleed space background: the shell does not pad icons for us
         g.setPaint(new LinearGradientPaint(0, 0, 0, ICON_MASTER,
             new float[]{0f, 0.55f, 1f},
@@ -214,7 +235,9 @@ public class ArtConverter{
         nebula(g, 232, 452, 330, NEBULA_BLUE, 0.55f);
         if(u >= 0.15f) nebula(g, 468, 404, 190, EMBER, 0.35f);
         stars(g, u);
+    }
 
+    static void drawEmblem(Graphics2D g, float u){
         final float pcx = 262f, pcy = 300f, pr = 148f, rx = 228f, ry = 78f;
 
         //halo behind the disc
@@ -296,9 +319,6 @@ public class ArtConverter{
             }
             sparkle(g, 84f, 88f, 34f, 6.5f);
         }
-
-        g.dispose();
-        return img;
     }
 
     static Arc2D arc(Ellipse2D ellipse, double start, double extent){
@@ -336,6 +356,144 @@ public class ArtConverter{
         star.closePath();
         g.setPaint(argb(0xffffff, 0.9f));
         g.fill(star);
+    }
+
+    // ---------- Android launcher icons ----------
+    //
+    // The launcher icon is drawn at each density's final resolution, just like the
+    // Windows ICO entries. Adaptive icons (API 26+) use two layers: the full-bleed
+    // space background and a transparent foreground whose emblem is scaled into the
+    // 72dp safe area of the 108dp canvas. That keeps the rings inside the mask
+    // instead of having the launcher crop them.
+
+    static final String[] ANDROID_DENSITIES = {"mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"};
+    static final int[] ANDROID_LEGACY = {48, 72, 96, 144, 192};
+    static final int[] ANDROID_ADAPTIVE = {108, 162, 216, 324, 432};
+    static final float ANDROID_ART_SCALE = 0.66f;
+
+    static void writeAndroidIcons() throws Exception{
+        Path res = root.resolve("android/res");
+
+        for(int i = 0; i < ANDROID_DENSITIES.length; i++){
+            Path dir = res.resolve("mipmap-" + ANDROID_DENSITIES[i]);
+            BufferedImage legacy = drawIcon(ANDROID_LEGACY[i]);
+
+            //pre-API 26 fallback, including the round variant some launchers request
+            write(legacy, dir.resolve("ic_launcher.png"));
+            write(round(legacy), dir.resolve("ic_launcher_round.png"));
+
+            //adaptive icon layers at 108dp (the launcher masks the outer bleed)
+            write(drawAdaptiveBackground(ANDROID_ADAPTIVE[i]), dir.resolve("ic_launcher_background.png"));
+            write(drawAdaptiveForeground(ANDROID_ADAPTIVE[i]), dir.resolve("ic_launcher_foreground.png"));
+            write(drawAdaptiveMonochrome(ANDROID_ADAPTIVE[i]), dir.resolve("ic_launcher_monochrome.png"));
+        }
+
+        Path anydpi = res.resolve("mipmap-anydpi-v26");
+        String xml = adaptiveIconXml();
+        writeText(xml, anydpi.resolve("ic_launcher.xml"));
+        writeText(xml, anydpi.resolve("ic_launcher_round.xml"));
+
+        //Play Store listing icon: opaque 512x512 PNG
+        write(drawIcon(512), root.resolve("android/store/ic_launcher-playstore.png"));
+    }
+
+    static BufferedImage drawAdaptiveBackground(int size){
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        prepare(g, size);
+        drawBackground(g, size / (float)ICON_MASTER);
+        g.dispose();
+        return img;
+    }
+
+    static BufferedImage drawAdaptiveForeground(int size){
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        float u = adaptiveTransform(g, size);
+        drawEmblem(g, u);
+        g.dispose();
+        return img;
+    }
+
+    static BufferedImage drawAdaptiveMonochrome(int size){
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        float u = adaptiveTransform(g, size);
+        drawMonochromeEmblem(g, u);
+        g.dispose();
+        return img;
+    }
+
+    /** Centers the 512-unit emblem in the adaptive canvas and scales it into the safe area. */
+    static float adaptiveTransform(Graphics2D g, int size){
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        float u = size / (float)ICON_MASTER * ANDROID_ART_SCALE;
+        g.translate(size / 2f, size / 2f);
+        g.scale(u, u);
+        g.translate(-ICON_MASTER / 2f, -ICON_MASTER / 2f);
+        return u;
+    }
+
+    static void drawMonochromeEmblem(Graphics2D g, float u){
+        final float pcx = 262f, pcy = 300f, pr = 148f, rx = 228f, ry = 78f;
+        Ellipse2D ring = new Ellipse2D.Float(pcx - rx, pcy - ry, rx * 2f, ry * 2f);
+        float stroke = Math.min(Math.max(pr * 0.18f, 2.4f / u), pr * 0.44f);
+        Shape disc = new Ellipse2D.Float(pcx - pr, pcy - pr, pr * 2f, pr * 2f);
+
+        g.setPaint(argb(0xffffff, 1f));
+        g.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+        //ring behind the planet
+        g.rotate(-0.30, pcx, pcy);
+        g.draw(arc(ring, 180f, 180f));
+        g.rotate(0.30, pcx, pcy);
+
+        g.fill(disc);
+
+        //ring in front of the planet
+        g.rotate(-0.30, pcx, pcy);
+        g.draw(arc(ring, 0f, 180f));
+        g.rotate(0.30, pcx, pcy);
+
+        float mx = 418f, my = 106f, mr = 31f;
+        g.fill(new Ellipse2D.Float(mx - mr, my - mr, mr * 2f, mr * 2f));
+    }
+
+    /** Circular legacy icon for launchers that request android:roundIcon on API 25. */
+    static BufferedImage round(BufferedImage src){
+        int size = src.getWidth();
+        BufferedImage mask = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D mg = mask.createGraphics();
+        mg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        mg.setColor(Color.WHITE);
+        mg.fill(new Ellipse2D.Float(0, 0, size, size));
+        mg.dispose();
+
+        BufferedImage out = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.drawImage(src, 0, 0, null);
+        g.setComposite(AlphaComposite.DstIn);
+        g.drawImage(mask, 0, 0, null);
+        g.dispose();
+        return out;
+    }
+
+    static String adaptiveIconXml(){
+        return """
+            <?xml version="1.0" encoding="utf-8"?>
+            <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+                <background android:drawable="@mipmap/ic_launcher_background"/>
+                <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+                <monochrome android:drawable="@mipmap/ic_launcher_monochrome"/>
+            </adaptive-icon>
+            """;
+    }
+
+    static void writeText(String text, Path out) throws Exception{
+        Files.createDirectories(out.getParent());
+        Files.writeString(out, text, StandardCharsets.UTF_8);
+        System.out.printf("wrote %-52s %8d bytes%n", root.relativize(out), Files.size(out));
     }
 
     // ---------- ICO (BMP/DIB entries) ----------
