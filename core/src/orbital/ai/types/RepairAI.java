@@ -10,6 +10,9 @@ import orbital.world.blocks.ConstructBlock.*;
 public class RepairAI extends AIController{
     public static float retreatDst = 160f, fleeRange = 310f, retreatDelay = Time.toSeconds * 3f;
 
+    /** Own timer slot: {@code timerTarget} (0) belongs to weapon retargeting in {@link #updateWeapons()}. */
+    private static final int timerDamaged = timerTarget5;
+
     @Nullable Teamc avoid;
     float retreatTimer;
     Building damagedTarget;
@@ -24,9 +27,11 @@ public class RepairAI extends AIController{
                 shoot = true;
             }
 
-            unit.controlWeapons(shoot);
+            //the repair beam steers the hull's own weapons; a mounted dorsal turret keeps the
+            //target its own targeting picked, or it would be silenced while the unit repairs
+            unit.controlNonTurretWeapons(shoot);
         }else if(target == null){
-            unit.controlWeapons(false);
+            unit.controlNonTurretWeapons(false);
         }
 
         boolean hold = hasStance(UnitStance.holdPosition);
@@ -67,14 +72,16 @@ public class RepairAI extends AIController{
 
     @Override
     public void updateTargeting(){
-        if(timer.get(timerTarget, 15)){
+        if(timer.get(timerDamaged, 15)){
             damagedTarget = Units.findDamagedTile(unit.team, unit.x, unit.y);
             if(damagedTarget instanceof ConstructBuild) damagedTarget = null;
         }
 
-        if(damagedTarget == null){
-            super.updateTargeting();
-        }else{
+        //weapons keep their own targeting while the unit repairs: a dorsal turret mounted on a
+        //repair ship must still engage whatever its own range and ammo allow
+        if(unit.hasWeapons()) updateWeapons();
+
+        if(damagedTarget != null){
             this.target = damagedTarget;
         }
     }

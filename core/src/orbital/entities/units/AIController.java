@@ -20,10 +20,12 @@ import static orbital.Vars.*;
 public class AIController implements UnitController{
     protected static final Vec2 vec = new Vec2();
     protected static final float rotateBackTimer = 60f * 5f;
-    protected static final int timerTarget = 0, timerTarget2 = 1, timerTarget3 = 2, timerTarget4 = 3;
+    protected static final int timerTarget = 0, timerTarget2 = 1, timerTarget3 = 2, timerTarget4 = 3, timerTarget5 = 4;
 
     protected Unit unit;
-    protected Interval timer = new Interval(4);
+    //slot 4 is free: a command controller that needs its own cadence must never share slot 0 with
+    //weapon retargeting, or `retarget()` is starved and weapons stop finding new targets
+    protected Interval timer = new Interval(5);
     protected @Nullable AIController fallback;
     protected float noTargetTime;
 
@@ -169,14 +171,59 @@ public class AIController implements UnitController{
         timer.reset(timerTarget, -1f);
     }
 
+    /**
+     * Range the main-target search may use.
+     *
+     * <p>Dorsal turret modules may out-range the hull's own weapons - a 3x3 Ripple on a Mono
+     * reaches more than twice as far as the hull's native gun. Since a single-target hull hands
+     * this very target to every mount, searching only within {@code unit.range()} would leave a
+     * mounted turret blind to everything the hull itself could not engage.</p>
+     */
+    private float mainTargetRange(){
+        float range = unit.range();
+        for(var mount : unit.mounts){
+            if(mount.weapon instanceof TurretWeapon turret){
+                range = Math.max(range, turret.range());
+            }
+        }
+        return range;
+    }
+
+    /** @return whether the main-target search may pick flying targets. */
+    private boolean mainTargetAir(){
+        boolean air = unit.type.targetAir;
+        for(var mount : unit.mounts){
+            if(mount.weapon instanceof TurretWeapon turret && turret.bullet != null){
+                air |= turret.bullet.collidesAir;
+            }
+        }
+        return air;
+    }
+
+    /**
+     * @return whether the main-target search may pick ground units and blocks.
+     *
+     * <p>Builder hulls (Poly, Mend-projector ships) declare {@code targetGround = false} and
+     * their own missiles fly over buildings. A dorsal turret with ground-ammo must still be able
+     * to shoot them, otherwise the module is drawn on the hull and never fires.</p>
+     */
+    private boolean mainTargetGround(){
+        boolean ground = unit.type.targetGround;
+        for(var mount : unit.mounts){
+            if(mount.weapon instanceof TurretWeapon turret && turret.bullet != null){
+                ground |= turret.bullet.collidesGround;
+            }
+        }
+        return ground;
+    }
+
     public void updateWeapons(){
         float rotation = unit.rotation - 90;
         boolean ret = retarget();
 
         if(ret){
-            target = findMainTarget(unit.x, unit.y, unit.range(), unit.type.targetAir, unit.type.targetGround);
+            target = findMainTarget(unit.x, unit.y, mainTargetRange(), mainTargetAir(), mainTargetGround());
         }
-
         noTargetTime += Time.delta;
 
         if(invalid(target)){

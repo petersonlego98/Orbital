@@ -2,6 +2,7 @@ package orbital.entities.comp;
 
 import arc.Core;
 import arc.math.geom.*;
+import arc.struct.*;
 import arc.util.*;
 import orbital.annotations.Annotations.*;
 import orbital.content.*;
@@ -59,6 +60,49 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
             if(mount.weapon.removable) count++;
         }
         return count;
+    }
+
+    /**
+     * @return every item ammo this unit's turrets already accept.
+     *
+     * <p>The hull's native hardpoints count too: a Duo welded to a mono defines the ammo the unit
+     * carries exactly like a module the player mounted later. A unit with no item-ammo turret
+     * returns an empty array - its first turret is still free to pick any ammo.</p>
+     */
+    public Item[] loadoutAmmo(){
+        Seq<Item> ammo = new Seq<>(Item.class);
+        for(WeaponMount mount : mounts){
+            if(mount.weapon instanceof TurretWeapon turret) ammo.addAll(turret.ammoItems());
+        }
+        return ammo.toArray(Item.class);
+    }
+
+    /**
+     * @return whether the turret's ammo is compatible with what this unit already carries.
+     *
+     * <p>One dorsal loadout shares a single ammo supply, so once a turret defines it, every turret
+     * mounted afterwards may only accept ammo the unit already has: otherwise part of that supply
+     * would be stranded behind a turret that can never use it. Turrets without item ammo (power
+     * turrets) are always compatible, since they draw no items at all.</p>
+     */
+    public boolean ammoCompatible(Turret turret){
+        if(!ammoDefined()) return true;
+
+        Seq<Item> ammo = new Seq<>(Item.class);
+        for(Item item : loadoutAmmo()) ammo.add(item);
+
+        for(Item item : TurretWeapon.ammoItems(turret)){
+            if(!ammo.contains(item, true)) return false;
+        }
+        return true;
+    }
+
+    /** @return true if any mounted turret accepts item ammo - that is, the unit's ammo is defined. */
+    private boolean ammoDefined(){
+        for(WeaponMount mount : mounts){
+            if(mount.weapon instanceof TurretWeapon turret && turret.ammoItems().size > 0) return true;
+        }
+        return false;
     }
 
     private SupportMount[] supports(){
@@ -234,6 +278,8 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     /** @return true if the turret fits this unit's current runtime loadout. */
     public boolean canMount(Turret turret){
         if(turret == null || !TurretWeapon.canAdapt(turret)) return false;
+        //one supply per loadout: the turret's ammo must be part of what the unit already carries
+        if(!ammoCompatible(turret)) return false;
         if(!type.hasSlotFor(turret.size) || !type.fitsSilhouette(turret.size)) return false;
         if(mountedTurrets() >= type.turretSlots.size) return false;
 
@@ -278,6 +324,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     /** @return true if this exact dorsal slot accepts the turret right now. */
     public boolean canMountAt(Turret turret, int slotIndex){
         if(turret == null || !TurretWeapon.canAdapt(turret) || type == null) return false;
+        if(!ammoCompatible(turret)) return false;
         if(slotIndex < 0 || slotIndex >= type.turretSlots.size) return false;
         if(!type.hasSlotFor(turret.size) || !type.fitsSilhouette(turret.size)) return false;
         if(loadoutCost() + turret.size * TurretSlot.pxTile * turret.size * TurretSlot.pxTile > type.dorsalBudget()) return false;
@@ -394,6 +441,26 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         }
         isRotate = rotate;
         isShooting = shoot;
+    }
+
+    /**
+     * Drives the hull's own weapons, leaving {@link TurretWeapon} mounts alone.
+     *
+     * <p>Command controllers (repair, for instance) steer the hull's own weapon while they work;
+     * a mounted dorsal turret must keep the target its own targeting picked, otherwise the
+     * module is drawn on the hull and never fires.</p>
+     */
+    void controlNonTurretWeapons(boolean rotateShoot){
+        controlNonTurretWeapons(rotateShoot, rotateShoot);
+    }
+
+    void controlNonTurretWeapons(boolean rotate, boolean shoot){
+        for(WeaponMount mount : mounts){
+            if(mount.weapon.controllable && !(mount.weapon instanceof TurretWeapon)){
+                mount.rotate = rotate;
+                mount.shoot = shoot;
+            }
+        }
     }
 
     void aim(Position pos){

@@ -1,5 +1,7 @@
 package orbital.type;
 
+import arc.struct.*;
+import arc.util.Nullable;
 import orbital.entities.bullet.*;
 import orbital.entities.part.*;
 import orbital.gen.Unit;
@@ -106,6 +108,25 @@ public class TurretWeapon extends Weapon{
         if(turret instanceof ItemTurret itemTurret) return itemTurret.ammoTypes.size > 0;
         if(turret instanceof PowerTurret powerTurret) return powerTurret.shootType != null;
         return false;
+    }
+
+    /**
+     * @return every item the turret accepts as ammo, in content order.
+     *
+     * <p>Power turrets return an empty list: they run on energy, so they never compete for the
+     * item supply a hull carries - which is what makes them compatible with any loadout.</p>
+     */
+    public static Seq<Item> ammoItems(@Nullable Turret turret){
+        Seq<Item> items = new Seq<>(Item.class);
+        if(turret instanceof ItemTurret itemTurret){
+            for(Item item : itemTurret.ammoTypes.keys()) items.add(item);
+        }
+        return items;
+    }
+
+    /** @return every item ammo the block turret behind this weapon accepts. */
+    public Seq<Item> ammoItems(){
+        return ammoItems(turret);
     }
 
     /** Creates a weapon from a turret block, using its first ammo type. */

@@ -68,6 +68,14 @@ public class HudFragment{
     private long turretBarSignature = Long.MIN_VALUE;
     /** turret add/remove menu for the selected unit. */
     private @Nullable TurretLoadoutDialog turretDialog;
+    /** block picker of the enemy-structure tool of the test mode. */
+    private @Nullable EnemyBuildingDialog enemyDialog;
+    /** last armed block/team/mode of the enemy-structure tool, used to rebuild its panel only on change. */
+    private long enemySignature = Long.MIN_VALUE;
+    /** reused plan for the ghost preview of the armed enemy structure. */
+    private final BuildPlan enemyPlan = new BuildPlan();
+    /** the ghost preview never searches for neighboring plans, so an empty list is enough. */
+    private final Seq<BuildPlan> emptyPlans = new Seq<>();
 
     private static ObjectSet<String> favoriteBlocks = new ObjectSet<>();
     private static String lastFavorited = null;
@@ -785,8 +793,193 @@ public class HudFragment{
                         Unit unit = selectedUnit();
                         return unit == null || unit.type.turretSlots.isEmpty();
                     });
+                buildEnemyBuildings(panel);
             }).pad(4f);
         });
+
+        buildEnemyBuildPlacer(parent);
+    }
+
+    /**
+     * Arm / disarm section of the test-mode panel: enemy team, block to drop, remove mode.
+     *
+     * <p>It is rebuilt only when the armed block, team or mode changes (same trick as the turret
+     * bar), so the labels and toggles stay in sync without flickering every frame.</p>
+     */
+    private void buildEnemyBuildings(Table panel){
+        float width = mobile ? 188f : 248f;
+
+        Table section = new Table();
+        section.left();
+        panel.add(section).width(width).left().row();
+        section.update(() -> {
+            long signature = enemyToolSignature();
+            if(signature != enemySignature){
+                enemySignature = signature;
+                rebuildEnemyBuildings(section, width);
+            }
+        });
+    }
+
+    private long enemyToolSignature(){
+        //block ids, team ids, the remove flag and the rotation are the only things that change the section
+        long block = TestNewFeaturesMode.enemyBlock == null ? -1 : TestNewFeaturesMode.enemyBlock.id;
+        return block * 31L + (TestNewFeaturesMode.enemyRemoving ? 7 : 0) + (TestNewFeaturesMode.enemyTeam == null ? 0 : TestNewFeaturesMode.enemyTeam.id) + control.input.rotation * 3L;
+    }
+
+    private void rebuildEnemyBuildings(Table section, float width){
+        section.clearChildren();
+        section.left();
+
+        section.add("@mode.testfeatures.buildings").color(Pal.accent).left().padTop(6f).padBottom(4f).row();
+
+        //team row: one toggle per team that can hold enemy structures
+        section.table(teams -> {
+            teams.left();
+            teams.defaults().growX().padRight(2f).padBottom(2f).height(24f);
+            for(Team team : TestNewFeaturesMode.enemyTeams()){
+                teams.button(team.localized(), Styles.flatToggleMenut, () -> TestNewFeaturesMode.enemyTeam = team)
+                    .update(b -> b.setChecked(TestNewFeaturesMode.enemyTeam == team)).get();
+            }
+        }).width(width).left().row();
+
+        section.label(() -> {
+            Block block = TestNewFeaturesMode.enemyBlock;
+            StringBuilder text = new StringBuilder(Core.bundle.format("mode.testfeatures.buildings.team", TestNewFeaturesMode.enemyTeam.localized()));
+            text.append('\n').append(TestNewFeaturesMode.enemyRemoving
+                ? Core.bundle.get("mode.testfeatures.buildings.removing")
+                : block == null
+                ? Core.bundle.get("mode.testfeatures.buildings.hint")
+                : Core.bundle.format("mode.testfeatures.buildings.tap", block.localizedName) + "\n[lightgray]" +
+                Core.bundle.format("mode.testfeatures.buildings.rotate", control.input.rotation));
+            return text.toString();
+        }).color(Color.lightGray).width(width).wrap().left().padBottom(4f).row();
+
+        //block button: arms a block, and disarms it (same as cancel) when clicked again
+        section.button(b -> {
+            b.left();
+            b.image().size(mobile ? 24f : 28f).padRight(6f).update(i -> {
+                Block block = TestNewFeaturesMode.enemyBlock;
+                i.setDrawable(block == null ? Icon.add : new TextureRegionDrawable(block.uiIcon));
+                i.setScaling(Scaling.fit);
+            });
+            b.label(() -> TestNewFeaturesMode.enemyBlock == null
+                ? Core.bundle.get("mode.testfeatures.buildings.select")
+                : TestNewFeaturesMode.enemyBlock.localizedName).growX().wrap();
+        }, Styles.defaultt, () -> {
+            if(TestNewFeaturesMode.enemyBlock == null){
+                openEnemyBuildingDialog();
+            }else{
+                TestNewFeaturesMode.enemyBlock = null;
+            }
+        }).growX().height(mobile ? 36f : 40f).left().padBottom(2f).row();
+
+        section.button("@mode.testfeatures.buildings.remove", Icon.cancel, Styles.cleart, () -> {
+            TestNewFeaturesMode.enemyRemoving = !TestNewFeaturesMode.enemyRemoving;
+            if(TestNewFeaturesMode.enemyRemoving) TestNewFeaturesMode.enemyBlock = null;
+        }).checked(b -> TestNewFeaturesMode.enemyRemoving).growX().left().padBottom(2f).row();
+
+        section.button(b -> b.add(Core.bundle.format("mode.testfeatures.buildings.clear", TestNewFeaturesMode.enemyTeam.localized())).left(),
+            Styles.cleart, this::clearEnemyStructures).growX().left();
+    }
+
+    /**
+     * Invisible full-screen click target for the enemy-structure tool.
+     *
+     * <p>It lives at the back of the HUD group, so every real HUD widget still receives its own
+     * taps. It is only touchable while the tool is armed: a tap on empty space then drops (or
+     * removes) a structure for the enemy team instead of selecting units or aiming.</p>
+     */
+    private void buildEnemyBuildPlacer(Group parent){
+        Table placer = new Table();
+        placer.name = "enemybuildplacer";
+        placer.touchable = Touchable.disabled;
+        placer.update(() -> placer.touchable = TestNewFeaturesMode.enemyToolArmed() ? Touchable.enabled : Touchable.disabled);
+        placer.clicked(this::placeEnemyAtCursor);
+        //right click disarms the tool: it also blocks aiming, which is how the normal build menu
+        //is dismissed, so the player can always get back to shooting in one click
+        placer.addListener(new ClickListener(){
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
+                if(button != KeyCode.mouseRight) return false;
+
+                TestNewFeaturesMode.enemyBlock = null;
+                TestNewFeaturesMode.enemyRemoving = false;
+                event.stop();
+                return true;
+            }
+        });
+
+        parent.addChild(placer);
+        placer.setFillParent(true);
+        placer.toBack();
+
+        //the plan preview uses the same layer the regular build plans are drawn on
+        Events.run(Trigger.drawOver, () -> Draw.draw(Layer.plans, this::drawEnemyPlan));
+    }
+
+    /** Drops (or removes) the enemy structure under the cursor. */
+    private void placeEnemyAtCursor(){
+        if(!state.isGame() || !TestNewFeaturesMode.active()) return;
+
+        int x = World.toTile(Core.input.mouseWorldX()), y = World.toTile(Core.input.mouseWorldY());
+
+        if(TestNewFeaturesMode.enemyRemoving){
+            Block previous = world.tile(x, y) == null ? null : world.tile(x, y).block();
+            if(TestNewFeaturesMode.removeEnemyBuilding(x, y) && previous != null){
+                previous.breakSound.at(x * tilesize, y * tilesize);
+            }
+            return;
+        }
+
+        Block block = TestNewFeaturesMode.enemyBlock;
+        if(block == null) return;
+
+        if(TestNewFeaturesMode.placeEnemyBuilding(block, TestNewFeaturesMode.enemyTeam, x, y, control.input.rotation, block.nextConfig())){
+            block.placeSound.at(Core.input.mouseWorldX(), Core.input.mouseWorldY());
+        }
+    }
+
+    /** Removes every structure of the armed team from the test map. */
+    private void clearEnemyStructures(){
+        int removed = TestNewFeaturesMode.clearEnemyBuildings(TestNewFeaturesMode.enemyTeam);
+        ui.showInfoToast(Core.bundle.format(removed > 0 ? "mode.testfeatures.buildings.cleared" : "mode.testfeatures.buildings.none",
+            TestNewFeaturesMode.enemyTeam.localized(), removed), 3f);
+    }
+
+    private void openEnemyBuildingDialog(){
+        if(enemyDialog == null){
+            enemyDialog = new EnemyBuildingDialog();
+        }
+        enemyDialog.show(() -> {});
+    }
+
+    /** Draws the ghost of the armed enemy structure at the cursor, like a regular build plan. */
+    private void drawEnemyPlan(){
+        if(!state.isGame() || !TestNewFeaturesMode.enemyToolArmed()) return;
+
+        Tile tile = world.tileWorld(Core.input.mouseWorldX(), Core.input.mouseWorldY());
+        if(tile == null) return;
+
+        Block block = TestNewFeaturesMode.enemyBlock;
+        int x = tile.x, y = tile.y;
+        if(block != null && block.isMultiblock()){
+            //preview the tile the structure would really land on: multiblocks clamp to their center
+            x = Mathf.clamp(x, (block.size - 1) / 2, world.width() - block.size / 2 - 1);
+            y = Mathf.clamp(y, (block.size - 1) / 2, world.height() - block.size / 2 - 1);
+        }
+
+        Lines.stroke(2f, TestNewFeaturesMode.enemyTeam.color);
+        Lines.rect(x * tilesize - tilesize / 2f, y * tilesize - tilesize / 2f, block == null ? tilesize : block.size * tilesize, block == null ? tilesize : block.size * tilesize);
+        Draw.reset();
+
+        if(block == null || block.uiIcon == null) return;
+
+        enemyPlan.set(x, y, control.input.rotation, block);
+        enemyPlan.config = block.nextConfig();
+        enemyPlan.animScale = 1f;
+        block.drawPlan(enemyPlan, emptyPlans, true);
+        Draw.reset();
     }
 
     /** @return the first selected unit, or the unit currently controlled by the player. */

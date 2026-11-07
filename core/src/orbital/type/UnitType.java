@@ -711,12 +711,22 @@ public class UnitType extends UnlockableContent implements Senseable{
         return false;
     }
 
-    /** @return true if the turret silhouette fits inside the hull's dorsal area. */
+    /**
+     * @return true if the turret silhouette fits inside the hull's dorsal area.
+     *
+     * <p>Both ratios are taken from the same space - {@link #spriteArea()}, the dorsal area the
+     * hull allots to modules - so a module is measured against the room it actually has. Taking
+     * coverage from that area while measuring width against the raw sprite made the two ratios
+     * disagree: the 40px mono has a 2300px² dorsal area (a 48px side, 67% of it taken by a 1x1)
+     * but a 40px sprite (80%), so the very module {@code TurretLoadouts} bolts onto it - the Duo,
+     * a 1x1 block - was rejected by the catalogue, which came back empty after it was removed.</p>
+     */
     public boolean fitsSilhouette(int turretSize){
         if(turretSize <= 0) return false;
         float footprint = turretSize * TurretSlot.pxTile;
-        float coverage = (footprint * footprint) / spriteArea();
-        float widthRatio = footprint / Math.max(spriteWidth(), spriteHeight());
+        float area = spriteArea();
+        float coverage = (footprint * footprint) / area;
+        float widthRatio = footprint / Mathf.sqrt(area);
         return coverage <= 0.5f && widthRatio <= 0.7f;
     }
 

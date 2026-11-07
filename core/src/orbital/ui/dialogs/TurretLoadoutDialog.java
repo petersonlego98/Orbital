@@ -126,7 +126,12 @@ public class TurretLoadoutDialog extends BaseDialog{
         list.add("@turret.loadout.installed").style(Styles.outlineLabel).left().padBottom(4f).row();
         rebuildInstalled();
 
-        list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
+        list.image().color(Pal.accent).height(3f).growX().padBottom(8f).row();
+        //what the unit already carries, and the rule that follows from it - the catalogue below
+        //only offers turrets that run on that ammo
+        list.label(() -> Core.bundle.format("turret.loadout.ammo", ammoText(unit))).color(Color.lightGray)
+            .left().wrap().padBottom(2f).row();
+        list.add("@turret.loadout.ammo.rule").color(Color.lightGray).left().wrap().padBottom(6f).row();
         heading("@turret.loadout.available", turretKeys());
         rebuildTurretGrid();
 
@@ -260,8 +265,7 @@ public class TurretLoadoutDialog extends BaseDialog{
                     }
                 }, weapon == null ? null : new SlotDrag(weapon));
 
-            box.setBackground(armed || hoverSlot == index
-                ? ((TextureRegionDrawable)Tex.pane).tint(Pal.accent) : Tex.pane);
+            box.setBackground(armed || hoverSlot == index ? tinted(Tex.pane, Pal.accent) : Tex.pane);
             box.userObject = new SlotTag(index);
             slotBoxes.add(box);
 
@@ -371,6 +375,20 @@ public class TurretLoadoutDialog extends BaseDialog{
         }
     }
 
+    /**
+     * @return a tinted copy of a drawable, or the original when it cannot be tinted.
+     *
+     * <p>{@code Drawable} has no {@code tint} method: {@link NinePatchDrawable} and
+     * {@link TextureRegionDrawable} each provide their own. {@code Tex.pane} is a scaled nine
+     * patch, so casting it to {@code TextureRegionDrawable} - as an earlier version of this
+     * dialog did - crashed the game the moment a slot was highlighted.</p>
+     */
+    public static Drawable tinted(Drawable drawable, Color color){
+        if(drawable instanceof NinePatchDrawable patch) return patch.tint(color);
+        if(drawable instanceof TextureRegionDrawable region) return region.tint(color);
+        return drawable;
+    }
+
     /** how many slot boxes fit on one row of the rail */
     private int boxesPerRow(){
         return mobile ? 2 : Mathf.clamp((int)(slotWidth() / 132f), 3, 6);
@@ -453,6 +471,22 @@ public class TurretLoadoutDialog extends BaseDialog{
         }
     }
 
+    /**
+     * @return the names of the ammo the unit's turrets carry, or the "free" placeholder when
+     * nothing mounted yet defines one item - in that state the first turret may pick any ammo.
+     */
+    private static String ammoText(Unit unit){
+        Item[] ammo = unit.loadoutAmmo();
+        if(ammo.length == 0) return text("@turret.loadout.ammo.free");
+
+        StringBuilder names = new StringBuilder();
+        for(Item item : ammo){
+            if(names.length() > 0) names.append(", ");
+            names.append(item.localizedName);
+        }
+        return names.toString();
+    }
+
     /** Turret blocks, in one collapsible section per footprint. */
     private void rebuildTurretGrid(){
         cardMetrics();
@@ -463,6 +497,9 @@ public class TurretLoadoutDialog extends BaseDialog{
             //the hull decides what this catalogue may offer, not the current loadout: a turret
             //that stopped fitting stays listed - locked - instead of vanishing and moving the page
             if(!unit.type.hasSlotFor(turret.size) || !unit.type.fitsSilhouette(turret.size)) continue;
+            //ammo is the one rule that filters entries out instead of locking them: the loadout
+            //shares a single supply, so an incompatible turret would strand part of it
+            if(!unit.ammoCompatible(turret)) continue;
             turrets.add(turret);
         }
 
@@ -837,7 +874,7 @@ public class TurretLoadoutDialog extends BaseDialog{
     private void moduleCard(Table grid, Drawable icon, String name, String role, int size, float cost,
         Runnable mount, @Nullable Boolf<Integer> placeAt, @Nullable String locked){
         //a locked card is dimmed: same size, same place, no interaction
-        Drawable background = locked == null ? Tex.pane : ((TextureRegionDrawable)Tex.whiteui).tint(Color.darkGray);
+        Drawable background = locked == null ? Tex.pane : tinted(Tex.whiteui, Color.darkGray);
         Table card = grid.table(background, cell -> {
             cell.margin(6f).top();
             cell.image(icon).size(btnSize).scaling(Scaling.fit).padBottom(4f);
@@ -1027,7 +1064,7 @@ public class TurretLoadoutDialog extends BaseDialog{
         for(int i = 0; i < slotBoxes.size; i++){
             Table box = slotBoxes.get(i);
             box.setBackground(i == index || i == armedSlot
-                ? ((TextureRegionDrawable)Tex.pane).tint(Pal.accent)
+                ? tinted(Tex.pane, Pal.accent)
                 : Tex.pane);
         }
     }

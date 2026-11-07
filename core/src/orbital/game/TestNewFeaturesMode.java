@@ -3,6 +3,7 @@ package orbital.game;
 import arc.*;
 import arc.math.*;
 import arc.struct.*;
+import arc.util.Nullable;
 import orbital.content.*;
 import orbital.entities.*;
 import orbital.game.EventType.*;
@@ -10,6 +11,7 @@ import orbital.gen.*;
 import orbital.maps.*;
 import orbital.type.*;
 import orbital.world.*;
+import orbital.world.meta.BuildVisibility;
 
 import static orbital.Vars.*;
 
@@ -21,6 +23,13 @@ public final class TestNewFeaturesMode{
     private static Map testMap;
     private static boolean initializeMono;
     private static boolean listenerInstalled;
+
+    /** Team that receives structures placed with the enemy-building tool. */
+    public static Team enemyTeam = Team.crux;
+    /** Block armed by the enemy-building tool; null means nothing is selected. */
+    public static @Nullable Block enemyBlock;
+    /** When true, the enemy-building tool removes whatever is under the cursor instead of placing. */
+    public static boolean enemyRemoving;
 
     private TestNewFeaturesMode(){
     }
@@ -101,5 +110,108 @@ public final class TestNewFeaturesMode{
         Seq<UnitType> result = content.units().select(type -> type.flying && !type.isHidden());
         result.sort((a, b) -> a.localizedName.compareToIgnoreCase(b.localizedName));
         return result;
+    }
+
+    /**
+     * @return every team that can hold enemy structures: all editor base teams except the player's
+     * own and the derelicts. On a planet map these normally include the campaign enemies.
+     */
+    public static Seq<Team> enemyTeams(){
+        Seq<Team> result = new Seq<>();
+        for(Team team : Team.baseTeams){
+            if(team == Team.derelict || (player != null && !player.dead() && team == player.team())) continue;
+            result.add(team);
+        }
+        return result;
+    }
+
+    /**
+     * @return the editor block catalog, sorted by name, for the enemy-structure picker.
+     * Floors, cliffs and debug-only content are left out, so the list holds structures (turrets,
+     * power, walls, cores...) exactly like the map editor palette.
+     */
+    public static Seq<Block> enemyBlocks(){
+        Seq<Block> result = content.blocks().select(block ->
+            block.inEditor
+            && block.buildVisibility != BuildVisibility.debugOnly
+            && block.buildVisibility != BuildVisibility.hidden
+            && !block.isAir() && !block.isFloor() && block != Blocks.cliff
+        );
+        result.sort((a, b) -> a.localizedName.compareToIgnoreCase(b.localizedName));
+        return result;
+    }
+
+    /** @return whether the enemy-building tool is armed, either placing or removing. */
+    public static boolean enemyToolArmed(){
+        return active() && (enemyBlock != null || enemyRemoving);
+    }
+
+    /**
+     * Places one enemy structure at this tile.
+     *
+     * <p>Unlike the normal build path, the campaign restrictions (enemy core build radius,
+     * placement overlap, darkness) are skipped: the test map only has the player's own core, and
+     * the point of the tool is to put an enemy base <b>anywhere</b> it is needed to aim at, not
+     * inside a protected radius around a core that does not exist.</p>
+     *
+     * @return whether the structure was placed.
+     */
+    public static boolean placeEnemyBuilding(Block block, Team team, int x, int y, int rotation, @Nullable Object config){
+        if(block == null || team == null || !active()) return false;
+
+        //multiblocks are anchored at their center tile, so pull the cursor back into the map
+        if(block.isMultiblock()){
+            x = Mathf.clamp(x, (block.size - 1) / 2, world.width() - block.size / 2 - 1);
+            y = Mathf.clamp(y, (block.size - 1) / 2, world.height() - block.size / 2 - 1);
+        }
+
+        Tile tile = world.tile(x, y);
+        if(tile == null) return false;
+
+        tile.setBlock(block, team, rotation);
+
+        if(tile.build != null){
+            tile.build.health = block.health;
+            //power links and other proximity-dependent state are resolved from here; in a local
+            //session this is the same call a regular instant build ends up performing
+            tile.build.placed();
+            if(config != null) tile.build.configured(null, config);
+        }
+
+        block.placeEnded(tile, null, rotation, config);
+        Events.fire(new BlockBuildEndEvent(tile, null, team, false, config));
+
+        //the normal path plays the placement effect when the tile is visible to the team; do the
+        //same here so placing a structure feels like the regular instant build
+        if(!headless && state.isGame() && fogControl.isVisibleTile(team, tile.x, tile.y)){
+            block.placeEffect.at(tile.drawx(), tile.drawy(), block.size);
+        }
+        return true;
+    }
+
+    /** Removes the structure at this tile, however big or whose team it is. @return whether one was removed. */
+    public static boolean removeEnemyBuilding(int x, int y){
+        if(!active()) return false;
+        Tile tile = world.tile(x, y);
+        if(tile == null || tile.build == null || tile.block() == Blocks.air) return false;
+        tile.remove();
+        return true;
+    }
+
+    /** Removes every structure of one team from the test map. @return how many were removed. */
+    public static int clearEnemyBuildings(Team team){
+        if(!active() || team == null) return 0;
+
+        Seq<Tile> targets = new Seq<>();
+        //collect first: removing a multiblock silently clears its neighbors while iterating
+        for(Tile tile : world.tiles){
+            if(tile.build != null && tile.isCenter() && tile.build.team == team && tile.block() != Blocks.air){
+                targets.add(tile);
+            }
+        }
+        for(Tile tile : targets){
+            tile.remove();
+        }
+        return targets.size;
     }
 }
