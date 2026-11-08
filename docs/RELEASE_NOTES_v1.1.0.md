@@ -1,15 +1,33 @@
-# Orbital v1.1.0 — Windows (instalador sem administrador)
+# Orbital v1.1.0 — Windows (instalador sem administrador) e Android (APK)
 
-Build `e0dbcfcd0f`. O instalador continua **sem exigir administrador**: instala em
+Build `8051c9855e`. O instalador continua **sem exigir administrador**: instala em
 `%LOCALAPPDATA%\Programs\Orbital`, cria atalhos na Área de Trabalho e no Menu Iniciar e
 registra a desinstalação em `HKCU`. O JRE 21 vai embutido — não é preciso ter Java instalado.
 
+**Sistemas operacionais:** Windows 10/11 64 bits; Android 5.0 (API 21) ou superior.
+
+### Windows
+
 **Download:** `Orbital-1.1.0-win64-usuario.zip` (instalador + `payload/`, ~143 MB)
-`SHA-256: 8dd78d8f17f54f65e0e9d184a87782e3b1a9b4a4302d89c192513eb0bbc694c2`
+`SHA-256: fb7c401eca0ed96522c0f0fce64248f06711b4a47754177ea2f574f34a13816b`
 
 1. Baixe o zip e confira a integridade com o `.sha256`.
 2. Extraia mantendo `OrbitalSetup.exe` e a pasta `payload/` **juntos**.
 3. Execute `OrbitalSetup.exe`.
+
+### Android
+
+**Download:** `Orbital-1.1.0-android-debug.apk` (~82 MB, `versionName` 1.1.0,
+`versionCode` 110)
+`SHA-256: 41af9d5b3cdd75be876d56e8a6f21077a63fc2f66ae823f0e426d1c998f7801d`
+
+1. Baixe o APK no celular (ou copie pelo `adb`).
+2. Libere *instalar de fontes desconhecidas* para o navegador/gerenciador de arquivos.
+3. Instale. O app abre em **paisagem**; a interface móvel tem escala própria em
+   *Settings → Graphics → UI Scaling* (padrão 125%).
+
+> ⚠️ Build de depuração: o id do pacote é `orbital.android.debug`. O release
+> assinado continua pendente de keystore.
 
 ---
 
@@ -81,3 +99,4 @@ como módulos de combate em unidades aéreas, no mesmo sistema de slots dorsais:
 
 > ⚠️ Build em desenvolvimento: ainda pode conter bugs. Reporte em
 > <https://github.com/petersonlego98/Orbital/issues>
+
