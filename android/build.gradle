@@ -52,8 +52,11 @@ android{
         applicationId "orbital.android"
         minSdkVersion 21          // Android 5.0 Lollipop
         targetSdkVersion 36
-        versionCode 1
-        versionName "${versionNumber}-${versionType}"
+        //Same release number as the Windows build (v1.1.0, see README and
+        //docs/RELEASE_NOTES_v1.1.0.md). versionCode is the numeric encoding
+        //major*100 + minor*10 + patch so it keeps growing on every release.
+        versionCode 110
+        versionName "1.1.0"
         multiDexEnabled = true
     }
 
