@@ -13,12 +13,18 @@ O projeto preserva a base de automação, construção, mapas, mods e multiplaye
 herdada do Mindustry, mas desenvolve uma identidade e uma experiência próprias.
 
 > **Estado atual:** protótipo jogável em desenvolvimento, com a **versão
-> instalável v1.1.0 para Windows** já publicada. Mecânicas, conteúdo e
-> balanceamento podem mudar sem aviso, e a build **pode conter bugs**.
+> instalável v1.1.0 para Windows** já publicada e o **APK Android 1.1.0**
+> compilado a partir do mesmo código. Mecânicas, conteúdo e balanceamento podem
+> mudar sem aviso, e a build **pode conter bugs**.
 
 ---
 
-## Versão instalável (Windows)
+## Versões instaláveis
+
+Ambas as plataformas são geradas a partir do mesmo código-fonte e usam a
+mesma numeração de release (**v1.1.0**).
+
+### Windows — `Orbital-1.1.0-win64-usuario.zip`
 
 O release **[v1.1.0](https://github.com/petersonlego98/Orbital/releases/tag/v1.1.0)**
 distribui `Orbital-1.1.0-win64-usuario.zip` com o instalador por usuário, que
@@ -34,6 +40,38 @@ A instalação vai para `%LOCALAPPDATA%\Programs\Orbital`, cria o atalho na Áre
 de Trabalho e registra o desinstalador em *Aplicativos e recursos*. O
 `Uninstall.exe` também funciona com duplo clique. Detalhes, limitações e
 validação em [docs/INSTALADOR_SEM_ADMIN.md](docs/INSTALADOR_SEM_ADMIN.md).
+
+### Android — `orbital.android` (`versionName` 1.1.0, `versionCode` 110)
+
+O APK é gerado pelo módulo `android` com o mesmo número de release do Windows:
+
+```powershell
+.\gradlew.bat :android:assembleDebug
+# saída: android\build\outputs\apk\debug\android-debug.apk
+adb install -r "android\build\outputs\apk\debug\android-debug.apk"
+```
+
+O APK de depuração instala como `orbital.android.debug`; o de release usa o
+id `orbital.android`. A tela é travada em paisagem e a interface móvel tem
+escala própria, ajustável em *Settings → Graphics → UI Scaling* (padrão 125% no
+Android, 100% no desktop). O build de release ainda depende de keystore, que
+**não** está no repositório.
+
+---
+
+## Requisitos de sistema (sistemas operacionais compatíveis)
+
+| Plataforma | Sistema operacional | Observações |
+|---|---|---|
+| **Windows** | Windows 10 ou 11, **64 bits (x64)** | O release embute o JRE 21, então **não precisa de Java instalado**. Requer o Universal CRT, presente nesses sistemas. |
+| **Android** | Android 5.0 (API 21) ou superior | ```
+minSdkVersion 21
+``` com `targetSdkVersion 36`. |
+| **Compilação** | Windows, Linux ou macOS com **JDK 17+** | Gradle Wrapper incluído; precisa de internet na primeira compilação. |
+
+Detalhes do Android por ABI: o APK traz bibliotecas nativas para `arm64-v8a`,
+`armeabi-v7a`, `x86_64` e `x86`, e exige OpenGL ES 2.0. Em celulares, o
+`arm64-v8a` é o usado; `x86_64` serve para o emulador do Android Studio.
 
 ---
 
@@ -66,10 +104,31 @@ inventário global e para a expansão das colônias.
   balanceamento sem criar um save de campanha.
 - **Base herdada do Mindustry** para automação, transporte, defesa, editor de
   mapas, mods e multiplayer.
-
 Atualmente, **Quatia** é o setor pacífico de produção e **Gier** é a frente de
 expedição ativa. As campanhas originais de **Serpulo** e **Erekir** estão
 desativadas; os corpos continuam no mapa estelar como elementos visuais.
+
+---
+
+## Modo Teste Novos Recursos
+
+Mapa de areia isolado (160×160), **não persistente** — nada é gravado no save da
+campanha. É acessado pelo botão **Novidades** no menu principal e serve para
+testar unidades, torres dorsais e balanceamento sem sujar o progresso.
+
+O modo inicia com uma unidade **Mono** sob controle do jogador e oferece três
+conjuntos de recursos:
+
+- **Unidades aéreas (sem custo).** Painel no canto inferior direito que gera
+  qualquer unidade aérea da lista de conteúdo, ignorando o estado de
+  desbloqueio e sem consumir recursos.
+- **Módulos.** Com uma unidade selecionada, o botão *Gerenciar torretas* abre o
+  catálogo de torres dorsais por tamanho (**1x1** a **5x5**), as armas nativas do
+  casco e os encaixes de suporte (**Reparo**, **Domo de Sobrecarga** e **Campo de
+  Força**), respeitando orçamento dorsal, número de slots e silhueta.
+- **Construções inimigas.** Escolha de time (**Crux**, **Malis**, **Greer** ou
+  **Blue**), escolha de bloco e toque no mapa para posicionar, remover ou limpar
+  construções daquele time.
 
 ---
 
