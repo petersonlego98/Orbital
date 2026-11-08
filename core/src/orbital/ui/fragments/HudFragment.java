@@ -751,7 +751,7 @@ public class HudFragment{
                         rebuildTurretBar(content, unit);
                     }
                 });
-            }).padBottom(mobile ? 96f : 8f);
+            }).padLeft(mobile ? 175f : 0f).padBottom(mobile ? 12f : 8f);
         });
 
         buildTestFeaturesPanel(parent);
@@ -767,10 +767,12 @@ public class HudFragment{
                 panel.add("@mode.testfeatures.units").style(Styles.outlineLabel).left().padBottom(5f).row();
                 panel.pane(scroll -> {
                     scroll.left().top();
-                    int columns = mobile ? 4 : 5;
+                    //columns follow the pane width, so phones show more than four units per row
+                    float width = Core.graphics.getWidth() * (mobile ? 0.22f : 0.28f);
+                    int columns = Mathf.clamp((int)(width / Scl.scl(46f)), 4, 7);
                     int index = 0;
-                    float btnSize = mobile ? 40f : 44f;
-                    float imgSize = mobile ? 28f : 32f;
+                    float btnSize = mobile ? 36f : 44f;
+                    float imgSize = mobile ? 26f : 32f;
                     for(UnitType type : TestNewFeaturesMode.aerialTypes()){
                         var btn = scroll.button(new TextureRegionDrawable(type.uiIcon), Styles.selecti, () -> {
                             if(!TestNewFeaturesMode.spawn(type)){
@@ -1068,8 +1070,10 @@ public class HudFragment{
 
         if(unit == null) return;
 
-        float cellSize = mobile ? 44f : 54f;
-        float cellPad = mobile ? 1f : 2f;
+        //Cells are as large on phones as on desktop: the dorsal bar is a touch surface, and the
+        //small icons that fit a 44 unit cell are hard to hit when the game is in the player's hands.
+        float cellSize = mobile ? 56f : 54f;
+        float cellPad = mobile ? 2f : 2f;
 
         for(WeaponMount mount : unit.mounts){
             if(mount.weapon.isTurretMount()){
@@ -1099,7 +1103,7 @@ public class HudFragment{
         Table cell = new Table();
         cell.background(Styles.black3);
         cell.button(icon, Styles.clearNonei, () -> openTurretDialog(unit))
-            .size(mobile ? 34f : 44f).tooltip(tooltip);
+            .size(44f).tooltip(tooltip);
         return cell;
     }
 
@@ -1113,7 +1117,7 @@ public class HudFragment{
         Weapon weapon = mount.weapon;
         boolean removable = weapon.removable;
         float baseThickness = removable ? 3f : 2f;
-        float iconSize = mobile ? 34f : 44f;
+        float iconSize = 44f;
         TextureRegion region = weapon.region != null && weapon.region.found() ? weapon.region : Core.atlas.find(weapon.name);
         if(region == null || !region.found()){
             region = unit.type.uiIcon;
@@ -1131,11 +1135,11 @@ public class HudFragment{
         if(!removable){
             Table lock = new Table();
             lock.top().right();
-            lock.image(Icon.lockSmall).size(mobile ? 11f : 13f).pad(1f).get().setColor(Pal.gray);
+            lock.image(Icon.lockSmall).size(13f).pad(1f).get().setColor(Pal.gray);
             stack.add(lock);
         }
 
-        cell.add(stack).size(iconSize).pad(mobile ? 1f : 2f).row();
+        cell.add(stack).size(iconSize).pad(2f).row();
 
         Bar reload = new Bar(() -> "", () -> removable ? Pal.accent : Pal.gray, () -> reloadFraction(mount));
         reload.blink(Color.white);
@@ -1173,7 +1177,7 @@ public class HudFragment{
      * never removed here, so its anchor, category and footprint stay reserved.
      */
     private Table supportCell(Unit unit, SupportMount mount){
-        float iconSize = mobile ? 34f : 44f;
+        float iconSize = 44f;
         TextureRegion region = mount.block.uiIcon;
         if(region == null || !region.found()) region = unit.type.uiIcon;
 
@@ -1194,7 +1198,7 @@ public class HudFragment{
             .style(Styles.outlineLabel).fontScale(mobile ? 0.55f : 0.65f).get();
         stack.add(overlay);
 
-        cell.add(stack).size(iconSize).pad(mobile ? 1f : 2f).row();
+        cell.add(stack).size(iconSize).pad(2f).row();
 
         Bar status = new Bar(() -> "", () -> mount.active ? Pal.heal : Pal.remove,
             () -> mount.active ? 1f : 0f);

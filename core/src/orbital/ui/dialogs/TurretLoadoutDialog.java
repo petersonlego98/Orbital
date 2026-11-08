@@ -76,7 +76,7 @@ public class TurretLoadoutDialog extends BaseDialog{
 
     /** width of the slot column on the right, from the module grid's right edge to the menu edge */
     private static float slotWidth(){
-        return mobile ? 280f : Mathf.clamp(Core.graphics.getWidth() * 0.34f, 380f, 620f);
+        return mobile ? 340f : Mathf.clamp(Core.graphics.getWidth() * 0.34f, 380f, 620f);
     }
 
     public void show(Unit unit, Runnable changed){
@@ -201,8 +201,8 @@ public class TurretLoadoutDialog extends BaseDialog{
      * every drag coming from the catalogue below.
      */
     private void rebuildSlots(){
-        float boxSize = mobile ? 96f : 126f;
-        float slotImg = mobile ? 56f : 74f;
+        float boxSize = mobile ? 104f : 126f;
+        float slotImg = mobile ? 62f : 74f;
         int perRow = boxesPerRow();
 
         //one left offset for every element of the rail: headings, box rows and the hint line
@@ -337,7 +337,7 @@ public class TurretLoadoutDialog extends BaseDialog{
             //whatever the aspect ratio of the block sprite
             cell.image(icon).size(slotImg).scaling(Scaling.fit).color(iconColor);
             cell.row();
-            cell.add(label).width(boxSize - 12f).wrap().center().fontScale(0.85f).color(Color.lightGray);
+            cell.add(label).width(boxSize - 12f).wrap().center().fontScale(mobile ? 1f : 0.85f).color(Color.lightGray);
         }).size(boxSize).pad(3f).get();
 
         if(click != null){
@@ -389,9 +389,15 @@ public class TurretLoadoutDialog extends BaseDialog{
         return drawable;
     }
 
-    /** how many slot boxes fit on one row of the rail */
+    /**
+     * how many slot boxes fit on one row of the rail.
+     *
+     * <p>Computed from the rail width instead of a fixed number, so a wider rail shows more
+     * boxes and phones show as many as their 340 unit column allows (3) instead of two.</p>
+     */
     private int boxesPerRow(){
-        return mobile ? 2 : Mathf.clamp((int)(slotWidth() / 132f), 3, 6);
+        float cell = (mobile ? 104f : 126f) + 6f;
+        return Mathf.clamp((int)(slotWidth() / cell), 2, 8);
     }
 
     /** @return the mounted weapon occupying a dorsal slot, or null when it is free. */
@@ -776,20 +782,40 @@ public class TurretLoadoutDialog extends BaseDialog{
 
     /** recomputes the card metrics for the current screen width */
     private void cardMetrics(){
-        cardWidth = mobile ? 148f : 168f;
-        btnSize = mobile ? 86f : 98f;
-        imgSize = mobile ? 58f : 68f;
-        //two text lines under the icon, so one- and two-line labels still line up
-        nameLineHeight = mobile ? 36f : 40f;
-        roleLineHeight = mobile ? 30f : 32f;
-        cardMinHeight = mobile ? 168f : 186f;
+        if(mobile){
+            //A module card is a reading surface, so on phones it keeps a fixed physical size
+            //instead of shrinking with the UI scale: at the 125% default it is 118 units wide,
+            //and at 100% it grows in units so the card on the screen stays just as large.
+            float unit = 1f / Scl.scl(1f);
+            cardWidth = 295f * unit;
+            btnSize = 175f * unit;
+            imgSize = 128f * unit;
+            //two text lines under the icon, so one- and two-line labels still line up
+            nameLineHeight = 30f * unit;
+            roleLineHeight = 26f * unit;
+            cardMinHeight = 144f * unit;
+        }else{
+            cardWidth = 168f;
+            btnSize = 98f;
+            imgSize = 68f;
+            nameLineHeight = 40f;
+            roleLineHeight = 32f;
+            cardMinHeight = 186f;
+        }
     }
 
     /** columns that fit the catalogue pane, not the whole screen: the slot rail takes the rest */
     private int columns(){
-        if(mobile) return 3;
+        float width;
+        if(mobile){
+            //list.getWidth() under-reports the space the pane actually offers (margins and the
+            //scroll bar), which on phones cost a whole column. The available width is therefore
+            //computed from the screen minus the rail, so seven modules fit per row.
+            width = Core.graphics.getWidth() - slotWidth() * Scl.scl(1f) - Scl.scl(48f);
+            return Mathf.clamp((int)(width / Scl.scl(cardWidth + 4f)), 3, 7);
+        }
         //the pane is laid out by the frame it is drawn, so its width is only known the second time
-        float width = list.getWidth() > 1f
+        width = list.getWidth() > 1f
             ? list.getWidth() - Scl.scl(24f)
             : Core.graphics.getWidth() - slotWidth() - Scl.scl(60f);
         return Mathf.clamp((int)(width / Scl.scl(cardWidth + 18f)), 3, 8);
@@ -879,16 +905,20 @@ public class TurretLoadoutDialog extends BaseDialog{
             cell.margin(6f).top();
             cell.image(icon).size(btnSize).scaling(Scaling.fit).padBottom(4f);
             cell.row();
-            cell.add(name).width(cardWidth - 8f).height(nameLineHeight).wrap().center().padTop(2f).row();
+            //the name and the role scale with the card: on phones the cards are narrow, and a
+            //full-size label would break the module name in the middle of a word
+            cell.add(name).width(cardWidth - 8f).height(nameLineHeight).wrap().center()
+                .fontScale(mobile ? 0.72f : 1f).padTop(2f).row();
             //the role line carries the shot type or the support category, or the lock reason.
             //Both lines have an explicit width and height: a wrapped label without a width has
             //a preferred width of zero, so arc breaks the text after every glyph
             String line = locked != null ? locked : role;
             cell.add(line == null ? "" : line).width(cardWidth - 8f).height(roleLineHeight)
-                .color(locked == null ? Color.lightGray : Pal.remove).fontScale(0.85f).center().wrap().row();
+                .color(locked == null ? Color.lightGray : Pal.remove)
+                .fontScale(mobile ? 0.72f : 0.85f).center().wrap().row();
             cell.add(Core.bundle.format("weapon.module.footprint", size, size))
-                .color(sizeColor(size)).fontScale(0.85f).center();
-        }).width(cardWidth).minHeight(cardMinHeight).pad(4f).tooltip(tooltip(name, role, size, cost))
+                .color(sizeColor(size)).fontScale(mobile ? 0.7f : 0.85f).center();
+        }).width(cardWidth).minHeight(cardMinHeight).pad(2f).tooltip(tooltip(name, role, size, cost))
             .get();
 
         //a locked card is inert: no click, no drag, no tooltip change

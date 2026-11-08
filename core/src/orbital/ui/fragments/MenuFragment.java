@@ -140,38 +140,50 @@ public class MenuFragment{
         }).touchable = Touchable.disabled;
 
         //Atribuição resumida no menu principal, logo abaixo do logo/versão.
-        parent.fill(t -> {
-            t.top();
-            t.touchable = Touchable.childrenOnly;
-            float logoh = logoHeight();
-            float topOffset = logoh + Scl.scl(Core.graphics.isPortrait() ? 58f : 38f);
-            float maxWidth = Math.min(Core.graphics.getWidth() - Scl.scl(24f), Scl.scl(620f));
+        //
+        //Em telas móveis o painel é omitido: o menu tem pouco espaço vertical e painel e
+        //botões acabavam se sobrepondo conforme a escala de UI cresce. A atribuição
+        //continua disponível no botão de informação (canto inferior esquerdo), que abre o
+        //diálogo "Sobre" com o mesmo texto e os links dos repositórios.
+        if(!mobile){
+            parent.fill(t -> {
+                t.top();
+                t.touchable = Touchable.childrenOnly;
+                float logoh = logoHeight();
+                float topOffset = logoh + Scl.scl(Core.graphics.isPortrait() ? 58f : 38f);
+                float maxWidth = Math.min(Core.graphics.getWidth() - Scl.scl(24f), Scl.scl(620f));
 
-            t.table(OrbitalTheme.panel(), banner -> {
-                banner.margin(8f);
+                t.table(OrbitalTheme.panel(), banner -> {
+                    banner.margin(8f);
 
-                //Labels are created and sized up front so their wrapped height is known before the table lays out the rows.
-                Label title = new Label(Core.bundle.get("menu.attribution.title"), Styles.outlineLabel);
-                title.setFontScale(0.9f);
-                title.setWrap(true);
-                title.setAlignment(Align.center);
-                title.setColor(OrbitalTheme.silver);
-                title.setWidth(maxWidth);
+                    //Labels are created and sized up front so their wrapped height is known before the table lays out the rows.
+                    Label title = new Label(Core.bundle.get("menu.attribution.title"), Styles.outlineLabel);
+                    title.setFontScale(0.9f);
+                    title.setWrap(true);
+                    title.setAlignment(Align.center);
+                    title.setColor(OrbitalTheme.silver);
+                    title.setWidth(maxWidth);
 
-                Label disclaimer = new Label(Core.bundle.get("menu.attribution.disclaimer"), Styles.outlineLabel);
-                disclaimer.setFontScale(0.75f);
-                disclaimer.setWrap(true);
-                disclaimer.setAlignment(Align.center);
-                disclaimer.setColor(OrbitalTheme.ice);
-                disclaimer.setWidth(maxWidth);
+                    Label disclaimer = new Label(Core.bundle.get("menu.attribution.disclaimer"), Styles.outlineLabel);
+                    disclaimer.setFontScale(0.75f);
+                    disclaimer.setWrap(true);
+                    disclaimer.setAlignment(Align.center);
+                    disclaimer.setColor(OrbitalTheme.ice);
+                    disclaimer.setWidth(maxWidth);
 
-                banner.add(title).width(maxWidth).center().row();
-                banner.add(disclaimer).width(maxWidth).center().padTop(7f).row();
-                banner.button(Core.bundle.get("menu.attribution.link"), Icon.link, Styles.cleart, () -> {
-                    Core.app.openURI(Links.originalRepo);
-                }).fontScale(0.75f).height(30f).padTop(6f);
-            }).width(maxWidth).padTop(topOffset).center();
-        });
+                    banner.add(title).width(maxWidth).center().row();
+                    banner.add(disclaimer).width(maxWidth).center().padTop(7f).row();
+                    banner.button(Core.bundle.get("menu.attribution.link"), Icon.link, Styles.cleart, () -> {
+                        Core.app.openURI(Links.originalRepo);
+                    }).fontScale(0.75f).height(30f).padTop(6f);
+                }).width(maxWidth).padTop(topOffset).row();
+
+                //Absorbing row: it takes the space left below the banner, so the banner stays
+                //anchored right under the logo instead of drifting to the middle of the screen
+                //as the UI scale grows.
+                t.add().growY();
+            });
+        }
     }
 
     /** The wordmark cut from the key art, falling back to the atlas logo when the texture is missing. */
@@ -200,7 +212,10 @@ public class MenuFragment{
     private void buildMobile(){
         container.clear();
         container.name = "buttons";
-        container.setSize(Core.graphics.getWidth(), Core.graphics.getHeight());
+        //The pane's viewport is measured in scene units, and Scl.scl(1) is how many pixels one
+        //unit takes. Sizing the content with the raw pixel size made it grow relative to the
+        //viewport as UI scaling increases, which pushed the second row of buttons off-screen.
+        container.setSize(Core.graphics.getWidth() / Scl.scl(1f), Core.graphics.getHeight() / Scl.scl(1f));
 
         float size = 120f;
         container.defaults().size(size).pad(5).padTop(4f);
@@ -269,7 +284,8 @@ public class MenuFragment{
 
     private void buildDesktop(){
         container.clear();
-        container.setSize(Core.graphics.getWidth(), Core.graphics.getHeight());
+        //same as buildMobile: keep the content in units so it tracks the pane's viewport
+        container.setSize(Core.graphics.getWidth() / Scl.scl(1f), Core.graphics.getHeight() / Scl.scl(1f));
 
         float width = 230f;
         Drawable background = OrbitalTheme.panel();

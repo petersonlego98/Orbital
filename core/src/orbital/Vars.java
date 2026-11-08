@@ -519,7 +519,16 @@ public class Vars implements Loadable{
             settings.put("uiscale", 100);
         }
 
-        Scl.setProduct(Math.max(settings.getInt("uiscale", 100), 25) / 100f);
+        //A phone screen is held close and driven by touch, so the default UI scale is
+        //larger there than on desktop. Scl already raises the base scale by density; this
+        //adds the extra that makes labels and buttons comfortable without the user having
+        //to hunt for the Graphics > UI Scaling slider.
+        int defaultUiScale = Vars.android ? 125 : 100;
+        int uiscale = settings.getInt("uiscale", defaultUiScale);
+        //persist it so the slider and the next launch see the same value
+        settings.put("uiscale", uiscale);
+
+        Scl.setProduct(Math.max(uiscale, 25) / 100f);
 
         if(!loadLocales) return;
 

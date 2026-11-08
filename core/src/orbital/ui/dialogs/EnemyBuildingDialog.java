@@ -7,6 +7,7 @@ import arc.scene.style.*;
 import arc.scene.ui.*;
 import arc.scene.ui.ImageButton.*;
 import arc.scene.ui.layout.*;
+import arc.math.*;
 import arc.struct.*;
 import orbital.game.*;
 import orbital.gen.*;
@@ -67,7 +68,10 @@ public class EnemyBuildingDialog extends BaseDialog{
         list.top().left().margin(12f);
         list.defaults().left().pad(4f);
 
-        int columns = mobile ? 4 : 6;
+        //columns follow the pane width instead of a fixed count, so more blocks fit per row on
+        //phones and the horizontal space of the picker is not wasted
+        float width = list.getWidth() > 1f ? list.getWidth() : Core.graphics.getWidth() - Scl.scl(40f);
+        int columns = Mathf.clamp((int)(width / Scl.scl(58f)), 4, 8);
         int found = 0;
         Seq<Block> blocks = TestNewFeaturesMode.enemyBlocks();
 
