@@ -1986,6 +1986,23 @@ public class UnitType extends UnlockableContent implements Senseable{
 
         if(tint) Draw.color();
         Draw.reset();
+
+        logWallTint(unit, tint, "drawBody");
+    }
+
+    /** Diagnostic: reports whether the hull tint reaches the real game render path. */
+    private static float wallTintLogTimer = 0f;
+    private void logWallTint(Unit unit, boolean tint, String where){
+        wallTintLogTimer += Time.delta;
+        if(wallTintLogTimer < 120f) return;
+        wallTintLogTimer = 0f;
+        Log.info("[walltint] @ unit=@ tint=@ wallColor=(@,@,@) region=@ found=@",
+            where, unit.type.name, tint,
+            unit.wallColor == null ? "null" : (int)(unit.wallColor.r * 255) + "",
+            unit.wallColor == null ? "null" : (int)(unit.wallColor.g * 255) + "",
+            unit.wallColor == null ? "null" : (int)(unit.wallColor.b * 255) + "",
+            region == null ? "null" : "ok",
+            region != null && region.found());
     }
 
     public void drawCell(Unit unit){

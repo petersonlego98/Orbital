@@ -368,6 +368,20 @@ public class WallLoadoutTest{
         }
     }
 
+    @Test
+    void theColourReachesTheUnitThroughItsRealUpdateLoop(){
+        Unit unit = UnitTypes.quad.create(Team.sharded);
+        assertNotNull(unit.mountWall(Blocks.phaseWallLarge));
+
+        //one frame of the unit's own update: WeaponsComp.update() runs inside it and must
+        //push the plate colour onto the hull entity
+        unit.update();
+
+        assertEquals(Items.phaseFabric.color.r, unit.wallColor.r, 0.001f);
+        assertEquals(Items.phaseFabric.color.g, unit.wallColor.g, 0.001f);
+        assertEquals(Items.phaseFabric.color.b, unit.wallColor.b, 0.001f);
+    }
+
     //endregion
 
     //region every hull
