@@ -1892,34 +1892,12 @@ public class UnitType extends UnlockableContent implements Senseable{
     }
 
     /**
-     * Draws the wall plate sprites attached to the dorsal slots they took from the turrets.
-     *
-     * <p>Sprites use the hull's visual scale, exactly like support and turret modules. Only the
-     * drawing size changes: slots, footprints, overlap checks and the compatibility list keep
-     * using the full block size.</p>
+     * Wall plate effects on the hull are drawn by tinting the unit's body colour; the plate
+     * sprites themselves are not drawn on the hull (the player chose hull tint, not a visible
+     * square plate). This method is kept so the call sites and the rotation convention stay,
+     * but it deliberately draws nothing.
      */
     public void drawWallModules(Unit unit){
-        if(unit.wallMounts == null || unit.wallMounts.length == 0) return;
-
-        //same hull-local rotation convention as Weapon#draw
-        float rotation = unit.rotation - 90f;
-
-        for(WallMount mount : unit.wallMounts){
-            if(mount == null || mount.block == null || mount.block.region == null || !mount.block.region.found()) continue;
-
-            float wx = unit.x + Angles.trnsx(rotation, mount.x, mount.y);
-            float wy = unit.y + Angles.trnsy(rotation, mount.x, mount.y);
-
-            //tint the plate with the wall's material colour - not the whole hull
-            Draw.color(mount.wallColor.r, mount.wallColor.g, mount.wallColor.b, 0.75f);
-
-            var region = mount.block.region;
-            float w = region.width * region.scl() * Draw.xscl * mount.visualScale;
-            float h = region.height * region.scl() * Draw.yscl * mount.visualScale;
-            Draw.rect(region, wx, wy, w, h, rotation);
-
-            Draw.color(Color.white);
-        }
     }
 
     /**
@@ -1984,7 +1962,7 @@ public class UnitType extends UnlockableContent implements Senseable{
         Draw.reset();
 
         if(Core.atlas.isFound(outlineRegion)){
-            applyColor(unit);
+            applyWallTint(unit);
             applyOutlineColor(unit);
             Draw.rect(outlineRegion, unit.x, unit.y, unit.rotation - 90);
             Draw.reset();
@@ -1992,12 +1970,7 @@ public class UnitType extends UnlockableContent implements Senseable{
     }
 
     public void drawBody(Unit unit){
-        applyColor(unit);
-
-        //tint hull with active wall plate colour
-        if(unit.wallColor != null && !unit.wallColor.equals(Color.white)){
-            Draw.color(unit.wallColor);
-        }
+        applyWallTint(unit);
 
         if(unit instanceof UnderwaterMovec){
             Draw.alpha(1f);
@@ -2011,13 +1984,14 @@ public class UnitType extends UnlockableContent implements Senseable{
 
     public void drawCell(Unit unit){
         applyColor(unit);
-
-        //tint hull with active wall plate colour
+        //cell tint combined with (multiplied by) the wall plate tint
+        Color cell = cellColor(unit);
         if(unit.wallColor != null && !unit.wallColor.equals(Color.white)){
-            Draw.color(unit.wallColor);
+            Tmp.c1.set(cell).mul(unit.wallColor);
+            Draw.color(Tmp.c1);
+        }else{
+            Draw.color(cell);
         }
-
-        Draw.color(cellColor(unit));
         Draw.rect(cellRegion, unit.x, unit.y, unit.rotation - 90);
         Draw.reset();
     }
@@ -2034,7 +2008,7 @@ public class UnitType extends UnlockableContent implements Senseable{
     }
 
     public <T extends Unit & Tankc> void drawTank(T unit){
-        applyColor(unit);
+        applyWallTint(unit);
         Draw.rect(treadRegion, unit.x, unit.y, unit.rotation - 90);
 
         if(treadRegion.found()){
@@ -2051,10 +2025,12 @@ public class UnitType extends UnlockableContent implements Senseable{
                 }
             }
         }
+
+        Draw.reset();
     }
 
     public <T extends Unit & Legsc> void drawLegs(T unit){
-        applyColor(unit);
+        applyWallTint(unit);
         Tmp.c3.set(Draw.getMixColor());
 
         Leg[] legs = unit.legs();
@@ -2131,7 +2107,7 @@ public class UnitType extends UnlockableContent implements Senseable{
 
     public void drawCrawl(Crawlc crawl){
         Unit unit = (Unit)crawl;
-        applyColor(unit);
+        applyWallTint(unit);
 
         float crawlTime =
             crawl instanceof Segmentc seg && seg.headSegment() instanceof Crawlc head ? head.crawlTime() + seg.segmentIndex() * segmentPhase * segments :
@@ -2164,6 +2140,8 @@ public class UnitType extends UnlockableContent implements Senseable{
                 }
             }
         }
+
+        Draw.reset();
     }
 
     public void drawMech(Mechc mech){
@@ -2227,6 +2205,21 @@ public class UnitType extends UnlockableContent implements Senseable{
         if(renderer != null && renderer.overlays != null){
             renderer.overlays.checkApplySelection(unit);
         }
+
+        //tint hull with active wall plate colour
+        if(unit.wallColor != null && !unit.wallColor.equals(Color.white)){
+            Draw.color(unit.wallColor);
+        }
+    }
+
+    /**
+     * Applies the base unit colour plus the wall plate tint. This is just
+     * {@link #applyColor(Unit)} with an explicit name at the hull-drawing call sites; it exists
+     * so the "where does the wall colour apply" question has one obvious answer.
+     * Every caller must end with {@code Draw.reset()} so the tint never leaks to other draws.
+     */
+    public void applyWallTint(Unit unit){
+        applyColor(unit);
     }
 
     //endregion
