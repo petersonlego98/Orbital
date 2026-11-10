@@ -67,6 +67,9 @@ public class WallModuleAbility extends Ability{
     public Sound lightningSound = Sounds.shootArc;
     public float shieldHealth, shieldRegen = 2f, shieldCooldown = 60f * 10f;
 
+    /** Colour of the wall's material - applied as a tint on the mounted plate, not the whole hull. */
+    public Color wallColor = Color.white;
+
     /** shield state; the pool itself lives in {@code unit.shield}, shared with native shields */
     protected float shieldRadiusScale;
     protected boolean wasBroken = true;
@@ -97,6 +100,28 @@ public class WallModuleAbility extends Ability{
             shieldRegen = shield.regenSpeed;
             shieldCooldown = shield.breakCooldown;
         }
+
+        wallColor = wallColorFor(block);
+    }
+
+    /** @return the dominant material colour of a wall block, or white when unknown. */
+    private static Color wallColorFor(Block block){
+        if(block == null || block.name == null) return Color.white;
+        return switch(block.name){
+            case "copper-wall-large" -> Items.copper.color;
+            case "titanium-wall-large" -> Items.titanium.color;
+            case "plastanium-wall-large" -> Items.plastanium.color;
+            case "thorium-wall-large" -> Items.thorium.color;
+            case "phase-wall-large" -> Items.phaseFabric.color;
+            case "surge-wall-large" -> Items.surgeAlloy.color;
+            case "scrap-wall-large" -> Items.scrap.color;
+            case "beryllium-wall-large" -> Items.beryllium.color;
+            case "tungsten-wall-large" -> Items.tungsten.color;
+            case "carbide-wall-large" -> Items.carbide.color;
+            case "reinforced-surge-wall-large" -> Items.surgeAlloy.color;
+            case "shielded-wall" -> Items.phaseFabric.color;
+            default -> Color.white;
+        };
     }
 
     private static WallMount[] wallMounts(Unit unit){

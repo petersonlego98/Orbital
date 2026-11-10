@@ -40,18 +40,19 @@ public enum SupportModuleCategory{
             case "repair-point", "repair-turret", "unit-repair-tower" -> unitRepair;
             case "wave", "tsunami" -> liquid;
             case "mass-driver" -> transport;
-            //walls and ramparts: one armour category, see WallModuleAbility
-            case "copper-wall", "copper-wall-large",
-                 "titanium-wall", "titanium-wall-large",
-                 "plastanium-wall", "plastanium-wall-large",
-                 "thorium-wall", "thorium-wall-large",
-                 "phase-wall", "phase-wall-large",
-                 "surge-wall", "surge-wall-large",
-                 "scrap-wall", "scrap-wall-large", "scrap-wall-huge", "scrap-wall-gigantic",
-                 "beryllium-wall", "beryllium-wall-large",
-                 "tungsten-wall", "tungsten-wall-large",
-                 "carbide-wall", "carbide-wall-large",
-                 "reinforced-surge-wall", "reinforced-surge-wall-large",
+            //walls and ramparts: one armour category - only the large (2x2) plates are modules,
+            //see WallModuleAbility. Small (1x1) walls stay regular buildable blocks.
+            case "copper-wall-large",
+                 "titanium-wall-large",
+                 "plastanium-wall-large",
+                 "thorium-wall-large",
+                 "phase-wall-large",
+                 "surge-wall-large",
+                 "scrap-wall-large",
+                 "beryllium-wall-large",
+                 "tungsten-wall-large",
+                 "carbide-wall-large",
+                 "reinforced-surge-wall-large",
                  "shielded-wall" -> armor;
             default -> null;
         };

@@ -5,6 +5,8 @@ import orbital.gen.Unit;
 import orbital.type.*;
 import orbital.world.Block;
 
+import arc.graphics.Color;
+
 import static orbital.Vars.tilesize;
 
 /**
@@ -33,6 +35,9 @@ public class WallMount{
     /** Gameplay effect driven each frame. Transient by ownership, never written to saves or sync. */
     public transient WallModuleAbility ability;
 
+    /** Material colour of the wall - applied as a tint on the mounted plate, not the whole hull. */
+    public Color wallColor = Color.white;
+
     /**
      * Whether the effect is running. A deactivated plate stays mounted, keeps its slot and keeps
      * its shape on the hull; it only stops defending.
@@ -46,6 +51,7 @@ public class WallMount{
         this.y = y;
         this.visualScale = visualScale > 0f ? Math.min(1f, visualScale) : 1f;
         this.ability = new WallModuleAbility(block);
+        this.wallColor = ability != null ? ability.wallColor : Color.white;
     }
 
     /** @return the square physical footprint side length, in world units. Never scaled. */

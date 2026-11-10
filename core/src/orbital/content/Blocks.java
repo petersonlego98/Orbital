@@ -7049,29 +7049,29 @@ public class Blocks{
      * and recipes stay alive (the wall catalogue and any map or save that still contains a placed
      * wall read them), but they can no longer be placed as base blocks.
      *
-     * <p>Covers every {@code Wall} of the defense category - the four material families, the four
-     * scrap sizes, the phase, surge, reinforced-surge, carbide and shielded walls and their large
-     * versions. The doors ({@code door}, {@code door-large}, {@code blast-door }) and
-     * {@code thruster} stay placeable on purpose: they are passage and sandbox tools, not plates.</p>
+     * <p>Covers only the large (2x2) wall versions - the dorsal armour plates. Small (1x1) walls
+     * and the oversize scrap variants (3x3, 4x4) remain regular placeable blocks, not modules.
+     * Doors ({@code door}, {@code door-large}, {@code blast-door }) and {@code thruster} stay
+     * placeable on purpose: they are passage and sandbox tools, not plates.</p>
      *
      * <p>Like {@link #hideModuleOnlyTurrets()}, the list is by explicit name so modded walls keep
      * their own buildability decision, and research nodes are left untouched.</p>
      */
     private static void hideWallModules(){
         ObjectSet<String> moduleOnly = ObjectSet.with(
-            //serpulo
-            "copper-wall", "copper-wall-large",
-            "titanium-wall", "titanium-wall-large",
-            "plastanium-wall", "plastanium-wall-large",
-            "thorium-wall", "thorium-wall-large",
-            "phase-wall", "phase-wall-large",
-            "surge-wall", "surge-wall-large",
-            "scrap-wall", "scrap-wall-large", "scrap-wall-huge", "scrap-wall-gigantic",
-            //erekir
-            "beryllium-wall", "beryllium-wall-large",
-            "tungsten-wall", "tungsten-wall-large",
-            "carbide-wall", "carbide-wall-large",
-            "reinforced-surge-wall", "reinforced-surge-wall-large",
+            //serpulo - only large walls (2x2) are dorsal armour modules
+            "copper-wall-large",
+            "titanium-wall-large",
+            "plastanium-wall-large",
+            "thorium-wall-large",
+            "phase-wall-large",
+            "surge-wall-large",
+            "scrap-wall-large",
+            //erekir - only large walls (2x2) are dorsal armour modules
+            "beryllium-wall-large",
+            "tungsten-wall-large",
+            "carbide-wall-large",
+            "reinforced-surge-wall-large",
             "shielded-wall"
         );
         for(Block block : content.blocks()){

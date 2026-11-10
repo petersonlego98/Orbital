@@ -1908,10 +1908,15 @@ public class UnitType extends UnlockableContent implements Senseable{
             float wx = unit.x + Angles.trnsx(rotation, mount.x, mount.y);
             float wy = unit.y + Angles.trnsy(rotation, mount.x, mount.y);
 
+            //tint the plate with the wall's material colour - not the whole hull
+            Draw.color(mount.wallColor.r, mount.wallColor.g, mount.wallColor.b, 0.75f);
+
             var region = mount.block.region;
             float w = region.width * region.scl() * Draw.xscl * mount.visualScale;
             float h = region.height * region.scl() * Draw.yscl * mount.visualScale;
             Draw.rect(region, wx, wy, w, h, rotation);
+
+            Draw.color(Color.white);
         }
     }
 
