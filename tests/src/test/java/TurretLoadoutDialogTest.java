@@ -1,12 +1,17 @@
 import arc.*;
+import arc.func.Boolf;
+import arc.scene.style.Drawable;
+import arc.scene.ui.layout.Table;
 import arc.struct.*;
 import arc.util.Nullable;
 import arc.util.Time;
 import arc.math.*;
 import orbital.content.*;
+import orbital.ctype.UnlockableContent;
 import orbital.entities.units.*;import orbital.gen.*;
 import orbital.game.*;
 import orbital.type.*;
+import orbital.ui.dialogs.TurretLoadoutDialog;
 import orbital.world.Block;
 import orbital.world.blocks.defense.turrets.*;
 import org.junit.jupiter.api.*;
@@ -101,10 +106,11 @@ public class TurretLoadoutDialogTest{
         Unit unit = UnitTypes.mono.create(Team.sharded);
         unit.removeWeapon(nativeTurret(unit));
 
-        //the filter the dialog's catalogue uses
+        //the filter the dialog's catalogue uses: hidden blocks are skipped, except module-only
+        //vanilla turrets, which are hidden from construction menus but still offered as modules
         int offer = 0;
         for(Block block : content.blocks()){
-            if(!(block instanceof Turret turret) || block.isHidden() || !TurretWeapon.canAdapt(turret)) continue;
+            if(!(block instanceof Turret turret) || (block.isHidden() && !block.moduleOnly) || !TurretWeapon.canAdapt(turret)) continue;
             if(!unit.type.hasSlotFor(turret.size) || !unit.type.fitsSilhouette(turret.size)) continue;
             if(!unit.ammoCompatible(turret)) continue;
             offer++;
@@ -141,6 +147,45 @@ public class TurretLoadoutDialogTest{
             Groups.bullet.update();
         }
         assertTrue(shots > 0, "the re-armed turret must fire");
+    }
+
+    /** @return a project source file, walking upward from the test working directory. */
+    private static File source(String relative){
+        File dir = new File(System.getProperty("user.dir")).getAbsoluteFile();
+        for(int i = 0; i < 5 && dir != null; i++, dir = dir.getParentFile()){
+            File file = new File(dir, relative);
+            if(file.isFile()) return file;
+        }
+        return null;
+    }
+
+    @Test
+    void everyModuleCardAcceptsInfoContent() throws Exception{
+        //the grid cards (turrets, weapon modules, support blocks) all carry the (i) affordance:
+        //headless has no scene, so the signature is checked on the compiled dialog itself
+        assertNotNull(TurretLoadoutDialog.class.getDeclaredMethod("moduleCard",
+            Table.class, Drawable.class, String.class, String.class, int.class, float.class,
+            Runnable.class, Boolf.class, String.class, UnlockableContent.class));
+    }
+
+    @Test
+    void infoIconsOpenTheExistingDialogAndItHasAnXClose() throws Exception{
+        File dialog = source("core/src/orbital/ui/dialogs/TurretLoadoutDialog.java");
+        File info = source("core/src/orbital/ui/dialogs/ContentInfoDialog.java");
+        assumeTrue(dialog != null && info != null, "dialog sources not reachable from this working directory");
+
+        String src = new String(Files.readAllBytes(dialog.toPath()), StandardCharsets.UTF_8);
+        String inf = new String(Files.readAllBytes(info.toPath()), StandardCharsets.UTF_8);
+
+        assertTrue(src.contains("Icon.info"), "each module card needs an (i) icon");
+        assertTrue(src.contains("ui.content.show(content)"), "the icon must open the existing info dialog");
+        assertTrue(src.contains("event.stop()"), "the icon click must not mount the module or start a drag");
+        assertTrue(src.contains("Touchable.childrenOnly"), "locked cards must keep the info icon clickable");
+        assertTrue(src.contains(", turret);") && src.contains(", module.unit);") && src.contains(", block);"),
+            "all three catalogues must pass the clicked module's content");
+
+        assertTrue(inf.contains("Icon.cancel"), "the info dialog needs an X close button");
+        assertTrue(inf.contains("this::hide"), "the X button must close the dialog");
     }
 
     /** @return the removable turret the hull carries out of the box, or null. */

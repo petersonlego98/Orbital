@@ -25,6 +25,13 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * Deliberately transient: the loadout is session-only, with no save or network serialization.
      */
     transient SupportMount[] supportMounts = {};
+    /**
+     * Runtime-only wall plates. They are not support modules: a wall plate occupies a dorsal
+     * <b>turret</b> slot and dorsal area (see {@link #findWallSlot}), so a hull can carry any
+     * number of them while space and budget last. Deliberately transient, exactly like
+     * {@code supportMounts}.
+     */
+    transient WallMount[] wallMounts = {};
     @ReadOnly transient boolean isRotate;
     @NoSerialize float aimX, aimY;
     boolean isShooting;
@@ -110,6 +117,158 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         return supportMounts;
     }
 
+    /** @return the wall plates currently installed. */
+    private WallMount[] walls(){
+        if(wallMounts == null) wallMounts = new WallMount[0];
+        return wallMounts;
+    }
+
+    /**
+     * @return the dorsal area, in px², already taken by wall plates.
+     *
+     * <p>Wall plates live in the same budget as the removable turrets, so their area is accounted
+     * separately and added on top of {@link #loadoutCost()} by the placement checks.</p>
+     */
+    public float wallLoadoutCost(){
+        float sum = 0f;
+        for(WallMount mount : walls()){
+            if(mount != null && mount.block != null){
+                float side = mount.block.size * TurretSlot.pxTile;
+                sum += side * side;
+            }
+        }
+        return sum;
+    }
+
+    /** @return true when a wall plate already occupies this dorsal slot. */
+    private boolean wallSlotOccupied(int slotIndex){
+        if(slotIndex < 0) return false;
+        for(WallMount mount : walls()){
+            if(mount != null && mount.slotIndex == slotIndex) return true;
+        }
+        return false;
+    }
+
+    /**
+     * @return true when this wall plate fits the hull's turret space right now.
+     *
+     * <p>Rules, in order: the block must be a wall module of the single armour category, the hull
+     * must have a free slot big enough, the plate must fit the hull silhouette, and the dorsal
+     * budget must still cover turrets plus every mounted plate.</p>
+     */
+    public boolean canMountWall(Block block){
+        return findWallSlot(block) >= 0;
+    }
+
+    /** @return the first dorsal slot this wall plate may take, or -1 when it does not fit. */
+    public int findWallSlot(Block block){
+        if(block == null || type == null || !SupportModuleCategory.isWallModule(block)) return -1;
+        for(int i = 0; i < type.turretSlots.size; i++){
+            if(acceptableWallSlot(block, i)) return i;
+        }
+        return -1;
+    }
+
+    /**
+     * @return true when this wall plate may take this exact dorsal slot.
+     *
+     * <p>Same rules as {@link #findWallSlot}, checked for one slot: the plate must fit the slot's
+     * size limit, sit inside the hull silhouette, not overlap anything already mounted, and leave
+     * the dorsal budget covering every module on the hull.</p>
+     */
+    public boolean canPlaceWallAt(Block block, int slotIndex){
+        if(block == null || type == null || !SupportModuleCategory.isWallModule(block)) return false;
+        return acceptableWallSlot(block, slotIndex);
+    }
+
+    private boolean acceptableWallSlot(Block block, int slotIndex){
+        if(!type.hasSlotFor(block.size)) return false;
+        if(!type.fitsSilhouette(block.size)) return false;
+        //a plate takes a slot exactly like a turret does, so there must be one left
+        if(mountedTurrets() + walls().length >= type.turretSlots.size && !wallSlotOccupied(slotIndex)) return false;
+        if(slotIndex < 0 || slotIndex >= type.turretSlots.size) return false;
+
+        float side = block.size * TurretSlot.pxTile;
+        if(loadoutCost() + wallLoadoutCost() + side * side > type.dorsalBudget()) return false;
+
+        TurretSlot slot = type.turretSlots.get(slotIndex);
+        if(slot.maxSize < block.size) return false;
+        if(slotOccupied(slotIndex)) return false;
+        if(wallSlotOccupied(slotIndex)) return false;
+
+        //slot offsets are validated once in TurretLoadouts (see everyTurretSlotAndAnchorFitsItsHull),
+        //so a plate reuses the turret rules: the drawn module must not touch anything mounted
+        float drawn = DorsalGeometry.visualFootprint(type, block.size, blockRegionPx(block));
+        if(overlapsTurretMounts(slot.offsetX, slot.offsetY, drawn)) return false;
+        if(overlapsSupportMounts(slot.offsetX, slot.offsetY, drawn)) return false;
+        return !overlapsWallMounts(slot.offsetX, slot.offsetY, drawn);
+    }
+
+    /**
+     * Mounts a wall plate in the first free dorsal slot and activates its effect.
+     * Plates stack freely: only space, silhouette and dorsal area limit them.
+     */
+    public @Nullable WallMount mountWall(Block block){
+        return mountWallAt(block, findWallSlot(block));
+    }
+
+    /** Mounts a wall plate in one specific dorsal slot, or nothing when the slot is not usable. */
+    public @Nullable WallMount mountWallAt(Block block, int slotIndex){
+        if(!canPlaceWallAt(block, slotIndex) || type == null) return null;
+
+        TurretSlot slot = type.turretSlots.get(slotIndex);
+        //drawing-only: the resolved scale is never fed back into footprints or overlap checks
+        float visualScale = DorsalGeometry.turretVisualScale(type, block.size, blockRegionPx(block));
+        WallMount mount = new WallMount(block, slotIndex, slot.offsetX, slot.offsetY, visualScale);
+
+        WallMount[] current = walls();
+        WallMount[] next = java.util.Arrays.copyOf(current, current.length + 1);
+        next[current.length] = mount;
+        wallMounts = next;
+
+        mount.created(self());
+        return mount;
+    }
+
+    public boolean removeWallMount(WallMount mount){
+        if(mount == null || walls().length == 0) return false;
+
+        WallMount[] current = walls();
+        int index = -1;
+        for(int i = 0; i < current.length; i++){
+            if(current[i] == mount){
+                index = i;
+                break;
+            }
+        }
+        if(index < 0) return false;
+
+        WallMount[] next = new WallMount[current.length - 1];
+        System.arraycopy(current, 0, next, 0, index);
+        System.arraycopy(current, index + 1, next, index, next.length - index);
+        wallMounts = next;
+
+        //release shared state (the plate's shield pool) after the array has been updated,
+        //so removed() can see whether another module still owns it
+        mount.removed(self());
+        return true;
+    }
+
+    public boolean removeWall(Block block){
+        for(WallMount mount : walls()){
+            if(mount != null && mount.block == block) return removeWallMount(mount);
+        }
+        return false;
+    }
+
+    private boolean overlapsWallMounts(float x, float y, float visualFootprint){
+        for(WallMount mount : walls()){
+            if(mount == null || mount.block == null) continue;
+            if(DorsalGeometry.overlaps(x, y, visualFootprint, mount.x, mount.y, mount.visualWidth())) return true;
+        }
+        return false;
+    }
+
     /** @return true if a support block from this category is already installed. */
     public boolean hasSupportCategory(SupportModuleCategory category){
         if(category == null) return false;
@@ -126,6 +285,9 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
 
     /** @return the first free support anchor for this block, or -1 if it cannot be mounted. */
     public int findSupportAnchor(Block block){
+        //wall plates take turret space, not a support anchor; they mount through mountWall()
+        if(SupportModuleCategory.isWallModule(block)) return -1;
+
         SupportModuleCategory category = SupportModuleCategory.of(block);
         if(category == null || type == null || hasSupportCategory(category)) return -1;
         //a hull with a built-in equivalent already provides this effect as a fixed module
@@ -520,6 +682,12 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         //support abilities are not part of UnitType.abilities, so they must be ticked here;
         //this is inlined into every generated unit's update() by the entity processor
         for(SupportMount mount : supports()){
+            if(mount != null) mount.update(self());
+        }
+
+        //wall plates are not support modules either, but they are placed turret-side, so they are
+        //ticked beside them with the same convention
+        for(WallMount mount : walls()){
             if(mount != null) mount.update(self());
         }
     }

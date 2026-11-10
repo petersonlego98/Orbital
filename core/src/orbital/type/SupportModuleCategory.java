@@ -9,7 +9,23 @@ import orbital.world.Block;
 public enum SupportModuleCategory{
     repair,
     overdrive,
-    force;
+    force,
+    /** pulls enemy air units with a tractor beam ({@code parallax}). */
+    tractor,
+    /** shoots down enemy bullets ({@code segment}). */
+    pointDefense,
+    /** heals allied units directly ({@code repair-point}, {@code repair-turret}, {@code unit-repair-tower}). */
+    unitRepair,
+    /** liquid support: extinguishes burning allies and applies the liquid's status to enemies ({@code wave}, {@code tsunami}). */
+    liquid,
+    /** logistics: launches items to allied buildings or units ({@code mass-driver}). */
+    transport,
+    /**
+     * Hull armour plates: every wall and rampart ({@code Wall} blocks of the defense category).
+     * They are one single category on purpose - the player may carry any number of wall
+     * modules, they simply compete with the turrets for dorsal space and area.
+     */
+    armor;
 
     /** @return the category of a supported block, or null when the block is not a support module. */
     public static @Nullable SupportModuleCategory of(Block block){
@@ -19,6 +35,24 @@ public enum SupportModuleCategory{
             case "mender", "mend-projector" -> repair;
             case "overdrive-projector", "overdrive-dome" -> overdrive;
             case "force-projector" -> force;
+            case "parallax" -> tractor;
+            case "segment" -> pointDefense;
+            case "repair-point", "repair-turret", "unit-repair-tower" -> unitRepair;
+            case "wave", "tsunami" -> liquid;
+            case "mass-driver" -> transport;
+            //walls and ramparts: one armour category, see WallModuleAbility
+            case "copper-wall", "copper-wall-large",
+                 "titanium-wall", "titanium-wall-large",
+                 "plastanium-wall", "plastanium-wall-large",
+                 "thorium-wall", "thorium-wall-large",
+                 "phase-wall", "phase-wall-large",
+                 "surge-wall", "surge-wall-large",
+                 "scrap-wall", "scrap-wall-large", "scrap-wall-huge", "scrap-wall-gigantic",
+                 "beryllium-wall", "beryllium-wall-large",
+                 "tungsten-wall", "tungsten-wall-large",
+                 "carbide-wall", "carbide-wall-large",
+                 "reinforced-surge-wall", "reinforced-surge-wall-large",
+                 "shielded-wall" -> armor;
             default -> null;
         };
     }
@@ -48,5 +82,17 @@ public enum SupportModuleCategory{
 
     public static boolean isSupport(Block block){
         return of(block) != null;
+    }
+
+    /**
+     * @return true when this block is a wall or rampart, i.e. a module of the single
+     * {@link #armor} category.
+     *
+     * <p>Wall modules are not installed on support anchors: they take turret space and dorsal
+     * area (see {@code WeaponsComp.mountWall}), so every anchor, exclusivity and catalogue check
+     * must branch on this predicate instead of treating them as ordinary support modules.</p>
+     */
+    public static boolean isWallModule(Block block){
+        return of(block) == armor;
     }
 }

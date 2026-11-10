@@ -962,3 +962,191 @@ Os valores numéricos estão em `TurretLoadouts.load()`; a contagem de slots/ân
 3. **`obviate` e `avert`/`mega` ficaram com módulos pequenos e próximos ao centro**, porque a
    arte desses cascos é estreita: não há espaço na borda para um módulo do tamanho aceito.
 4. **Somente na sessão:** sem save e sem sincronização, como nas fases anteriores.
+
+---
+
+## 19. Implementação — torres como módulos de suporte (fase 7)
+
+**Pedido de Péterson (10/11/2026):** *"poderia transformar as torres em modulos de suporte: paralaxe, segment, ponto de reparo, torre de reparo de unidade, torre de reparo, tsunami, wave, catapulta eletromagnetica"*.
+
+### 19.1 Decisões confirmadas por escolha explícita
+
+| Decisão | Valor escolhido |
+|---|---|
+| Agrupamento | **5 categorias novas**: `tractor` (paralaxe), `pointDefense` (segmento), `unitRepair` (ponto de reparo + torre de reparo + torre de reparo de unidade), `liquid` (wave + tsunami), `transport` (catapulta eletromagnética). Coexistem com reparo/sobrecarga/força. |
+| Catapulta eletromagnética | **Logística**: lança itens para construções ou outras unidades aéreas. |
+| Wave/Tsunami | **Ajuda aliados ou atrapalha inimigos**: apaga incêndio em aliados e aplica o status do líquido em inimigos no alcance. |
+
+### 19.2 Mapeamento bloco → habilidade (parâmetros reais)
+
+| Bloco | Habilidade nova | Parâmetros efetivos |
+|---|---|---|
+| `parallax` (2x2) | `TractorAbility` | alcance 300; força 16 + bônus de proximidade 9; dano contínuo 0,5/tick |
+| `segment` (2x2) | `PointDefenseAbility` | alcance 180; dano 30 por tiro; recarga 8 |
+| `repair-point` (1x1) | `RepairBeamAbility` | raio 60; 0,45 hp/tick (27 hp/s); feixe 0,73 |
+| `repair-turret` (2x2) | `RepairBeamAbility` | raio 145; 3 hp/tick (180 hp/s); feixe 1,1 |
+| `unit-repair-tower` (2x2) | `RepairFieldAbility` (recarga 1) | alcance 100; 1,5 hp/tick (90 hp/s) em área |
+| `wave` (2x2) | `LiquidSupportAbility` | alcance 110; recarga 3; status **wet** (molhado, do padrão de água do bloco) |
+| `tsunami` (3x3) | `LiquidSupportAbility` | alcance 190; recarga 3; status **wet** |
+| `mass-driver` (3x3) | `MassDriverAbility` | alcance 440; recarga 200; até 120 itens por lançamento |
+
+Semântica do extintor: aplicar **wet** sobre queimando usa a transição oposta do jogo original (`tempo_restante -= duração x 0,5`), que converte a entrada para wet quando a queima restante é menor que a metade da duração do líquido.
+
+### 19.3 Âncoras novas (solver geométrico)
+
+As posições foram resolvidas por busca em grade replicando exatamente `fitsHull` (em unidades de mundo), a separação por tamanho desenhado (`DorsalVisual`) e a regra "toda âncora tem slot de torreta compatível":
+
+| Casco | Âncoras novas | Não recebe por limite de silhueta |
+|---|---|---|
+| `zenith` | unitRepair 1x1 (−5,75, 5,75) — só aceita `repair-point` | — |
+| `obviate` | pointDefense 2x2 (−1,5, 1,5) | — |
+| `quad` | unitRepair, tractor, liquid 3x3, transport 3x3, pointDefense (5 novas) | — |
+| `antumbra`, `disrupt`, `eclipse`, `oct` | liquid 3x3, transport 3x3, unitRepair, tractor, pointDefense (5 novas) | — |
+| `emanate`, `horizon`, `quell` | — | nenhuma posição valida `fitsHull` + não-sobreposição com os módulos existentes; ficam só com as categorias anteriores |
+
+Cascos com armas nativas de suporte ganham bloqueio de categoria equivalente: `gamma` tem `RepairBeamWeapon` + `PointDefenseWeapon` nativos (sem âncoras, sem efeito visível); `vela`, `retusa`, `oxynoe`, `cyerce`, `aegires` idem (fora da lista de cascos).
+
+### 19.4 O que foi alterado
+
+| Arquivo | Mudança |
+|---|---|
+| `SupportModuleCategory.java` | 5 categorias novas + mapeamento por `block.name` |
+| `UnitType.java` | `hasNativeSupport` também reconhece `RepairBeamWeapon`/`PointDefenseWeapon` nativos |
+| `SupportMount.java` | `createAbility` constrói as 5 habilidades novas dos parâmetros reais dos blocos |
+| 5 arquivos novos em `entities/abilities/` | `TractorAbility`, `PointDefenseAbility`, `RepairBeamAbility`, `LiquidSupportAbility`, `MassDriverAbility` |
+| `TurretLoadouts.java` | âncoras novas por casco (tabela acima) |
+| `TurretLoadoutDialog.java` | ícones das categorias novas na lista de módulos nativos |
+| bundles (EN + pt-BR) | `support.category.tractor/pointDefense/unitRepair/liquid/transport` (CRLF preservado: 3784/3763 linhas, 0 LF solto) |
+| `SupportLoadoutTest.java` | 33 → **41 testes**; snapshot de compatibilidade atualizado; 7 testes novos (parâmetros reais dos 8 blocos, feixe de reparo, extinção, lentidão em inimigo, tração, abate de bala, logística de itens) |
+
+### 19.5 Verificação
+
+- `SupportLoadoutTest` + `TurretLoadoutSmokeTest` + `WeaponModuleTest` + `TurretLoadoutDialogTest` → **BUILD SUCCESSFUL**, 0 falhas.
+- Suíte completa `:tests:test` → **493 testes, 34 falhas**, todas em `ApplicationTests` (saves legados, mapas e setores serpulo) — **conjunto idêntico ao baseline** das fases anteriores; nenhuma regressão.
+- `:desktop:dist` → **BUILD SUCCESSFUL**; JAR validado por `unzip -t` e `javap` (5 classes novas e as 5 categorias no enum presentes dentro do JAR).
+- `deploy/windows64/Orbital/app/Orbital.jar` atualizado: SHA-256 `101cc9c03ae30fa1f9b652018d09331d900ee80fa1e10e96fac4f69c62fccac2`; `.exe` e `runtime/` intocados.
+- Durante a verificação houve novamente erros de filesystem Windows (`ReadOnly`/stale outputs em `*/build`); resolvidos limpando atributos, como nas fases anteriores. Não foi erro de código.
+
+### 19.6 Pendências e limites
+
+1. **Sem revisão visual em jogo**: posições, sprites e efeitos precisam da conferência de Péterson no `.exe`.
+2. Algumas âncoras novas caem **próximas ao centro** do casco (obviate, liquid/transport em quad/antumbra/disrupt/eclipse) porque `fitsHull` exige a pegada cheia do bloco dentro do quadrado de área equivalente — mesma limitação já aceita na fase 6.
+3. A âncora `unitRepair` do `zenith` é 1x1: só `repair-point` instala; as torres 2x2 não cabem na silhueta dele.
+4. **Caminho do núcleo** do `MassDriverAbility` (puxar do núcleo → lançar a construção/unidade) não tem teste de comportamento (exige mundo com construções); o caminho "portador carrega item → entrega a aliado" tem teste. Os dois caminhos compartilham a seleção de alvo e os parâmetros.
+5. Varredura linear de balas no `PointDefenseAbility` (em vez de quadtree): necessária porque a árvore do grupo só é reconstruída pelo loop de lógica; custo aceitável, re-scan a cada 5 ticks.
+6. Sem persistência/sync (transiente, como todas as fases) e **sem commit**.
+
+### 19.7 Regeneração do `Orbital.exe` (a pedido posterior de Péterson)
+
+Após a fase 7, Péterson pediu para **compilar o exe**. Seguido o fluxo de `docs/BUILD_EXECUTAVEL.md`:
+
+1. App-image antigo `deploy/windows64/` removido (o doc exige; `jpackage` recusa destino existente).
+2. `jpackage --type app-image --name Orbital --input desktop/build/libs --main-jar Orbital.jar --main-class orbital.desktop.DesktopLauncher --icon deploy/orbital.ico --dest deploy/windows64 --java-options "-Djpackage.app-version=1.0" --java-options "-XX:+ShowCodeDetailsInExceptionMessages"` → **exit 0**, log vazio.
+3. `Orbital.exe` novo: 800.768 bytes, assinatura MZ, carimbo 06:13; `app/Orbital.jar` com SHA-256 idêntico ao do build (`101cc9c0…ccac2`); `runtime/release` = JAVA_VERSION 21.0.12.1, 350 arquivos, `jli.dll` + `bin/server/jvm.dll` (sem `java.exe`, igual ao app-image anterior — o launcher carrega a JVM em processo).
+4. `LICENSE`, `README.md`, `CREDITS.md`, `NOTICE.txt`, `THIRD_PARTY_LICENSES/` e `docs/` (3 arquivos) recopiados por `cp`, conforme Passo 4.
+5. **Smoke test do empacotado**: `timeout 30 ./deploy/windows64/Orbital/Orbital.exe` → SDL 2.32.8, SoLoud, OpenGL 4.3 / Intel HD 4600 (GL2), Java 21.0.12.1, **"Total time to load: 16597ms"**; kill por tempo (exit 124, esperado). Único erro no log: `Failed to fetch community servers` 404 no CDN `servers_v8.json` — externo e preexistente, não afeta inicialização. Nenhum processo `Orbital`/`java` restante após o teste (janela fechada).
+
+O `Orbital.cfg` gerado mantém as duas entradas `app.classpath` (Orbital.jar + desktop-release.jar) e a linha `java-options=-Djpackage.app-version=1.0` duplicada — **idêntico byte a byte ao cfg do app-image anterior** (292 bytes), ou seja, comportamento do jpackage, não regressão.
+
+> Observação: a seção 19.5 registrou ".exe e runtime intocados"; isso valia até este pedido. A partir daqui o `.exe` foi regenerado com o ícone e o JAR da fase 7.
+
+### 19.8 Correção: módulos invisíveis no catálogo de suporte (relato de Péterson)
+
+**Relato:** *"tem modulos que nao estao disponiveis: wave, tsunami, torre de reparo, segment e outros que pedi"*.
+
+#### Causa raiz (medida, não inferida)
+
+`Blocks.hideModuleOnlyTurrets()` marca 30 torres — inclusive **wave, tsunami, parallax, repair-point, repair-turret** — com `buildVisibility = hidden` e `moduleOnly = true` (só existem como módulos). O catálogo de torres usava `(block.isHidden() && !block.moduleOnly)`, mas `rebuildSupportGrid()` usava apenas `block.isHidden()`: os 5 blocos ocultos **nunca entravam na lista de suporte**, embora tivessem âncora válida e `canMountSupport() == true` nos cinco capitais.
+
+Medição por casco (teste de diagnóstico, removido depois): nos capitais `quad/antumbra/disrupt/eclipse/oct` os **8 blocos** são todos `canMountSupport == true`; o catálogo atual só mostrava `segment`, `unit-repair-tower` e `mass-driver` (os três não ocultos). `segment` tem `moduleOnly=true` mas `isHidden()==false`, por isso já aparecia.
+
+#### Correção
+
+- Extraído `TurretLoadoutDialog.supportCatalogEligible(Block, UnitType)` (predicado real do catálogo, testável) com a mesma exceção `!block.moduleOnly` do catálogo de torres.
+- `rebuildSupportGrid()` passa a usar esse predicado.
+- Teste novo `hiddenModuleOnlySupportBlocksStayInTheCatalogue`: os 8 blocos são elegíveis e instaláveis nos 5 capitais; os ocultos continuam `isHidden() && moduleOnly` (não viram blocos construíveis); `zenith` (âncora 1x1) oferece `repair-point` mas não `repair-turret`; `duo` fora do catálogo.
+
+#### Verificação
+
+- Suítes de módulos com `--rerun-tasks` → **BUILD SUCCESSFUL**, 0 falhas.
+- Suíte completa → **494 testes, 34 falhas**, todas `ApplicationTests` (baseline exato, sem regressão).
+- **Armadilha evitada**: ao rodar `:tests:test :desktop:dist` no mesmo comando, a falha da suíte (baseline) fez o Gradle **pular `:desktop:dist`**, e o JAR permaneceu com o SHA antigo. Detectado pelo hash antes de empacotar; o build do JAR foi rodado separadamente.
+- JAR novo `fba97c95bee24c69af7ac0faaf08d8310a02e2166318fefb06779b7fadaa2bc5`; `javap` confirma `supportCatalogEligible` dentro do JAR; app-image regenerado (jpackage exit 0), licenças recopiadas, hashes do JAR em `app/` idênticos.
+- Smoke test do executável: **"Total time to load: 16758ms"**, Java 21.0.12.1; kill por tempo (124); único erro externo = 404 do CDN de community servers; nenhum processo residual.
+
+#### Limite que **não** é bug do catálogo
+
+Os 8 módulos só existem onde há âncora da categoria: **capitais** (quad, antumbra, disrupt, eclipse, oct) têm as 5 categorias novas; `obviate` tem ponto de defesa; `zenith` tem reparo de unidade 1x1 (só `repair-point`). **13 cascos não têm nenhuma âncora nova** (mono, flare, poly, mega, horizon, avert, quell, alpha, beta, gamma, evoke, incite, emanate) por limite de silhueta já medido na fase 7. Se o teste de Péterson foi num desses, a lista de suporte realmente não mostra os blocos novos — ampliar isso exigiria mudar as regras de encaixe das fases 1/6, o que **não foi feito sem autorização**.
+
+### 19.9 Posições dos módulos novos: reaproveitamento das coordenadas conhecidas
+
+**Pedido:** *"falta somente corrigir a posicao que fica esses novos modulos usando as posicoes ja conhecidas"*. Decisão confirmada por escolha explícita: **reaproveitar as coordenadas exatas** das âncoras calibradas na fase 6 (não espelhar, não manter as do solver).
+
+#### Mapeamento aplicado em `TurretLoadouts.load()`
+
+Cada categoria nova usa o `(x, y)` de uma das três posições conhecidas do casco (reparo / sobrecarga / força). Onde uma posição não comporta 3x3 em `fitsHull` (ex.: reparo do `quad` em `x=15.19`), as categorias 3x3 foram direcionadas às outras posições.
+
+| Casco | Reparo (posição conhecida) | Sobrecarga | Força |
+|---|---|---|---|
+| `zenith` | unitRepair (1x1) `(9, −9)` | — | — |
+| `obviate` | pointDefense (2x2) `(8, −8)` | — | — |
+| `quad` | unitRepair, pointDefense `(15.19, −0.8)` | tractor, transport `(−13.06, −13.06)` | liquid `(11.46, 12.5)` |
+| `antumbra` | unitRepair `(16.5, −4)` | liquid, tractor `(−15, −15)` | transport, pointDefense `(13, 14)` |
+| `disrupt` | unitRepair `(0.31, −20.38)` | liquid, tractor `(12, 17)` | transport, pointDefense `(−16, 16)` |
+| `eclipse` | liquid, tractor `(−19.5, −27)` | transport, pointDefense `(2.16, −26.64)` | unitRepair `(16.99, 16.99)` |
+| `oct` | liquid, tractor `(−21.07, −27.14)` | transport, pointDefense `(9.45, −33.08)` | unitRepair `(10.75, 8.6)` |
+
+#### Consequência (aceita na escolha)
+
+Âncoras de categorias diferentes passam a **coincidir**: são módulos alternativos para a mesma posição física. A regra de runtime (`overlapsSupportMounts` + `findSupportAnchor`) instala **no máximo um módulo por posição por vez**. O catálogo continua listando as 8 categorias; as que compartilham uma posição ocupada aparecem travadas. O limite "um por categoria" continua valendo.
+
+#### Testes ajustados / novos
+
+- `supportAnchorsNeverOverlapEachOther` e `noTwoDorsalModulesOverlapOnceDrawn`: pares de âncoras com offset idêntico são ignorados (posição compartilhada intencional); todos os demais pares — inclusive âncora vs slot — seguem proibidos.
+- `towerAnchorsReuseTheKnownPositions` (novo): nenhuma âncora de categoria nova pode ter coordenada fora do conjunto de posições conhecidas do casco.
+- `capitalHullsCarryAllThreeCategories`: agora verifica 8 âncoras, as 8 categorias instaláveis individualmente em cascos novos, 3 posições físicas distintas, e que um 4º módulo numa posição ocupada (`parallax`) é rejeitado.
+- Snapshot de compatibilidade **inalterado** (usa casco novo por categoria).
+
+#### Verificação
+
+- Suítes de módulos → **BUILD SUCCESSFUL**, 0 falhas.
+- Suíte completa → **495 testes, 34 falhas**, todas `ApplicationTests` (baseline exato). `:desktop:dist` rodado em invocação separada (BUILD SUCCESSFUL) para não ser pulado pela falha da suíte.
+- JAR `1dcdddee49c2f065ab0bccb35bf9b516b04e9a8f360a1e5a2ee451287d81ee57`; app-image regenerado (jpackage exit 0), JAR em `app/` com SHA idêntico, `javap` OK, licenças recopiadas.
+- Smoke test do `.exe`: **"Total time to load: 16448ms"**, Java 21.0.12.1; kill por tempo (124); único erro externo = 404 do CDN de community servers; nenhum processo residual.
+
+> A revisão visual em jogo continua sendo a de Péterson: agora os módulos novos pousam exatamente onde os três originais já apareciam nas capturas da fase 6.
+
+### 19.10 Ícone de informações nos cards e botão X no menu de informações
+
+**Pedido:** *"adicione perto do card de cada modulo um icone que sinaliza informacoes ai quando clica nele aparece o menu de informacoes do modulo clicado com botao de x para fechar, esse menu de informacao ja existe no jogo"*.
+
+#### O que já existia
+
+`ui.content.show(UnlockableContent)` abre `ContentInfoDialog` — o mesmo menu usado pela árvore tecnológica (`ResearchDialog`, `Icon.info`), pelo banco de dados e pelo fragmento de colocação. Ele só tinha `addCloseButton()` (botão "@back" com `Icon.left`), sem X.
+
+#### Implementação
+
+| Arquivo | Mudança |
+|---|---|
+| `TurretLoadoutDialog.java` | `moduleCard(...)` ganhou o parâmetro `@Nullable UnlockableContent info`. Um `Image` com `Icon.info` (24 px) fica no canto superior direito do card, com tooltip `@info.title`. O clique chama `ui.content.show(content)` e faz `event.stop()` no `touchDown` para **não** montar o módulo nem iniciar o drag do card. Layout do card passou a 2 colunas com `colspan(2)` nas linhas de texto. Cards travados mudaram de `Touchable.disabled` para `Touchable.childrenOnly`, para que o (i) continue clicável mesmo sem poder instalar. |
+| `TurretLoadoutDialog.java` (3 catálogos) | Torretas passam o próprio `Turret`; módulos de arma passam `module.unit` (o casco de origem — `Weapon` não é `UnlockableContent`); módulos de suporte passam o `Block`. |
+| `ContentInfoDialog.java` | Botão **X** (`Icon.cancel`, `Styles.clearNonei`, `this::hide`) acrescentado à linha de botões, ao lado de "@back". Como o diálogo é compartilhado, o X aparece em todas as origens (database, research, placement), não só nos cards. |
+
+#### Testes novos (`TurretLoadoutDialogTest`)
+
+- `everyModuleCardAcceptsInfoContent`: reflexão na assinatura compilada de `moduleCard` confirma o parâmetro `UnlockableContent` (sem depender de cena).
+- `infoIconsOpenTheExistingDialogAndItHasAnXClose`: inspeção de fonte (com busca de caminho ascendente, 0 skips) confirma `Icon.info`, `ui.content.show(content)`, `event.stop()`, `Touchable.childrenOnly`, os 3 conteúdos passados e o `Icon.cancel` + `this::hide` no diálogo de informações.
+
+#### Verificação
+
+- Suítes de módulos → BUILD SUCCESSFUL, 0 falhas, `TurretLoadoutDialogTest` 7 testes / 0 skips / 0 falhas.
+- Suíte completa → **497 testes, 34 falhas**, todas `ApplicationTests` (baseline exato). `:desktop:dist` em invocação separada.
+- JAR `15c1098cd7346bbb0258f9baa72f238b51029a35b87c365977ec3aff9c42be25`; app-image regenerado (jpackage exit 0); `javap -p` confirma `infoIcon(...)` e a nova assinatura de `moduleCard` dentro do JAR de deploy; licenças recopiadas.
+- Smoke test: **"Total time to load: 16371ms"**, Java 21.0.12.1; kill por tempo (124); único erro externo = 404 do CDN; nenhum processo residual.
+
+#### Limites
+
+1. **Sem inspeção visual da UI**: headless não tem cena; o posicionamento do (i) no canto e o layout de 2 colunas precisam da conferência de Péterson em jogo.
+2. O ícone foi adicionado aos **cards do catálogo** (torretas, armas de unidade e suporte). As linhas de módulos **já instalados** não receberam ícone — não foi pedido.
+3. Em módulos de arma, o menu mostra o **casco de origem** (`UnitType`), não a arma em si: `Weapon` não é `UnlockableContent` e o diálogo existente só aceita conteúdo.
+4. O X é global ao `ContentInfoDialog` (compartilhado), não exclusivo do loadout.

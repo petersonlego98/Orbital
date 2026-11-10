@@ -15,8 +15,9 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>The preference is written through a throwaway {@link Settings} and read back through
  * {@link VulkanPreferences#load(Fi)} - the same path {@code DesktopLauncher#main} uses before
- * {@code Core.settings} exists. Backend selection is asserted by hand: the port is incomplete, so
- * every request must resolve to OpenGL regardless of the drivers installed on the machine.</p>
+ * {@code Core.settings} exists. Backend selection is asserted by hand: the port rendered broken
+ * output when wired on a Vulkan-capable machine (2026-11-10), so every request must resolve to
+ * OpenGL regardless of the drivers installed.</p>
  */
 class VulkanBackendSelectionTest{
     //tests run with core/assets as the working directory, so the scratch data stays outside it

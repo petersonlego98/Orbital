@@ -10,7 +10,11 @@ import orbital.world.blocks.defense.turrets.Turret;
  * <p>Multipliers and measured areas come from the tower-module design report.
  * Turret slots and support anchors are explicit hull-local placements in world units.
  * Support anchors are separate from the turret budget and enforce one visual module
- * per category: repair, overdrive and force field.
+ * per category: repair, overdrive and force field. The tower-module categories
+ * (tractor, point defense, unit repair, liquid, transport) deliberately reuse the
+ * calibrated offsets of those three known anchors instead of adding new coordinates:
+ * they are alternative modules for the same physical positions, so the runtime
+ * overlap rule installs at most one module per position at a time.
  *
  * <p>Module <b>visual size</b> is not configured here anymore. {@link DorsalVisual} derives it
  * from each hull's measured sprite area ({@code dorsalAreaOverride}) and its number of dorsal
@@ -68,18 +72,29 @@ public class TurretLoadouts{
             turrets(t(2, -4f, 0f)), supports());
         setup(UnitTypes.zenith, 0.90f, 12544,
             turrets(t(2, -2.14f, -2.14f), t(1, 9f, 9f)),
-            supports(s(SupportModuleCategory.repair, 1, 9f, -9f)));
+            supports(
+                s(SupportModuleCategory.repair, 1, 9f, -9f),
+                s(SupportModuleCategory.unitRepair, 1, 9f, -9f)
+            ));
 
         //heavy hulls
         setup(UnitTypes.obviate, 0.95f, 18200,
             turrets(t(2, -8f, -8f), t(2, 8f, 8f)),
-            supports(s(SupportModuleCategory.repair, 1, 8f, -8f)));
+            supports(
+                s(SupportModuleCategory.repair, 1, 8f, -8f),
+                s(SupportModuleCategory.pointDefense, 2, 8f, -8f)
+            ));
         setup(UnitTypes.quad, 0.85f, 48400,
             turrets(t(4, -11f, 11f), t(2, 3.02f, -4.11f)),
             supports(
                 s(SupportModuleCategory.repair, 2, 15.19f, -0.8f),
                 s(SupportModuleCategory.overdrive, 3, -13.06f, -13.06f),
-                s(SupportModuleCategory.force, 3, 11.46f, 12.5f)
+                s(SupportModuleCategory.force, 3, 11.46f, 12.5f),
+                s(SupportModuleCategory.unitRepair, 2, 15.19f, -0.8f),
+                s(SupportModuleCategory.tractor, 2, -13.06f, -13.06f),
+                s(SupportModuleCategory.liquid, 3, 11.46f, 12.5f),
+                s(SupportModuleCategory.transport, 3, -13.06f, -13.06f),
+                s(SupportModuleCategory.pointDefense, 2, 15.19f, -0.8f)
             ));
         setup(UnitTypes.quell, 0.80f, 26244,
             turrets(t(3, -7.5f, -7.5f), t(1, 8.5f, 8.5f)),
@@ -94,21 +109,36 @@ public class TurretLoadouts{
             supports(
                 s(SupportModuleCategory.repair, 2, 16.5f, -4f),
                 s(SupportModuleCategory.overdrive, 3, -15f, -15f),
-                s(SupportModuleCategory.force, 3, 13f, 14f)
+                s(SupportModuleCategory.force, 3, 13f, 14f),
+                s(SupportModuleCategory.liquid, 3, -15f, -15f),
+                s(SupportModuleCategory.transport, 3, 13f, 14f),
+                s(SupportModuleCategory.unitRepair, 2, 16.5f, -4f),
+                s(SupportModuleCategory.tractor, 2, -15f, -15f),
+                s(SupportModuleCategory.pointDefense, 2, 13f, 14f)
             ));
         setup(UnitTypes.disrupt, 0.75f, 59049,
             turrets(t(4, -13.5f, -8f), t(2, 16f, -8f)),
             supports(
                 s(SupportModuleCategory.repair, 2, 0.31f, -20.38f),
                 s(SupportModuleCategory.overdrive, 3, 12f, 17f),
-                s(SupportModuleCategory.force, 3, -16f, 16f)
+                s(SupportModuleCategory.force, 3, -16f, 16f),
+                s(SupportModuleCategory.liquid, 3, 12f, 17f),
+                s(SupportModuleCategory.transport, 3, -16f, 16f),
+                s(SupportModuleCategory.unitRepair, 2, 0.31f, -20.38f),
+                s(SupportModuleCategory.tractor, 2, 12f, 17f),
+                s(SupportModuleCategory.pointDefense, 2, -16f, 16f)
             ));
         setup(UnitTypes.eclipse, 0.50f, 102720,
             turrets(t(5, -19.5f, -10f), t(5, 19.5f, -10f), t(2, -13.79f, 19.79f)),
             supports(
                 s(SupportModuleCategory.repair, 2, -19.5f, -27f),
                 s(SupportModuleCategory.overdrive, 3, 2.16f, -26.64f),
-                s(SupportModuleCategory.force, 3, 16.99f, 16.99f)
+                s(SupportModuleCategory.force, 3, 16.99f, 16.99f),
+                s(SupportModuleCategory.liquid, 3, -19.5f, -27f),
+                s(SupportModuleCategory.transport, 3, 2.16f, -26.64f),
+                s(SupportModuleCategory.unitRepair, 2, 16.99f, 16.99f),
+                s(SupportModuleCategory.tractor, 2, -19.5f, -27f),
+                s(SupportModuleCategory.pointDefense, 2, 2.16f, -26.64f)
             ));
         setup(UnitTypes.oct, 0.85f, 160000,
             turrets(
@@ -118,7 +148,12 @@ public class TurretLoadouts{
             supports(
                 s(SupportModuleCategory.repair, 2, -21.07f, -27.14f),
                 s(SupportModuleCategory.overdrive, 3, 9.45f, -33.08f),
-                s(SupportModuleCategory.force, 3, 10.75f, 8.6f)
+                s(SupportModuleCategory.force, 3, 10.75f, 8.6f),
+                s(SupportModuleCategory.liquid, 3, -21.07f, -27.14f),
+                s(SupportModuleCategory.transport, 3, 9.45f, -33.08f),
+                s(SupportModuleCategory.unitRepair, 2, 10.75f, 8.6f),
+                s(SupportModuleCategory.tractor, 2, -21.07f, -27.14f),
+                s(SupportModuleCategory.pointDefense, 2, 9.45f, -33.08f)
             ));
 
         //demonstration variants: same hulls, with one 1x1 dorsal slot.

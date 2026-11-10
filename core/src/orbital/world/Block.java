@@ -365,6 +365,13 @@ public class Block extends UnlockableContent implements Senseable{
     public float buildTime = -1f;
     /** Whether this block is visible and can currently be built. */
     public BuildVisibility buildVisibility = BuildVisibility.hidden;
+    /**
+     * Marks a vanilla turret that exists only as a dorsal module: it is hidden from every
+     * construction menu (see {@code Blocks.hideModuleOnlyTurrets()}), but the loadout
+     * catalogue must still offer it as a module. Never treat this field as placeable -
+     * it is the exception to {@link #isHidden()} for module sources.
+     */
+    public boolean moduleOnly = false;
     /** Multiplier for speed of building this block. */
     public float buildCostMultiplier = 1f;
     /** Build completion at which deconstruction finishes. */

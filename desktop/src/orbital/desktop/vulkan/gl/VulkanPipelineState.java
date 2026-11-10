@@ -5,8 +5,9 @@ package orbital.desktop.vulkan.gl;
  *
  * <p>OpenGL lets applications mutate state at any time; Vulkan freezes most of it into
  * VkGraphicsPipelineCreateInfo. This key captures every GL state that changes pipeline
- * compatibility, so {@link VulkanPipelineCache} can reuse pipelines instead of rebuilding them
- * on every draw call. Fields keep GL enum values - the native layer translates them to Vk enums.</p>
+ * compatibility, so {@link VulkanGL20} can detect real state changes and only ask the native
+ * backend for a new pipeline when the key differs from the active one. Fields keep GL enum
+ * values - the native layer translates them to Vk enums.</p>
  */
 public final class VulkanPipelineState{
     public final long vertexShader, fragmentShader, renderPass;

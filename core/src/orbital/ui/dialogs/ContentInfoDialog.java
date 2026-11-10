@@ -25,6 +25,10 @@ public class ContentInfoDialog extends BaseDialog{
 
         addCloseButton();
 
+        //explicit X close button: module info cards open this same dialog and need a
+        //visible close affordance at the top of the button row
+        buttons.button(Icon.cancel, Styles.clearNonei, this::hide).size(64f).padLeft(8f);
+
         keyDown(key -> {
             if(key == Binding.blockInfo.value.key){
                 Core.app.post(this::hide);

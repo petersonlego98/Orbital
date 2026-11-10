@@ -51,17 +51,20 @@ public class DesktopLauncher extends ClientLauncher{
             check32Bit();
             checkJavaVersion();
 
-            // Vulkan is desktop-only. Until the Arc Vulkan renderer is complete, every Vulkan
-            // request resolves to the existing SDL/OpenGL backend (see VulkanBackend.select).
-            // The preference comes from Settings > Advanced Graphics, but it has to be read from
-            // the settings file because Core.settings only exists once SdlApplication is created.
+            // Vulkan is desktop-only. The renderer preference (Settings > Advanced Graphics) and the
+            // -vulkan flag both resolve through VulkanBackend.select, which only returns VULKAN when
+            // a usable Vulkan device is present (rendererReady). The preference has to be read from
+            // the settings file because Core.settings only exists once the application is created.
             VulkanPreferences.load();
             //Settings > Advanced Graphics reports whether Vulkan can actually be used on this
             //machine; core must not depend on this module, so the probe is handed over here.
             RendererPreference.vulkanProbe = VulkanSupport::isAvailable;
             VulkanBackend.Type backend = VulkanBackend.select(arg);
             if(backend == VulkanBackend.Type.VULKAN){
-                // Reserved for VulkanApplication once it implements Arc's rendering contract.
+                // Reserved for VulkanApplication. Do NOT wire this: the preference path was wired
+                // on 2026-11-10 and on a Vulkan-capable machine it rendered broken output (colored
+                // rectangles) in real gameplay. Reverted the same day; the port is only reachable
+                // through the explicit -vulkan-app flag below until the defect is fixed there.
                 Log.warn("[Vulkan] Renderer entry point is not wired yet; falling back to OpenGL.");
             }
 
@@ -73,9 +76,8 @@ public class DesktopLauncher extends ClientLauncher{
                 }
             }
 
-            VulkanChecks.windowCheck = VulkanBackend.windowCheckRequested(arg);
-            // frames and reads the presented pixels back. It runs once the window exists, so it is
-            // scheduled here and executed from the SdlApplication main loop in setup().
+            // window self-check flag: read once here, executed from the SdlApplication main loop
+            // in setup() (it runs once the window exists and reads the presented pixels back).
             VulkanChecks.windowCheck = VulkanBackend.windowCheckRequested(arg);
 
             // Full Vulkan application backend: replaces SdlApplication, so Arc renders through

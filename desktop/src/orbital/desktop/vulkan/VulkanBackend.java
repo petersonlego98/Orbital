@@ -39,8 +39,10 @@ public final class VulkanBackend{
     /**
      * True once a launcher entry point can construct the Arc Vulkan renderer. This is the single
      * switch of the port: the native core, the GL20/GL30 layer over it and their tests are all in
-     * place, but nothing creates a Vulkan-backed application yet, so it is false and the game
-     * renders - and keeps rendering - with OpenGL.
+     * place, and {@code VulkanApplication} exists, but the preference path must NOT construct it
+     * yet - when exercised on a Vulkan-capable machine (2026-11-10) the port rendered broken
+     * output (colored rectangles) in real gameplay. It stays reachable only through the explicit
+     * {@code -vulkan-app} flag until the rendering defect is fixed on such a machine.
      */
     public static boolean rendererWired(){
         return false;

@@ -6,6 +6,10 @@ import orbital.gen.Unit;
 import orbital.type.*;
 import orbital.world.Block;
 import orbital.world.blocks.defense.*;
+import orbital.world.blocks.defense.turrets.*;
+import orbital.world.blocks.distribution.MassDriver;
+import orbital.world.blocks.units.RepairTower;
+import orbital.world.blocks.units.RepairTurret;
 
 import static orbital.Vars.tilesize;
 
@@ -139,6 +143,42 @@ public class SupportMount{
             //block: heals buildings for healPercent% of max health every reload ticks
             //unit analogue: heals nearby allied units for the same percentage
             return new RepairFieldAbility(0f, mend.reload, mend.range, mend.healPercent);
+        }
+
+        if(block instanceof RepairTurret repair){
+            //block: repairs the closest unit at repairSpeed hp per tick inside repairRadius,
+            //with a beam of beamWidth; no power or coolant on units
+            return new RepairBeamAbility(repair.repairRadius, repair.repairSpeed, repair.beamWidth);
+        }
+
+        if(block instanceof RepairTower tower){
+            //block: heals every damaged unit in range by healAmount per tick
+            //unit analogue: the same field, refreshed every tick
+            return new RepairFieldAbility(tower.healAmount, 1f, tower.range);
+        }
+
+        if(block instanceof TractorBeamTurret tractor){
+            //block: pulls the closest enemy air unit with force + proximity bonus,
+            //damaging it continuously; the same profile, centred on the carrier
+            return new TractorAbility(tractor.range, tractor.force, tractor.scaledForce, tractor.damage);
+        }
+
+        if(block instanceof PointDefenseTurret point){
+            //block: shoots down the closest hittable enemy bullet every reload ticks
+            //with bulletDamage; the same interception, around the carrier
+            return new PointDefenseAbility(point.range, point.bulletDamage, point.reload);
+        }
+
+        if(block instanceof LiquidTurret liquid){
+            //block: sprays the liquid's status (wet, freezing, oil, slag); unit analogue:
+            //extinguishes burning allies and applies the status to enemies in range
+            return LiquidSupportAbility.from(liquid);
+        }
+
+        if(block instanceof MassDriver driver){
+            //block: launches up to itemCapacity items within range to a linked building;
+            //unit analogue: auto-targeting logistics to buildings or allied units
+            return new MassDriverAbility(driver.range, driver.reload, driver.itemCapacity);
         }
 
         if(block instanceof OverdriveProjector drive){

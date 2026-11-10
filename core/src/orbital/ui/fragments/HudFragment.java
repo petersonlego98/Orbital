@@ -1021,6 +1021,12 @@ public class HudFragment{
                 if(mount != null) signature = signature * 31L + System.identityHashCode(mount);
             }
         }
+        //wall plates sit in turret slots, so installing or removing one reshapes the bar too
+        if(unit.wallMounts != null){
+            for(WallMount mount : unit.wallMounts){
+                if(mount != null) signature = signature * 31L + System.identityHashCode(mount);
+            }
+        }
         return signature;
     }
 
@@ -1090,7 +1096,17 @@ public class HudFragment{
             }
         }
 
-        if(unit.mountedTurrets() < unit.type.turretSlots.size){
+        //wall plates occupy turret slots, but their effect is a module toggle like the support
+        //cells above - the badge says whether the plate is defending
+        if(unit.wallMounts != null){
+            for(WallMount mount : unit.wallMounts){
+                if(mount == null || mount.block == null) continue;
+                table.add(wallCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(wallTooltip(mount));
+            }
+        }
+
+        //a slot is only free when no turret and no plate sits in it
+        if(unit.mountedTurrets() + unit.wallMounts.length < unit.type.turretSlots.size){
             table.add(actionCell(unit, Icon.add, Core.bundle.get("turret.loadout.add")))
                 .size(cellSize).pad(cellPad).tooltip(Core.bundle.get("turret.loadout.add"));
         }
@@ -1177,8 +1193,32 @@ public class HudFragment{
      * never removed here, so its anchor, category and footprint stay reserved.
      */
     private Table supportCell(Unit unit, SupportMount mount){
+        return moduleCell(unit, mount.block, () -> mount.active, () -> mount.setActive(unit, !mount.active),
+            () -> supportTooltip(mount));
+    }
+
+    /** @return the tooltip of a wall plate cell: name, category, current state and hint. */
+    private static String wallTooltip(WallMount mount){
+        return mount.block.localizedName
+            + "\n[lightgray]" + Core.bundle.get("support.category.armor")
+            + " · " + Core.bundle.get(supportStateKey(mount.active))
+            + "\n" + Core.bundle.get("support.hud.toggle");
+    }
+
+    /**
+     * A wall plate cell in the bottom dorsal bar. It reuses the support module cell - the same
+     * badge and the same click - because a plate is toggled, never uninstalled from here: it
+     * keeps its turret slot, its budget and its shape on the hull.
+     */
+    private Table wallCell(Unit unit, WallMount mount){
+        return moduleCell(unit, mount.block, () -> mount.active, () -> mount.setActive(unit, !mount.active),
+            () -> wallTooltip(mount));
+    }
+
+    /** Shared body of every module cell: icon, live state badge, click toggle. */
+    private Table moduleCell(Unit unit, Block block, Boolp active, Runnable toggle, Prov<String> tooltip){
         float iconSize = 44f;
-        TextureRegion region = mount.block.uiIcon;
+        TextureRegion region = block.uiIcon;
         if(region == null || !region.found()) region = unit.type.uiIcon;
 
         Table cell = new Table();
@@ -1194,23 +1234,24 @@ public class HudFragment{
         overlay.top();
         //overlay.top() centers horizontally and pins vertically to the top; do not call
         //center() on the cell, as it would override the vertical alignment.
-        Label state = overlay.label(() -> Core.bundle.get(supportStateKey(mount.active)))
+        Label state = overlay.label(() -> Core.bundle.get(supportStateKey(active.get())))
             .style(Styles.outlineLabel).fontScale(mobile ? 0.55f : 0.65f).get();
         stack.add(overlay);
 
         cell.add(stack).size(iconSize).pad(2f).row();
 
-        Bar status = new Bar(() -> "", () -> mount.active ? Pal.heal : Pal.remove,
-            () -> mount.active ? 1f : 0f);
+        Bar status = new Bar(() -> "", () -> active.get() ? Pal.heal : Pal.remove,
+            () -> active.get() ? 1f : 0f);
         cell.add(status).height(4f).growX().pad(0f, 2f, 2f, 2f).row();
 
-        cell.clicked(() -> mount.setActive(unit, !mount.active));
+        cell.clicked(toggle);
         cell.update(() -> {
-            state.setColor(mount.active ? Pal.heal : Pal.remove);
-            icon.border(mount.active ? Pal.accent : Pal.gray);
-            icon.thickness = mount.active ? 3f : 2f;
-            icon.setColor(mount.active ? Color.white : Color.gray);
-            cell.background(mount.active ? Styles.black3 : Styles.black6);
+            boolean on = active.get();
+            state.setColor(on ? Pal.heal : Pal.remove);
+            icon.border(on ? Pal.accent : Pal.gray);
+            icon.thickness = on ? 3f : 2f;
+            icon.setColor(on ? Color.white : Color.gray);
+            cell.background(on ? Styles.black3 : Styles.black6);
         });
         return cell;
     }

@@ -22,6 +22,7 @@ import orbital.core.*;
 import orbital.ctype.*;
 import orbital.entities.*;
 import orbital.entities.abilities.*;
+import orbital.type.weapons.*;
 import orbital.entities.part.*;
 import orbital.entities.units.*;
 import orbital.game.*;
@@ -702,13 +703,29 @@ public class UnitType extends UnlockableContent implements Senseable{
      * @return true when this hull already provides a built-in ability equivalent to a
      * support-module category. Such a category is shown as a fixed, non-removable module
      * and cannot be installed again, so native and mounted effects never overlap.
+     *
+     * <p>Native support <b>weapons</b> (repair beams, point-defense mounts) also claim
+     * their category: mounting a module that re-implements the same effect would double
+     * the healing or intercept the same bullet twice.</p>
      */
     public boolean hasNativeSupport(SupportModuleCategory category){
         if(category == null) return false;
         for(Ability ability : abilities){
             if(SupportModuleCategory.ofAbility(ability) == category) return true;
         }
+        for(Weapon weapon : weapons){
+            if(nativeWeaponSupport(weapon) == category) return true;
+        }
         return false;
+    }
+
+    /** @return the support category claimed by a native weapon, or null. */
+    private static SupportModuleCategory nativeWeaponSupport(Weapon weapon){
+        if(weapon instanceof RepairBeamWeapon) return SupportModuleCategory.unitRepair;
+        if(weapon instanceof PointDefenseWeapon || weapon instanceof PointDefenseBulletWeapon){
+            return SupportModuleCategory.pointDefense;
+        }
+        return null;
     }
 
     /**
@@ -1701,6 +1718,13 @@ public class UnitType extends UnlockableContent implements Senseable{
                 a.draw(unit);
             }
             drawSupportModuleEffects(unit);
+            //plate effects (shield outline) follow the same convention as support effects
+            if(unit.wallMounts != null){
+                for(WallMount mount : unit.wallMounts){
+                    Draw.reset();
+                    if(mount != null) mount.draw(unit);
+                }
+            }
         }
 
         if(mech != null){
@@ -1859,8 +1883,36 @@ public class UnitType extends UnlockableContent implements Senseable{
 
         //share the weapon draw state (color, scale and layer) so support sprites sit on the hull
         drawSupportModules(unit);
+        //wall plates are turret-side modules, so they are drawn in the same pass
+        drawWallModules(unit);
 
         Draw.reset();
+    }
+
+    /**
+     * Draws the wall plate sprites attached to the dorsal slots they took from the turrets.
+     *
+     * <p>Sprites use the hull's visual scale, exactly like support and turret modules. Only the
+     * drawing size changes: slots, footprints, overlap checks and the compatibility list keep
+     * using the full block size.</p>
+     */
+    public void drawWallModules(Unit unit){
+        if(unit.wallMounts == null || unit.wallMounts.length == 0) return;
+
+        //same hull-local rotation convention as Weapon#draw
+        float rotation = unit.rotation - 90f;
+
+        for(WallMount mount : unit.wallMounts){
+            if(mount == null || mount.block == null || mount.block.region == null || !mount.block.region.found()) continue;
+
+            float wx = unit.x + Angles.trnsx(rotation, mount.x, mount.y);
+            float wy = unit.y + Angles.trnsy(rotation, mount.x, mount.y);
+
+            var region = mount.block.region;
+            float w = region.width * region.scl() * Draw.xscl * mount.visualScale;
+            float h = region.height * region.scl() * Draw.yscl * mount.visualScale;
+            Draw.rect(region, wx, wy, w, h, rotation);
+        }
     }
 
     /**

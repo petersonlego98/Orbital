@@ -53,6 +53,8 @@ public class TurretLoadoutDialog extends BaseDialog{
     private int armedSlot = -1;
     /** card metrics, refreshed on every rebuild because they depend on the screen width */
     private float cardWidth, btnSize, imgSize, cardMinHeight, nameLineHeight, roleLineHeight;
+    /** side of the small (i) affordance in a module card's corner. */
+    private static final float infoIconSize = 24f;
     /** the slot boxes, in slot order, so a drag can highlight the one under the pointer */
     private final Seq<Table> slotBoxes = new Seq<>();
     /** slot highlighted by the drag in progress, -1 when none */
@@ -117,9 +119,10 @@ public class TurretLoadoutDialog extends BaseDialog{
         UnitType type = unit.type;
 
         list.add(type.localizedName).style(Styles.outlineLabel).left().padBottom(4f).row();
+        //wall plates share this budget, so the line reads turrets + plates against the total
         list.add(Core.bundle.format("turret.loadout.budget",
-            (int)unit.loadoutCost(), (int)type.dorsalBudget(),
-            unit.mountedTurrets(), type.turretSlots.size))
+            (int)(unit.loadoutCost() + unit.wallLoadoutCost()), (int)type.dorsalBudget(),
+            unit.mountedTurrets() + unit.wallMounts.length, type.turretSlots.size))
             .color(Color.lightGray).left().padBottom(6f).row();
         list.image().color(Pal.accent).height(3f).growX().padBottom(8f).row();
 
@@ -139,6 +142,13 @@ public class TurretLoadoutDialog extends BaseDialog{
         heading("@weapon.module.available", weaponKeys());
         list.add("@weapon.module.hint").color(Color.lightGray).left().wrap().padBottom(6f).row();
         rebuildWeaponGrid();
+
+        //wall plates come after the turret catalogue because they take turret space: the player
+        //reads the two grids as one budget decision
+        list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
+        heading("@support.loadout.available", wallKeys());
+        list.add("@support.category.armor.info").color(Color.lightGray).left().wrap().padBottom(6f).row();
+        rebuildWallGrid();
 
         list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
         list.add("@support.loadout.installed").style(Styles.outlineLabel).left().padBottom(4f).row();
@@ -243,14 +253,25 @@ public class TurretLoadoutDialog extends BaseDialog{
             int index = i;
             boolean armed = armedSlot == index;
             TurretSlot slot = unit.type.turretSlots.get(index);
+            //a slot is either turret, plate or free: only one module fits in it
             Weapon weapon = mountedAt(index);
-            String label = weapon == null
-                ? Core.bundle.format("weapon.module.slot.max", slot.maxSize, slot.maxSize)
-                : weaponName(weapon);
-            Drawable icon = weapon == null ? Icon.add : weaponIcon(weapon);
+            WallMount plate = weapon == null ? mountedWallAt(index) : null;
+            boolean free = weapon == null && plate == null;
+
+            String label = weapon != null
+                ? weaponName(weapon)
+                : plate != null
+                    ? plate.block.localizedName
+                    : Core.bundle.format("weapon.module.slot.max", slot.maxSize, slot.maxSize);
+
+            Drawable icon = weapon != null
+                ? weaponIcon(weapon)
+                : plate != null
+                    ? new TextureRegionDrawable(plate.block.uiIcon)
+                    : Icon.add;
 
             //the drop target is the box itself, so the index travels with the actor
-            Table box = slotBox(slotRow, icon, weapon == null ? Pal.accent : Color.white, label,
+            Table box = slotBox(slotRow, icon, free ? Pal.accent : Color.white, label,
                 boxSize, slotImg, () -> {
                     if(weapon != null){
                         //dropping a module off its square also removes it; so does a click
@@ -259,11 +280,16 @@ public class TurretLoadoutDialog extends BaseDialog{
                             changed.run();
                             rebuild();
                         }
+                    }else if(plate != null){
+                        //a plate leaves with the same click a turret does
+                        unit.removeWallMount(plate);
+                        changed.run();
+                        rebuild();
                     }else{
                         armedSlot = armed ? -1 : index;
                         rebuild();
                     }
-                }, weapon == null ? null : new SlotDrag(weapon));
+                }, weapon != null ? new SlotDrag(weapon) : null);
 
             box.setBackground(armed || hoverSlot == index ? tinted(Tex.pane, Pal.accent) : Tex.pane);
             box.userObject = new SlotTag(index);
@@ -417,6 +443,15 @@ public class TurretLoadoutDialog extends BaseDialog{
         return null;
     }
 
+    /** @return the wall plate sitting in this dorsal slot, or null when the slot holds no plate. */
+    private @Nullable WallMount mountedWallAt(int slotIndex){
+        if(unit.wallMounts == null) return null;
+        for(WallMount mount : unit.wallMounts){
+            if(mount != null && mount.slotIndex == slotIndex) return mount;
+        }
+        return null;
+    }
+
     /**
      * Installed mounts, one row per kind of weapon.
      *
@@ -499,7 +534,9 @@ public class TurretLoadoutDialog extends BaseDialog{
 
         Seq<Turret> turrets = new Seq<>(Turret.class);
         for(Block block : content.blocks()){
-            if(!(block instanceof Turret turret) || block.isHidden() || !TurretWeapon.canAdapt(turret)) continue;
+            //module-only vanilla turrets (see Blocks.hideModuleOnlyTurrets) are hidden from every
+            //construction menu but must stay listed here: their only existence is as modules
+            if(!(block instanceof Turret turret) || (block.isHidden() && !block.moduleOnly) || !TurretWeapon.canAdapt(turret)) continue;
             //the hull decides what this catalogue may offer, not the current loadout: a turret
             //that stopped fitting stays listed - locked - instead of vanishing and moving the page
             if(!unit.type.hasSlotFor(turret.size) || !unit.type.fitsSilhouette(turret.size)) continue;
@@ -528,7 +565,7 @@ public class TurretLoadoutDialog extends BaseDialog{
                         () -> place(slot -> unit.mountTurret(turret, slot) != null,
                             () -> unit.mountTurret(turret) != null),
                         slot -> unit.mountTurret(turret, slot) != null,
-                        fits ? null : reasonNoRoom());
+                        fits ? null : reasonNoRoom(), turret);
                     if(count % columns() == 0) grid.row();
                 }
             });
@@ -581,12 +618,94 @@ public class TurretLoadoutDialog extends BaseDialog{
                         () -> place(slot -> unit.mountWeaponModule(module, slot) != null,
                             () -> unit.mountWeaponModule(module) != null),
                         slot -> unit.mountWeaponModule(module, slot) != null,
-                        fits ? null : reasonNoRoom());
+                        fits ? null : reasonNoRoom(), module.unit);
                     inRow++;
                     if(inRow % columns() == 0) grid.row();
                 }
             });
         }
+    }
+
+    /**
+     * @return whether a support block may be listed in the loadout catalogue for a hull.
+     *
+     * <p>Module-only vanilla turrets (see {@code Blocks.hideModuleOnlyTurrets}) are hidden
+     * from every construction menu, but their only existence is as a module: the turret
+     * catalogue already makes that exception, and the support catalogue must do the same
+     * or blocks like wave, tsunami, parallax or repair-turret vanish from the list even
+     * though the hull has a valid anchor for them.</p>
+     */
+    public static boolean supportCatalogEligible(Block block, UnitType type){
+        if(block == null || type == null) return false;
+        //wall plates share the turret space, so they have their own catalogue instead of an
+        //anchor: see rebuildWallGrid()
+        if(SupportModuleCategory.isWallModule(block)) return false;
+        if(block.isHidden() && !block.moduleOnly) return false;
+        if(!SupportModuleCategory.isSupport(block)) return false;
+        return type.hasAnchorFor(SupportModuleCategory.of(block), block.size);
+    }
+
+    /**
+     * @return whether a wall plate may be listed in the loadout catalogue for a hull.
+     *
+     * <p>Wall modules are {@link Blocks#hideWallModules hidden from every construction menu}, so
+     * - exactly like the module-only turrets - the exception {@code moduleOnly} keeps them in the
+     * catalogue. The hull decides by turret space and silhouette; a plate that stopped fitting
+     * stays listed, locked, instead of vanishing and moving the page.</p>
+     */
+    public static boolean wallCatalogEligible(Block block, UnitType type){
+        if(block == null || type == null) return false;
+        if(!SupportModuleCategory.isWallModule(block)) return false;
+        if(block.isHidden() && !block.moduleOnly) return false;
+        return type.hasSlotFor(block.size) && type.fitsSilhouette(block.size);
+    }
+
+    /** Wall plates take turret space, so they get a catalogue of their own. */
+    private void rebuildWallGrid(){
+        cardMetrics();
+
+        Seq<Block> walls = new Seq<>(Block.class);
+        for(Block block : content.blocks()){
+            if(!wallCatalogEligible(block, unit.type)) continue;
+            walls.add(block);
+        }
+
+        if(walls.isEmpty()){
+            lockedLine("@support.loadout.noavailable");
+            return;
+        }
+
+        walls.sort((a, b) -> a.size != b.size ? a.size - b.size : a.localizedName.compareTo(b.localizedName));
+
+        for(Section<Block> section : sections(walls, b -> "wall-" + b.size,
+            b -> Core.bundle.format("turret.loadout.footprintgroup", b.size, b.size))){
+
+            section(section, () -> {
+                Table grid = newGrid();
+                int count = 0;
+                for(Block block : section.items){
+                    count++;
+                    boolean fits = unit.canMountWall(block);
+                    moduleCard(grid, new TextureRegionDrawable(block.uiIcon), block.localizedName,
+                        Core.bundle.get("support.category.armor"),
+                        block.size, budget(block.size),
+                        () -> place(slot -> unit.mountWallAt(block, slot) != null,
+                            () -> unit.mountWall(block) != null),
+                        slot -> unit.mountWallAt(block, slot) != null,
+                        fits ? null : reasonNoWall(block), block);
+                    if(count % columns() == 0) grid.row();
+                }
+            });
+        }
+    }
+
+    /** @return why this wall plate cannot be installed right now. */
+    private String reasonNoWall(Block block){
+        UnitType type = unit.type;
+        boolean slotsFree = unit.mountedTurrets() + unit.wallMounts.length < type.turretSlots.size;
+        return !slotsFree
+            ? Core.bundle.get("weapon.module.locked.slot")
+            : Core.bundle.get("weapon.module.locked.budget");
     }
 
     /** Support modules, in one collapsible section per effect. */
@@ -595,8 +714,7 @@ public class TurretLoadoutDialog extends BaseDialog{
 
         Seq<Block> supports = new Seq<>(Block.class);
         for(Block block : content.blocks()){
-            if(block == null || block.isHidden() || !SupportModuleCategory.isSupport(block)) continue;
-            if(!unit.type.hasAnchorFor(SupportModuleCategory.of(block), block.size)) continue;
+            if(!supportCatalogEligible(block, unit.type)) continue;
             supports.add(block);
         }
 
@@ -626,7 +744,7 @@ public class TurretLoadoutDialog extends BaseDialog{
                                 changed.run();
                                 rebuild();
                             }
-                        }, null, fits ? null : reasonNoSupport(block));
+                        }, null, fits ? null : reasonNoSupport(block), block);
                     if(count % columns() == 0) grid.row();
                 }
             });
@@ -669,6 +787,36 @@ public class TurretLoadoutDialog extends BaseDialog{
         if(supportCount == 0){
             list.add("@support.loadout.none").color(Color.lightGray).left().padBottom(4f).row();
         }
+
+        //wall plates are installed with the turrets, not on support anchors, so they get their
+        //own rows with the same toggle and remove affordance
+        for(WallMount mount : unit.wallMounts){
+            if(mount == null || mount.block == null) continue;
+
+            list.table(Styles.grayPanel, cell -> {
+                cell.left().margin(6f);
+                cell.image(mount.block.uiIcon).size(40f).padRight(10f).scaling(Scaling.fit);
+                cell.add(mount.block.localizedName).left().growX().ellipsis(false).wrap();
+                cell.add(Core.bundle.format("support.loadout.size", mount.block.size, mount.block.size))
+                    .color(Color.lightGray).padLeft(8f).padRight(8f);
+                Label state = cell.label(() -> Core.bundle.get(mount.active
+                    ? "support.hud.active" : "support.hud.inactive"))
+                    .padLeft(8f).padRight(8f).get();
+                state.update(() -> state.setColor(mount.active ? Pal.heal : Pal.remove));
+                //the plate stays mounted and keeps its slot when switched off
+                cell.button(Icon.power, Styles.clearNonei, () -> {
+                    mount.setActive(unit, !mount.active);
+                    changed.run();
+                }).size(48f).padLeft(4f).tooltip(Core.bundle.get("support.hud.toggle"))
+                    .get().getStyle().imageUpColor = mount.active ? Pal.heal : Pal.remove;
+                cell.button(Icon.cancel, Styles.clearNonei, () -> {
+                    unit.removeWallMount(mount);
+                    changed.run();
+                    rebuild();
+                }).size(48f).padLeft(4f).tooltip(Core.bundle.get("support.loadout.remove"))
+                    .get().getStyle().imageUpColor = Pal.remove;
+            }).growX().pad(3f).row();
+        }
     }
 
     /** live state line under the support heading */
@@ -679,6 +827,13 @@ public class TurretLoadoutDialog extends BaseDialog{
                 if(support == null || support.block == null) continue;
                 hasSupport = true;
                 if(support.active) anyActive = true;
+            }
+        }
+        if(unit.wallMounts != null){
+            for(WallMount mount : unit.wallMounts){
+                if(mount == null || mount.block == null) continue;
+                hasSupport = true;
+                if(mount.active) anyActive = true;
             }
         }
         return hasSupport && !anyActive ? "support.loadout.inactive" : "support.loadout.active";
@@ -777,6 +932,13 @@ public class TurretLoadoutDialog extends BaseDialog{
     private static Seq<String> supportKeys(){
         Seq<String> keys = new Seq<>(String.class);
         for(SupportModuleCategory category : SupportModuleCategory.values()) keys.add("support-" + category.name());
+        return keys;
+    }
+
+    /** every wall-plate section key: one per footprint, exactly like the turret catalogue */
+    private static Seq<String> wallKeys(){
+        Seq<String> keys = new Seq<>(String.class);
+        for(int size = 1; size <= 5; size++) keys.add("wall-" + size);
         return keys;
     }
 
@@ -896,34 +1058,44 @@ public class TurretLoadoutDialog extends BaseDialog{
      * @param locked reason the module does not fit right now, or null when it does. A locked
      *     card keeps its place in the grid - so mounting never rearranges the catalogue under
      *     the player's cursor - and shows a padlock with the reason instead of mounting.
+     * @param info content whose existing info dialog the corner (i) button opens, or null.
+     *     Weapon modules show their source hull, since a {@code Weapon} is not content.
      */
     private void moduleCard(Table grid, Drawable icon, String name, String role, int size, float cost,
-        Runnable mount, @Nullable Boolf<Integer> placeAt, @Nullable String locked){
+        Runnable mount, @Nullable Boolf<Integer> placeAt, @Nullable String locked,
+        @Nullable UnlockableContent info){
         //a locked card is dimmed: same size, same place, no interaction
         Drawable background = locked == null ? Tex.pane : tinted(Tex.whiteui, Color.darkGray);
         Table card = grid.table(background, cell -> {
             cell.margin(6f).top();
-            cell.image(icon).size(btnSize).scaling(Scaling.fit).padBottom(4f);
+            cell.image(icon).size(btnSize).scaling(Scaling.fit).padBottom(4f).expandX().left();
+            //corner (i) button: opens the game's existing content info dialog. The empty
+            //placeholder keeps the two-column layout stable for cards without content.
+            if(info != null){
+                cell.add(infoIcon(info)).size(infoIconSize).top().right().tooltip(Core.bundle.get("info.title"));
+            }else{
+                cell.add().size(infoIconSize);
+            }
             cell.row();
             //the name and the role scale with the card: on phones the cards are narrow, and a
             //full-size label would break the module name in the middle of a word
-            cell.add(name).width(cardWidth - 8f).height(nameLineHeight).wrap().center()
+            cell.add(name).colspan(2).width(cardWidth - 8f).height(nameLineHeight).wrap().center()
                 .fontScale(mobile ? 0.72f : 1f).padTop(2f).row();
             //the role line carries the shot type or the support category, or the lock reason.
             //Both lines have an explicit width and height: a wrapped label without a width has
             //a preferred width of zero, so arc breaks the text after every glyph
             String line = locked != null ? locked : role;
-            cell.add(line == null ? "" : line).width(cardWidth - 8f).height(roleLineHeight)
+            cell.add(line == null ? "" : line).colspan(2).width(cardWidth - 8f).height(roleLineHeight)
                 .color(locked == null ? Color.lightGray : Pal.remove)
                 .fontScale(mobile ? 0.72f : 0.85f).center().wrap().row();
-            cell.add(Core.bundle.format("weapon.module.footprint", size, size))
+            cell.add(Core.bundle.format("weapon.module.footprint", size, size)).colspan(2)
                 .color(sizeColor(size)).fontScale(mobile ? 0.7f : 0.85f).center();
         }).width(cardWidth).minHeight(cardMinHeight).pad(2f).tooltip(tooltip(name, role, size, cost))
             .get();
 
-        //a locked card is inert: no click, no drag, no tooltip change
+        //a locked card is inert for mounting, but its info button stays clickable
         if(locked != null){
-            card.touchable = Touchable.disabled;
+            card.touchable = Touchable.childrenOnly;
             return;
         }
 
@@ -935,6 +1107,30 @@ public class TurretLoadoutDialog extends BaseDialog{
             }
         });
         if(placeAt != null) card.addListener(new CardDrag(icon, size, placeAt));
+    }
+
+    /**
+     * @return the corner (i) icon that opens the game's existing content info dialog.
+     *
+     * <p>The touching stops at the icon: the card's click listener would otherwise mount the
+     * module, and its drag listener would start a drag when the player only wanted information.</p>
+     */
+    private static Image infoIcon(UnlockableContent content){
+        Image icon = new Image(Icon.info);
+        icon.addListener(new ClickListener(){
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, arc.input.KeyCode button){
+                boolean handled = super.touchDown(event, x, y, pointer, button);
+                event.stop();
+                return handled;
+            }
+
+            @Override
+            public void clicked(InputEvent event, float x, float y){
+                ui.content.show(content);
+            }
+        });
+        return icon;
     }
 
     /** @return why a dorsal module has no room: a full slot set, or an exhausted budget. */
@@ -1127,6 +1323,14 @@ public class TurretLoadoutDialog extends BaseDialog{
             case repair -> Blocks.mender;
             case overdrive -> Blocks.overdriveProjector;
             case force -> Blocks.forceProjector;
+            case tractor -> Blocks.parallax;
+            case pointDefense -> Blocks.segment;
+            case unitRepair -> Blocks.repairPoint;
+            case liquid -> Blocks.wave;
+            case transport -> Blocks.massDriver;
+            //walls and ramparts: all of them are armour, so the representative icon is the
+            //simplest plate in the category
+            case armor -> Blocks.copperWall;
         };
     }
 

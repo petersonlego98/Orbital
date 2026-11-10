@@ -2,14 +2,18 @@ import arc.*;
 import arc.util.*;
 import orbital.content.*;
 import orbital.entities.abilities.*;
+import orbital.entities.bullet.*;
 import orbital.entities.units.*;
 import orbital.game.*;
 import orbital.gen.*;
 import orbital.type.*;
+import orbital.ui.dialogs.TurretLoadoutDialog;
 import orbital.ui.fragments.HudFragment;
 import orbital.world.Block;
 import orbital.world.blocks.defense.*;
 import orbital.world.blocks.defense.turrets.*;
+import orbital.world.blocks.distribution.MassDriver;
+import orbital.world.blocks.units.*;
 import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -50,6 +54,14 @@ public class SupportLoadoutTest{
         assertEquals(SupportModuleCategory.overdrive, SupportModuleCategory.of(Blocks.overdriveProjector));
         assertEquals(SupportModuleCategory.overdrive, SupportModuleCategory.of(Blocks.overdriveDome));
         assertEquals(SupportModuleCategory.force, SupportModuleCategory.of(Blocks.forceProjector));
+        assertEquals(SupportModuleCategory.tractor, SupportModuleCategory.of(Blocks.parallax));
+        assertEquals(SupportModuleCategory.pointDefense, SupportModuleCategory.of(Blocks.segment));
+        assertEquals(SupportModuleCategory.unitRepair, SupportModuleCategory.of(Blocks.repairPoint));
+        assertEquals(SupportModuleCategory.unitRepair, SupportModuleCategory.of(Blocks.repairTurret));
+        assertEquals(SupportModuleCategory.unitRepair, SupportModuleCategory.of(Blocks.unitRepairTower));
+        assertEquals(SupportModuleCategory.liquid, SupportModuleCategory.of(Blocks.wave));
+        assertEquals(SupportModuleCategory.liquid, SupportModuleCategory.of(Blocks.tsunami));
+        assertEquals(SupportModuleCategory.transport, SupportModuleCategory.of(Blocks.massDriver));
         //mender/mendProjector share MendProjector, and both overdrive blocks share OverdriveProjector,
         //so class identity cannot be used to tell categories apart.
         assertNull(SupportModuleCategory.of(Blocks.duo));
@@ -86,11 +98,44 @@ public class SupportLoadoutTest{
                 SupportAnchor a = type.supportAnchors.get(i);
                 for(int j = i + 1; j < type.supportAnchors.size; j++){
                     SupportAnchor b = type.supportAnchors.get(j);
+                    //tower-module categories deliberately reuse the calibrated offsets of the
+                    //original three anchors: they are alternatives for the same physical position,
+                    //and the runtime overlap rule only ever installs one of them at a time
+                    if(a.offsetX == b.offsetX && a.offsetY == b.offsetY) continue;
                     assertFalse(DorsalGeometry.overlaps(
                         a.offsetX, a.offsetY, drawnFootprint(type, a.maxSize),
                         b.offsetX, b.offsetY, drawnFootprint(type, b.maxSize)),
                         type.name + " " + a.category + " overlaps " + b.category);
                 }
+            }
+        }
+    }
+
+    /** The tower-module anchors must sit exactly on the phase-6 calibrated positions. */
+    @Test
+    void towerAnchorsReuseTheKnownPositions(){
+        UnitType[] hulls = {
+            UnitTypes.zenith, UnitTypes.obviate, UnitTypes.quad, UnitTypes.antumbra,
+            UnitTypes.disrupt, UnitTypes.eclipse, UnitTypes.oct
+        };
+
+        for(UnitType type : hulls){
+            java.util.Set<String> known = new java.util.HashSet<>();
+            for(SupportAnchor anchor : type.supportAnchors){
+                if(anchor.category == SupportModuleCategory.repair
+                    || anchor.category == SupportModuleCategory.overdrive
+                    || anchor.category == SupportModuleCategory.force){
+                    known.add(anchor.offsetX + "," + anchor.offsetY);
+                }
+            }
+            assertFalse(known.isEmpty(), type.name + " has no known support position");
+
+            for(SupportAnchor anchor : type.supportAnchors){
+                if(anchor.category == SupportModuleCategory.repair
+                    || anchor.category == SupportModuleCategory.overdrive
+                    || anchor.category == SupportModuleCategory.force) continue;
+                assertTrue(known.contains(anchor.offsetX + "," + anchor.offsetY),
+                    type.name + " " + anchor.category + " must reuse a known position");
             }
         }
     }
@@ -124,20 +169,28 @@ public class SupportLoadoutTest{
             java.util.List<float[]> points = new java.util.ArrayList<>();
             java.util.List<Integer> sizes = new java.util.ArrayList<>();
             java.util.List<String> names = new java.util.ArrayList<>();
+            java.util.List<Boolean> isAnchor = new java.util.ArrayList<>();
 
             for(TurretSlot slot : type.turretSlots){
                 points.add(new float[]{slot.offsetX, slot.offsetY});
                 sizes.add(slot.maxSize);
                 names.add("slot " + slot.maxSize);
+                isAnchor.add(false);
             }
             for(SupportAnchor anchor : type.supportAnchors){
                 points.add(new float[]{anchor.offsetX, anchor.offsetY});
                 sizes.add(anchor.maxSize);
                 names.add(anchor.category.name());
+                isAnchor.add(true);
             }
 
             for(int i = 0; i < points.size(); i++){
                 for(int j = i + 1; j < points.size(); j++){
+                    //two anchors sharing one calibrated offset are alternative modules for the
+                    //same physical position, never two sprites drawn at once
+                    if(isAnchor.get(i) && isAnchor.get(j)
+                        && points.get(i)[0] == points.get(j)[0]
+                        && points.get(i)[1] == points.get(j)[1]) continue;
                     assertFalse(DorsalGeometry.overlaps(
                         points.get(i)[0], points.get(i)[1], drawnFootprint(type, sizes.get(i)),
                         points.get(j)[0], points.get(j)[1], drawnFootprint(type, sizes.get(j))),
@@ -193,18 +246,68 @@ public class SupportLoadoutTest{
     }
 
     @Test
+    void hiddenModuleOnlySupportBlocksStayInTheCatalogue(){
+        //wave, tsunami, parallax, repair-point and repair-turret are hidden from construction
+        //menus by Blocks.hideModuleOnlyTurrets, but the loadout catalogue must still offer
+        //them: their only existence is as dorsal modules (same rule as the turret catalogue).
+        Block[] blocks = {
+            Blocks.parallax, Blocks.segment, Blocks.repairPoint, Blocks.repairTurret,
+            Blocks.unitRepairTower, Blocks.wave, Blocks.tsunami, Blocks.massDriver
+        };
+        UnitType[] capitals = {
+            UnitTypes.quad, UnitTypes.antumbra, UnitTypes.disrupt, UnitTypes.eclipse, UnitTypes.oct
+        };
+
+        for(Block block : blocks){
+            assertNotNull(SupportModuleCategory.of(block), block.name + " must belong to a support category");
+            for(UnitType type : capitals){
+                assertTrue(TurretLoadoutDialog.supportCatalogEligible(block, type),
+                    type.name + " must list " + block.name + " in the support catalogue");
+                assertTrue(type.create(Team.sharded).canMountSupport(block),
+                    type.name + " must be able to mount " + block.name);
+            }
+        }
+
+        //they stay hidden as buildable blocks and non-support blocks stay out of the catalogue
+        assertTrue(Blocks.wave.isHidden() && Blocks.wave.moduleOnly);
+        assertTrue(Blocks.tsunami.isHidden() && Blocks.tsunami.moduleOnly);
+        assertTrue(Blocks.repairTurret.isHidden() && Blocks.repairTurret.moduleOnly);
+        assertFalse(TurretLoadoutDialog.supportCatalogEligible(Blocks.duo, UnitTypes.quad));
+
+        //zenith's 1x1 unitRepair anchor offers the point, not the 2x2 repair turret
+        assertTrue(TurretLoadoutDialog.supportCatalogEligible(Blocks.repairPoint, UnitTypes.zenith));
+        assertFalse(TurretLoadoutDialog.supportCatalogEligible(Blocks.repairTurret, UnitTypes.zenith));
+    }
+
+    @Test
     void capitalHullsCarryAllThreeCategories(){
         UnitType[] capitals = {
             UnitTypes.quad, UnitTypes.antumbra, UnitTypes.disrupt, UnitTypes.eclipse
         };
+        Block[] towerBlocks = {
+            Blocks.parallax, Blocks.segment, Blocks.repairPoint, Blocks.repairTurret,
+            Blocks.unitRepairTower, Blocks.wave, Blocks.tsunami, Blocks.massDriver
+        };
 
         for(UnitType type : capitals){
-            assertEquals(3, type.supportAnchors.size, type.name);
+            assertEquals(8, type.supportAnchors.size, type.name);
+
+            //every category is individually installable on a fresh hull
+            for(Block block : towerBlocks){
+                assertNotNull(type.create(Team.sharded).mountSupport(block),
+                    type.name + " must accept " + block.name + " on a fresh hull");
+            }
+
+            //but the five new categories reuse the three known positions, so only one
+            //module per physical position can be installed at a time
             Unit unit = type.create(Team.sharded);
             assertNotNull(unit.mountSupport(Blocks.mender), type.name + " repair");
             assertNotNull(unit.mountSupport(Blocks.overdriveProjector), type.name + " overdrive");
             assertNotNull(unit.mountSupport(Blocks.forceProjector), type.name + " force");
             assertEquals(3, unit.supportMounts.length, type.name);
+            assertFalse(unit.canMountSupport(Blocks.parallax),
+                type.name + " tractor shares a position that is already occupied");
+            assertNull(unit.mountSupport(Blocks.parallax));
         }
     }
 
@@ -244,13 +347,19 @@ public class SupportLoadoutTest{
         assertTrue(UnitTypes.oct.hasNativeSupport(SupportModuleCategory.repair));
         assertFalse(UnitTypes.oct.hasNativeSupport(SupportModuleCategory.overdrive));
 
-        //oct has physical anchors for all three categories, so a rejection here is caused by
+        //oct has physical anchors for every category, so a rejection here is caused by
         //the native conflict rule, not by missing space
-        assertEquals(3, UnitTypes.oct.supportAnchors.size);
+        assertEquals(8, UnitTypes.oct.supportAnchors.size);
         Unit oct = UnitTypes.oct.create(Team.sharded);
         assertFalse(oct.canMountSupport(Blocks.mender));
         assertFalse(oct.canMountSupport(Blocks.mendProjector));
         assertFalse(oct.canMountSupport(Blocks.forceProjector));
+        //the new categories have no native conflict on oct and must still mount
+        assertTrue(oct.canMountSupport(Blocks.parallax));
+        assertTrue(oct.canMountSupport(Blocks.segment));
+        assertTrue(oct.canMountSupport(Blocks.repairPoint));
+        assertTrue(oct.canMountSupport(Blocks.wave));
+        assertTrue(oct.canMountSupport(Blocks.massDriver));
         assertNotNull(oct.mountSupport(Blocks.overdriveProjector), "the free category must still mount");
         assertEquals(1, oct.supportMounts.length);
     }
@@ -399,6 +508,255 @@ public class SupportLoadoutTest{
 
     //endregion
 
+    //region tower modules: parallax, segment, repair-point, repair-turret, unit-repair-tower, wave, tsunami, mass-driver
+
+    @Test
+    void towerSupportModulesUseTheRealBlockParameters(){
+        Unit unit = UnitTypes.quad.create(Team.sharded);
+        SupportMount mount;
+
+        TractorBeamTurret parallax = (TractorBeamTurret)Blocks.parallax;
+        mount = unit.mountSupport(Blocks.parallax);
+        assertNotNull(mount);
+        assertTrue(mount.ability instanceof TractorAbility);
+        TractorAbility tractor = (TractorAbility)mount.ability;
+        assertEquals(parallax.range, tractor.range, 0.001f);
+        assertEquals(parallax.force, tractor.force, 0.001f);
+        assertEquals(parallax.scaledForce, tractor.scaledForce, 0.001f);
+        assertEquals(parallax.damage, tractor.damage, 0.001f);
+        assertTrue(unit.removeSupportMount(mount));
+
+        PointDefenseTurret segment = (PointDefenseTurret)Blocks.segment;
+        mount = unit.mountSupport(Blocks.segment);
+        assertNotNull(mount);
+        assertTrue(mount.ability instanceof PointDefenseAbility);
+        PointDefenseAbility point = (PointDefenseAbility)mount.ability;
+        assertEquals(segment.range, point.range, 0.001f);
+        assertEquals(segment.bulletDamage, point.bulletDamage, 0.001f);
+        assertEquals(segment.reload, point.reload, 0.001f);
+        assertTrue(unit.removeSupportMount(mount));
+
+        RepairTurret pointBlock = (RepairTurret)Blocks.repairPoint;
+        mount = unit.mountSupport(Blocks.repairPoint);
+        assertNotNull(mount);
+        assertTrue(mount.ability instanceof RepairBeamAbility);
+        RepairBeamAbility beam = (RepairBeamAbility)mount.ability;
+        assertEquals(pointBlock.repairRadius, beam.range, 0.001f);
+        assertEquals(pointBlock.repairSpeed, beam.repairSpeed, 0.001f);
+        assertEquals(pointBlock.beamWidth, beam.beamWidth, 0.001f);
+        assertTrue(unit.removeSupportMount(mount));
+
+        RepairTurret turretBlock = (RepairTurret)Blocks.repairTurret;
+        mount = unit.mountSupport(Blocks.repairTurret);
+        assertNotNull(mount);
+        RepairBeamAbility bigBeam = (RepairBeamAbility)mount.ability;
+        assertEquals(turretBlock.repairRadius, bigBeam.range, 0.001f);
+        assertEquals(turretBlock.repairSpeed, bigBeam.repairSpeed, 0.001f);
+        assertEquals(turretBlock.beamWidth, bigBeam.beamWidth, 0.001f);
+        assertTrue(unit.removeSupportMount(mount));
+
+        RepairTower tower = (RepairTower)Blocks.unitRepairTower;
+        mount = unit.mountSupport(Blocks.unitRepairTower);
+        assertNotNull(mount);
+        assertTrue(mount.ability instanceof RepairFieldAbility);
+        RepairFieldAbility field = (RepairFieldAbility)mount.ability;
+        assertEquals(tower.healAmount, field.amount, 0.001f);
+        assertEquals(1f, field.reload, 0.001f);
+        assertEquals(tower.range, field.range, 0.001f);
+        assertTrue(unit.removeSupportMount(mount));
+
+        LiquidTurret waveBlock = (LiquidTurret)Blocks.wave;
+        mount = unit.mountSupport(Blocks.wave);
+        assertNotNull(mount);
+        assertTrue(mount.ability instanceof LiquidSupportAbility);
+        LiquidSupportAbility wave = (LiquidSupportAbility)mount.ability;
+        assertEquals(waveBlock.range, wave.range, 0.001f);
+        assertEquals(waveBlock.reload, wave.reload, 0.001f);
+        assertEquals(StatusEffects.wet, wave.status);
+        assertTrue(unit.removeSupportMount(mount));
+
+        LiquidTurret tsunamiBlock = (LiquidTurret)Blocks.tsunami;
+        mount = unit.mountSupport(Blocks.tsunami);
+        assertNotNull(mount);
+        LiquidSupportAbility tsunami = (LiquidSupportAbility)mount.ability;
+        assertEquals(tsunamiBlock.range, tsunami.range, 0.001f);
+        assertEquals(tsunamiBlock.reload, tsunami.reload, 0.001f);
+        assertTrue(unit.removeSupportMount(mount));
+
+        MassDriver driver = (MassDriver)Blocks.massDriver;
+        mount = unit.mountSupport(Blocks.massDriver);
+        assertNotNull(mount);
+        assertTrue(mount.ability instanceof MassDriverAbility);
+        MassDriverAbility logistics = (MassDriverAbility)mount.ability;
+        assertEquals(driver.range, logistics.range, 0.001f);
+        assertEquals(driver.reload, logistics.reload, 0.001f);
+        assertEquals(driver.itemCapacity, logistics.launchMax);
+    }
+
+    @Test
+    void repairBeamModuleHealsTheClosestDamagedAlly(){
+        Unit carrier = UnitTypes.quad.spawn(Team.sharded, 0f, 0f);
+        Unit ally = UnitTypes.mono.spawn(Team.sharded, 10f, 0f);
+        float delta = Time.delta;
+
+        try{
+            state.teams.updateTeamStats();
+            ally.health = ally.maxHealth * 0.5f;
+            float before = ally.health;
+
+            SupportMount mount = carrier.mountSupport(Blocks.repairPoint);
+            assertNotNull(mount);
+
+            Time.delta = 100f;
+            mount.update(carrier);
+
+            assertTrue(ally.health > before, "the repair beam must heal a damaged allied unit");
+        }finally{
+            Time.delta = delta;
+            ally.remove();
+            carrier.remove();
+            Groups.unit.update();
+        }
+    }
+
+    @Test
+    void liquidModuleExtinguishesABurningAlly(){
+        Unit carrier = UnitTypes.quad.spawn(Team.sharded, 0f, 0f);
+        Unit ally = UnitTypes.mono.spawn(Team.sharded, 10f, 0f);
+        float delta = Time.delta;
+
+        try{
+            state.teams.updateTeamStats();
+            //the opposite transition subtracts wet's duration x0.5 from the burn time,
+            //so a fresh burn (60) is fully converted by wave's wet (120)
+            ally.apply(StatusEffects.burning, 60f);
+            assertTrue(ally.getDuration(StatusEffects.burning) > 0f);
+
+            SupportMount mount = carrier.mountSupport(Blocks.wave);
+            assertNotNull(mount);
+
+            Time.delta = ((LiquidTurret)Blocks.wave).reload + 1f;
+            mount.update(carrier);
+
+            //getDuration reads the live status list; hasEffect() misses statuses applied
+            //through opposite transitions
+            assertFalse(ally.getDuration(StatusEffects.burning) > 0f,
+                "the liquid module must extinguish a burning allied unit");
+            assertTrue(ally.getDuration(StatusEffects.wet) > 0f, "the liquid module must apply its liquid status");
+        }finally{
+            Time.delta = delta;
+            ally.remove();
+            carrier.remove();
+            Groups.unit.update();
+        }
+    }
+
+    @Test
+    void liquidModuleSlowsEnemiesInsideItsField(){
+        Unit carrier = UnitTypes.quad.spawn(Team.sharded, 0f, 0f);
+        Unit enemy = UnitTypes.flare.spawn(Team.crux, 60f, 0f);
+        float delta = Time.delta;
+
+        try{
+            state.teams.updateTeamStats();
+
+            SupportMount mount = carrier.mountSupport(Blocks.wave);
+            assertNotNull(mount);
+
+            Time.delta = ((LiquidTurret)Blocks.wave).reload + 1f;
+            mount.update(carrier);
+
+            assertTrue(enemy.hasEffect(StatusEffects.wet), "the liquid module must hinder an enemy in range");
+        }finally{
+            Time.delta = delta;
+            enemy.remove();
+            carrier.remove();
+            Groups.unit.update();
+        }
+    }
+
+    @Test
+    void tractorModulePullsAnEnemyAirUnit(){
+        Unit carrier = UnitTypes.quad.spawn(Team.sharded, 0f, 0f);
+        Unit enemy = UnitTypes.flare.spawn(Team.crux, 100f, 0f);
+        float delta = Time.delta;
+
+        try{
+            state.teams.updateTeamStats();
+
+            SupportMount mount = carrier.mountSupport(Blocks.parallax);
+            assertNotNull(mount);
+
+            mount.update(carrier);
+
+            assertTrue(enemy.vel.len() > 0f, "the tractor beam must pull the enemy towards the carrier");
+        }finally{
+            Time.delta = delta;
+            enemy.remove();
+            carrier.remove();
+            Groups.unit.update();
+        }
+    }
+
+    @Test
+    void pointDefenseModuleShootsDownABullet(){
+        Unit carrier = UnitTypes.quad.spawn(Team.sharded, 0f, 0f);
+        Unit shooter = UnitTypes.flare.spawn(Team.crux, 0f, 120f);
+        float delta = Time.delta;
+
+        try{
+            state.teams.updateTeamStats();
+
+            Bullet bullet = new BasicBulletType(2f, 5f).create(shooter, Team.crux, 80f, 0f, 0f);
+            assertNotNull(bullet);
+            assertTrue(bullet.isAdded());
+
+            SupportMount mount = carrier.mountSupport(Blocks.segment);
+            assertNotNull(mount);
+
+            Time.delta = ((PointDefenseTurret)Blocks.segment).reload + 1f;
+            mount.update(carrier);
+
+            assertFalse(bullet.isAdded(), "the point-defense module must destroy an enemy bullet in range");
+        }finally{
+            Time.delta = delta;
+            shooter.remove();
+            carrier.remove();
+            Groups.bullet.update();
+            Groups.unit.update();
+        }
+    }
+
+    @Test
+    void massDriverModuleDeliversCarriedItemsToAnAlly(){
+        Unit carrier = UnitTypes.quad.spawn(Team.sharded, 0f, 0f);
+        Unit ally = UnitTypes.mono.spawn(Team.sharded, 10f, 0f);
+        float delta = Time.delta;
+
+        try{
+            state.teams.updateTeamStats();
+            carrier.stack.item = Items.copper;
+            carrier.stack.amount = 10;
+
+            SupportMount mount = carrier.mountSupport(Blocks.massDriver);
+            assertNotNull(mount);
+
+            Time.delta = ((MassDriver)Blocks.massDriver).reload + 1f;
+            mount.update(carrier);
+
+            assertTrue(ally.hasItem(), "the mass driver must hand carried items to an allied unit");
+            assertEquals(10, ally.stack().amount);
+            assertFalse(carrier.hasItem(), "the carrier must be empty after the launch");
+        }finally{
+            Time.delta = delta;
+            ally.remove();
+            carrier.remove();
+            Groups.unit.update();
+        }
+    }
+
+    //endregion
+
     //region visual scale (phases 3-4)
 
     /**
@@ -412,6 +770,13 @@ public class SupportLoadoutTest{
                 case repair -> Blocks.mender;
                 case overdrive -> Blocks.overdriveProjector;
                 case force -> Blocks.forceProjector;
+                case tractor -> Blocks.parallax;
+                case pointDefense -> Blocks.segment;
+                case unitRepair -> Blocks.repairPoint;
+                case liquid -> Blocks.wave;
+                case transport -> Blocks.massDriver;
+                //walls and ramparts are one armour category; the simplest plate probes it
+                case armor -> Blocks.copperWall;
             };
             if(type.create(Team.sharded).canMountSupport(probe)){
                 if(out.length() > 0) out.append('|');
@@ -423,14 +788,18 @@ public class SupportLoadoutTest{
 
     @Test
     void visualScalePreservesEveryHullCompatibility(){
-        //frozen snapshot from the functional phase, in air() order. Phase 3 changes drawing only:
-        //not one hull may gain or lose a category.
+        //frozen snapshot, in air() order. The tractor/pointDefense/unitRepair/liquid/transport
+        //anchors of the tower-module phase add categories to the hulls that hold their anchors;
+        //the projector categories keep the functional-phase compatibility everywhere.
         String[] expected = {
-            "mono:", "flare:", "poly:", "mega:", "horizon:repair", "zenith:repair",
-            "antumbra:repair|overdrive|force", "eclipse:repair|overdrive|force",
-            "quad:repair|overdrive|force", "oct:overdrive", "avert:", "obviate:repair",
-            "quell:repair|overdrive", "disrupt:repair|overdrive|force", "alpha:", "beta:",
-            "gamma:", "evoke:", "incite:", "emanate:repair", "mono-duo:", "flare-duo:"
+            "mono:", "flare:", "poly:", "mega:", "horizon:repair", "zenith:repair|unitRepair",
+            "antumbra:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport",
+            "eclipse:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport",
+            "quad:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport",
+            "oct:overdrive|tractor|pointDefense|unitRepair|liquid|transport", "avert:", "obviate:repair|pointDefense",
+            "quell:repair|overdrive", "disrupt:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport",
+            "alpha:", "beta:", "gamma:", "evoke:", "incite:", "emanate:repair",
+            "mono-duo:", "flare-duo:"
         };
 
         UnitType[] hulls = air();
@@ -560,7 +929,7 @@ public class SupportLoadoutTest{
 
             assertTrue(tuned > 0f && tuned < base, "a per-hull tuning knob must be able to shrink further");
             assertEquals(before, compatibility(quad), "tuning must not change the compatibility list");
-            assertEquals(3, quad.supportAnchors.size);
+            assertEquals(8, quad.supportAnchors.size);
             assertEquals(2, quad.turretSlots.size);
         }finally{
             quad.dorsalVisualTuning = original;

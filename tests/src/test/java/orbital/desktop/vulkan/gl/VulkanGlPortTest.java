@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.*;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -149,34 +148,6 @@ class VulkanGlPortTest{
         assertTrue(result.fragmentSource.contains("#ifdef GL_ES"));
         assertTrue(result.fragmentSource.contains("texture(u_texture, v_texCoords)"));
         assertTrue(result.fragmentSource.contains("layout(location = 0) in vec4 v_color;"));
-    }
-
-    @Test
-    void pipelineCacheReusesIdenticalState(){
-        VulkanGLState state = new VulkanGLState();
-        state.program(1, 2);
-        state.framebuffer(3, 0);
-        VulkanPipelineState first = state.snapshot();
-        VulkanPipelineCache cache = new VulkanPipelineCache(2);
-        AtomicLong factory = new AtomicLong(100);
-
-        assertEquals(100, cache.getOrCreate(first, factory::getAndIncrement));
-        assertEquals(100, cache.getOrCreate(first, factory::getAndIncrement));
-        assertEquals(1, cache.misses());
-        assertEquals(1, cache.hits());
-
-        state.blendFunc(GL20.GL_ONE, GL20.GL_ZERO);
-        VulkanPipelineState second = state.snapshot();
-        assertNotEquals(first, second);
-        assertEquals(101, cache.getOrCreate(second, factory::getAndIncrement));
-        assertEquals(2, cache.size());
-
-        state.enable(GL20.GL_BLEND);
-        VulkanPipelineState third = state.snapshot();
-        assertEquals(102, cache.getOrCreate(third, factory::getAndIncrement));
-        assertEquals(2, cache.size());
-        assertEquals(1, cache.evictions());
-        assertEquals(3, cache.misses());
     }
 
     @Test

@@ -233,6 +233,7 @@ Os documentos de design ficam em:
 - [Visão de jogo](docs/VISAO_DE_JOGO_ORBITAL.md)
 - [Sistema de setores](docs/RELATORIO_SISTEMA_DE_SETORES.md)
 - [Torres como módulos](docs/RELATORIO_TORRES_COMO_MODULOS.md)
+- [Valores de construção dos módulos](docs/CATALOGO_VALORES_CONSTRUCAO_MODULOS.md)
 - [Unidades de Orbital](docs/RELATORIO_UNIDADES_ORBITAL.md)
 - [Licenciamento de assets](docs/LICENCIAMENTO_ASSETS.md)
 - [Guia de compilação do executável](docs/BUILD_EXECUTAVEL.md)

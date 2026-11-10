@@ -44,8 +44,6 @@ public class VulkanGL20 implements GL20{
 
     private final VulkanGLState state = new VulkanGLState();
 
-    private final VulkanPipelineCache pipelineCache = new VulkanPipelineCache(64);
-
     private float clearR = 0f, clearG = 0f, clearB = 0f, clearA = 1f;
     private int boundFramebuffer = 0;
     private int boundRenderbuffer = 0;
@@ -297,12 +295,6 @@ public static class FramebufferData{
     public VulkanGLState getState(){
 
         return state;
-
-    }
-
-    public VulkanPipelineCache getPipelineCache(){
-
-        return pipelineCache;
 
     }
 
@@ -1590,7 +1582,6 @@ if(!VulkanDevice.indices(indexData)){
 if(VulkanDevice.renderIndexed(indexData.length, false)){
 
 drawSubmitted++;
-                pipelineCache.getOrCreate(snapshot, () -> 1L);
 
 }
 
@@ -1599,7 +1590,6 @@ drawSubmitted++;
 else if(VulkanDevice.render(vertexCount, false)){
 
 drawSubmitted++;
-                pipelineCache.getOrCreate(snapshot, () -> 1L);
 
 }
 
