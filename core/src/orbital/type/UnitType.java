@@ -1994,6 +1994,11 @@ public class UnitType extends UnlockableContent implements Senseable{
     public void drawBody(Unit unit){
         applyColor(unit);
 
+        //tint hull with active wall plate colour
+        if(unit.wallColor != null && !unit.wallColor.equals(Color.white)){
+            Draw.color(unit.wallColor);
+        }
+
         if(unit instanceof UnderwaterMovec){
             Draw.alpha(1f);
             Draw.mixcol(unit.floorOn().mapColor.write(Tmp.c1).mul(0.9f), 1f);
@@ -2006,6 +2011,11 @@ public class UnitType extends UnlockableContent implements Senseable{
 
     public void drawCell(Unit unit){
         applyColor(unit);
+
+        //tint hull with active wall plate colour
+        if(unit.wallColor != null && !unit.wallColor.equals(Color.white)){
+            Draw.color(unit.wallColor);
+        }
 
         Draw.color(cellColor(unit));
         Draw.rect(cellRegion, unit.x, unit.y, unit.rotation - 90);
@@ -2216,11 +2226,6 @@ public class UnitType extends UnlockableContent implements Senseable{
         //this is horribly scuffed.
         if(renderer != null && renderer.overlays != null){
             renderer.overlays.checkApplySelection(unit);
-        }
-
-        //tint hull with active wall plate colour
-        if(unit.wallColor != null && !unit.wallColor.equals(Color.white)){
-            Draw.color(unit.wallColor);
         }
     }
 
