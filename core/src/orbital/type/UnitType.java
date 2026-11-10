@@ -1970,12 +1970,9 @@ public class UnitType extends UnlockableContent implements Senseable{
     }
 
     public void drawBody(Unit unit){
+        //applyColor() carries the wall plate tint (the engine's single colour hook); the sprite
+        //below is drawn in that colour. Nothing local to do here.
         applyColor(unit);
-
-        //wall plate tint: set immediately before the sprite, cleared immediately after, so the
-        //colour can never leak into the next draw call (menus, cards, terrain, other units)
-        boolean tint = unit.wallColor != null && !unit.wallColor.equals(Color.white);
-        if(tint) Draw.color(unit.wallColor);
 
         if(unit instanceof UnderwaterMovec){
             Draw.alpha(1f);
@@ -1984,10 +1981,7 @@ public class UnitType extends UnlockableContent implements Senseable{
 
         Draw.rect(region, unit.x, unit.y, unit.rotation - 90);
 
-        if(tint) Draw.color();
         Draw.reset();
-
-        logWallTint(unit, tint, "drawBody");
     }
 
     /** Diagnostic: reports whether the hull tint reaches the real game render path. */
@@ -2006,15 +2000,9 @@ public class UnitType extends UnlockableContent implements Senseable{
     }
 
     public void drawCell(Unit unit){
+        //applyColor() already applies the wall plate tint; the cell colour is combined with it
         applyColor(unit);
-        //cell tint combined with (multiplied by) the wall plate tint
-        Color cell = cellColor(unit);
-        if(unit.wallColor != null && !unit.wallColor.equals(Color.white)){
-            Tmp.c1.set(cell).mul(unit.wallColor);
-            Draw.color(Tmp.c1);
-        }else{
-            Draw.color(cell);
-        }
+        Draw.color(cellColor(unit));
         Draw.rect(cellRegion, unit.x, unit.y, unit.rotation - 90);
         Draw.reset();
     }
@@ -2234,6 +2222,15 @@ public class UnitType extends UnlockableContent implements Senseable{
         if(renderer != null && renderer.overlays != null){
             renderer.overlays.checkApplySelection(unit);
         }
+
+        //wall plate tint: this is the engine's single "which colour is the unit drawn in" hook,
+        //used by the body, cell, weapons and parts alike, so the whole hull takes the plate colour.
+        //Safe because every caller resets afterwards (Weapon.draw used not to - that was the leak).
+        if(unit.wallColor != null && !unit.wallColor.equals(Color.white)){
+            Draw.color(unit.wallColor);
+        }
+
+        logWallTint(unit, unit.wallColor != null && !unit.wallColor.equals(Color.white), "applyColor");
     }
 
     //endregion
