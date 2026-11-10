@@ -18,6 +18,7 @@ import arc.util.io.*;
 import orbital.content.*;
 import orbital.content.TechTree.*;
 import orbital.core.*;
+import orbital.core.RendererPreference;
 import orbital.ctype.*;
 import orbital.game.EventType.*;
 import orbital.gen.*;
@@ -33,6 +34,8 @@ import static orbital.Vars.*;
 
 public class SettingsMenuDialog extends BaseDialog{
     public SettingsTable graphics;
+    /** Desktop-only renderer settings; see {@link RendererPreference}. */
+    public SettingsTable advancedgraphics;
     public SettingsTable game;
     public SettingsTable sound;
     public SettingsTable dev;
@@ -61,6 +64,7 @@ public class SettingsMenuDialog extends BaseDialog{
         onResize(() -> {
             if(lastRebuildSize[0] != Core.graphics.getWidth() || lastRebuildSize[1] != Core.graphics.getHeight()){
                 graphics.rebuild();
+                advancedgraphics.rebuild();
                 sound.rebuild();
                 game.rebuild();
                 dev.rebuild();
@@ -78,6 +82,7 @@ public class SettingsMenuDialog extends BaseDialog{
 
         game = new SettingsTable();
         graphics = new SettingsTable();
+        advancedgraphics = new SettingsTable();
         sound = new SettingsTable();
         dev = new SettingsTable();
 
@@ -343,18 +348,21 @@ public class SettingsMenuDialog extends BaseDialog{
         menu.defaults().size(300f, 60f);
         menu.button("@settings.game", Icon.settings, style, isize, () -> visible(0)).marginLeft(marg).row();
         menu.button("@settings.graphics", Icon.image, style, isize, () -> visible(1)).marginLeft(marg).row();
-        menu.button("@settings.sound", Icon.volumeUp, style, isize, () -> visible(2)).marginLeft(marg).row();
+        if(!mobile){
+            menu.button("@settings.advancedgraphics", Icon.terminal, style, isize, () -> visible(2)).marginLeft(marg).row();
+        }
+        menu.button("@settings.sound", Icon.volumeUp, style, isize, () -> visible(3)).marginLeft(marg).row();
         menu.button("@settings.language", Icon.chat, style, isize, ui.language::show).marginLeft(marg).row();
         if(!mobile || Core.settings.getBool("keyboard")){
             menu.button("@settings.controls", Icon.move, style, isize, ui.controls::show).marginLeft(marg).row();
         }
 
         menu.button("@settings.data", Icon.save, style, isize, () -> dataDialog.show()).marginLeft(marg).row();
-        menu.button("@settings.dev", Icon.fileCode, style, isize, () -> visible(3)).marginLeft(marg).row();
+        menu.button("@settings.dev", Icon.fileCode, style, isize, () -> visible(4)).marginLeft(marg).row();
         //ui.about is created after this dialog, so the reference must be resolved lazily.
         menu.button("@about.button", Icon.info, style, isize, () -> ui.about.show()).marginLeft(marg).row();
 
-        int i = 4;
+        int i = 5;
         for(var cat : categories){
             int index = i;
             if(cat.icon == null){
@@ -565,6 +573,21 @@ public class SettingsMenuDialog extends BaseDialog{
             Core.settings.put("swapdiagonal", false);
         }
 
+        //renderer choice is desktop-only: Vulkan has no mobile backend and the preference has to be
+        //read by the launcher before the window exists, so the row registers nothing elsewhere.
+        if(!mobile){
+            advancedgraphics.pref(new SettingsTable.OptionsSetting(RendererPreference.key, RendererPreference.opengl,
+            Seq.with(RendererPreference.opengl, RendererPreference.vulkan).toArray(String.class), value -> {
+                if(RendererPreference.vulkan.equals(value)){
+                    // The row label stays short, so the long warnings live here instead: a wide
+                    // row stretches the table and paints its text over the controls.
+                    String note = bundle.get(RendererPreference.vulkanUsable()
+                        ? "setting.renderer.available" : "setting.renderer.unavailable");
+                    ui.showInfo(bundle.get("settings.renderer.restart") + "\n\n" + note);
+                }
+            }, () -> bundle.get("setting.renderer.name")));
+        }
+
         dev.checkPref("console", false, val -> {
             if(val == false && ui.consolefrag != null){
                 ui.consolefrag.close();
@@ -651,7 +674,7 @@ public class SettingsMenuDialog extends BaseDialog{
         prefs.clearChildren();
 
         Seq<Table> tables = new Seq<>();
-        tables.addAll(game, graphics, sound, dev);
+        tables.addAll(game, graphics, advancedgraphics, sound, dev);
         for(var custom : categories){
             tables.add(custom.table);
         }
@@ -770,6 +793,65 @@ public class SettingsMenuDialog extends BaseDialog{
             list.add(new AreaTextSetting(name, def, changed));
             settings.defaults(name, def);
             rebuild();
+        }
+
+        /**
+         * Preference that stores one value out of a fixed set of strings, shown as a row of
+         * mutually exclusive buttons. The label of each option is read from
+         * {@code setting.<name>.<value>}, and {@code status}, when given, is rendered below the
+         * row and re-evaluated every frame.
+         */
+        public static class OptionsSetting extends Setting{
+            String def;
+            Seq<String> values;
+            @Nullable Cons<String> changed;
+            @Nullable Prov<String> status;
+
+            public OptionsSetting(String name, String def, String[] values, @Nullable Cons<String> changed){
+                this(name, def, values, changed, null);
+            }
+
+            public OptionsSetting(String name, String def, String[] values, @Nullable Cons<String> changed, @Nullable Prov<String> status){
+                super(name);
+                this.def = def;
+                this.values = Seq.with(values);
+                this.changed = changed;
+                this.status = status;
+                settings.defaults(name, def);
+            }
+
+            @Override
+            public void add(SettingsTable table){
+                Table content = table.table().left().growX().get();
+                content.add(title, Styles.outlineLabel).left();
+                addDesc(content);
+                table.row();
+
+                Table options = table.table().left().get();
+                ButtonGroup<TextButton> group = new ButtonGroup<>();
+                for(String value : values){
+                    TextButton button = new TextButton(bundle.get("setting." + name + "." + value), Styles.flatTogglet);
+                    button.clicked(() -> {
+                        boolean modified = !value.equals(settings.getString(name, def));
+                        settings.put(name, value);
+                        if(changed != null && modified){
+                            changed.get(value);
+                        }
+                    });
+                    options.add(button).group(group).update(b -> b.setChecked(value.equals(settings.getString(name, def)))).size(180f, 45f);
+                }
+                addDesc(table.add(options).left().padTop(3f).get());
+                table.row();
+
+                if(status != null){
+                    //the stored value is a request: Vulkan only renders when a complete backend for
+                    //it exists, so the row also says what the current selection will actually do.
+                    Label current = new Label(status.get(), Styles.outlineLabel);
+                    current.setWrap(true);
+                    table.add(current).left().growX().padTop(6f).update(label -> label.setText(status.get()));
+                    table.row();
+                }
+            }
         }
 
         public void rebuild(){

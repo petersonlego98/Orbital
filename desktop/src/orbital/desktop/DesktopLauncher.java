@@ -17,6 +17,7 @@ import arc.util.serialization.*;
 import orbital.*;
 import orbital.core.*;
 import orbital.desktop.steam.*;
+import orbital.desktop.vulkan.*;
 import orbital.game.EventType.*;
 import orbital.gen.*;
 import orbital.graphics.*;
@@ -49,6 +50,42 @@ public class DesktopLauncher extends ClientLauncher{
 
             check32Bit();
             checkJavaVersion();
+
+            // Vulkan is desktop-only. Until the Arc Vulkan renderer is complete, every Vulkan
+            // request resolves to the existing SDL/OpenGL backend (see VulkanBackend.select).
+            // The preference comes from Settings > Advanced Graphics, but it has to be read from
+            // the settings file because Core.settings only exists once SdlApplication is created.
+            VulkanPreferences.load();
+            //Settings > Advanced Graphics reports whether Vulkan can actually be used on this
+            //machine; core must not depend on this module, so the probe is handed over here.
+            RendererPreference.vulkanProbe = VulkanSupport::isAvailable;
+            VulkanBackend.Type backend = VulkanBackend.select(arg);
+            if(backend == VulkanBackend.Type.VULKAN){
+                // Reserved for VulkanApplication once it implements Arc's rendering contract.
+                Log.warn("[Vulkan] Renderer entry point is not wired yet; falling back to OpenGL.");
+            }
+
+            // Offscreen Vulkan self-check: exercises the native core and reports the pixels it
+            // reads back. Useful to validate a shipped build without a development environment.
+            if(VulkanBackend.checkRequested(arg)){
+                for(String line : VulkanSelfTest.report(256).split("\n")){
+                    Log.info(line);
+                }
+            }
+
+            VulkanChecks.windowCheck = VulkanBackend.windowCheckRequested(arg);
+            // frames and reads the presented pixels back. It runs once the window exists, so it is
+            // scheduled here and executed from the SdlApplication main loop in setup().
+            VulkanChecks.windowCheck = VulkanBackend.windowCheckRequested(arg);
+
+            // Full Vulkan application backend: replaces SdlApplication, so Arc renders through
+            // VulkanGL20. Experimental: reachable only through this explicit flag, and it keeps the
+            // same OpenGL fallback rules as the rest of the port.
+            if(VulkanBackend.appRequested(arg)){
+                new VulkanApplication(new DesktopLauncher(arg), "Orbital", 900, 700, !OS.isAndroid,
+                    VulkanBackend.pixelReportRequested(arg));
+                return;
+            }
 
             new SdlApplication(new DesktopLauncher(arg), new SdlConfig(){{
                 title = "Orbital";
@@ -150,6 +187,12 @@ public class DesktopLauncher extends ClientLauncher{
 
     public DesktopLauncher(String[] args){
         this.args = args;
+
+        //The windowed Vulkan check needs the SDL window, which exists by the time the client
+        //finishes loading; runOnClientLoad defers it until then.
+        if(VulkanChecks.windowCheck){
+            runOnClientLoad(() -> VulkanWindowSelfTest.report());
+        }
 
         if(useDiscord){
             Runtime.getRuntime().addShutdownHook(new Thread(DiscordRPC::close));

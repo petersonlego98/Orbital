@@ -272,6 +272,12 @@ project(":desktop"){
         implementation "com.github.Anuken:steamworks4j:$steamworksVersion"
 
         implementation arcModule("backends:backend-sdl")
+
+        // GLSL 450 -> SPIR-V for the desktop Vulkan backend. Native binaries are loaded lazily,
+        // so this dependency is only exercised when shader compilation is requested.
+        implementation "org.lwjgl:lwjgl-shaderc:3.4.3"
+        runtimeOnly "org.lwjgl:lwjgl:3.4.3:natives-windows"
+        runtimeOnly "org.lwjgl:lwjgl-shaderc:3.4.3:natives-windows"
     }
 }
 
@@ -288,6 +294,124 @@ project(":core"){
     }
 
     compileJava.options.fork = true
+
+    def particleSimdResourceDir = layout.buildDirectory.dir("generated/resources/particle-simd")
+    sourceSets.main.resources.srcDir(particleSimdResourceDir)
+
+    tasks.register("buildParticleSimdNative"){
+        inputs.files(
+            file("src/orbital/graphics/ParticleSimdNative.cpp"),
+            file("src/orbital/graphics/ParticleSimdAvx2.cpp")
+        )
+        outputs.dir(particleSimdResourceDir)
+
+        doLast{
+            if(!System.getProperty("os.name").toLowerCase().contains("windows")) return
+
+            def env = System.getenv()
+            def vswhere = new File(env.get("ProgramFiles(x86)") ?: "C:/Program Files (x86)", "Microsoft Visual Studio/Installer/vswhere.exe")
+            def clPath = project.findProperty("simdCl") ?: env.get("SIMD_CL")
+            def vcRoot = null
+
+            if(clPath == null && vswhere.isFile()){
+                def process = new ProcessBuilder(
+                    vswhere.absolutePath,
+                    "-latest", "-products", "*",
+                    "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                    "-property", "installationPath"
+                ).redirectErrorStream(true).start()
+                vcRoot = process.inputStream.getText("UTF-8").trim()
+                if(process.waitFor() != 0) vcRoot = null
+            }
+
+            if(clPath == null && vcRoot){
+                def toolRoot = new File(vcRoot, "VC/Tools/MSVC")
+                def versions = toolRoot.listFiles()?.findAll{ it.isDirectory() }?.sort{ a, b -> b.name <=> a.name }
+                def candidate = versions ? new File(versions[0], "bin/Hostx64/x64/cl.exe") : null
+                if(candidate?.isFile()) clPath = candidate.absolutePath
+            }
+
+            if(clPath == null){
+                logger.lifecycle("Particle SIMD native build skipped: cl.exe unavailable; Java scalar fallback remains active.")
+                return
+            }
+
+            if(vcRoot == null){
+                def compilerDir = new File(clPath).parentFile.parentFile.parentFile.parentFile
+                vcRoot = compilerDir.parentFile.parentFile.parentFile.parentFile.absolutePath
+            }
+            def vcTools = new File(vcRoot, "VC/Tools/MSVC")
+            def vcVersionDir = vcTools.listFiles()?.findAll{ it.isDirectory() }?.sort{ a, b -> b.name <=> a.name }?.first()
+            if(vcVersionDir == null){
+                logger.lifecycle("Particle SIMD native build skipped: MSVC tool headers/libraries unavailable; Java scalar fallback remains active.")
+                return
+            }
+
+            def jdkHome = new File(env.get("JAVA_HOME") ?: System.getProperty("java.home"))
+            if(!new File(jdkHome, "include/jni.h").isFile()) jdkHome = jdkHome.parentFile
+            def jniInclude = new File(jdkHome, "include")
+            if(!new File(jniInclude, "jni.h").isFile()){
+                logger.lifecycle("Particle SIMD native build skipped: JNI headers unavailable; Java scalar fallback remains active.")
+                return
+            }
+
+            def kitsRoot = new File(env.get("ProgramFiles(x86)") ?: "C:/Program Files (x86)", "Windows Kits/10")
+            def sdkIncludeRoot = new File(kitsRoot, "Include")
+            def sdkVersionDir = sdkIncludeRoot.listFiles()?.findAll{ it.isDirectory() }?.sort{ a, b -> b.name <=> a.name }?.first()
+            if(sdkVersionDir == null){
+                logger.lifecycle("Particle SIMD native build skipped: Windows SDK unavailable; Java scalar fallback remains active.")
+                return
+            }
+
+            def outputDir = particleSimdResourceDir.get().dir("native/windows-x86_64").asFile
+            def objectDir = layout.buildDirectory.dir("particle-simd-objects").get().asFile
+            outputDir.mkdirs()
+            objectDir.mkdirs()
+
+            def compilerEnv = new HashMap(env)
+            compilerEnv.put("INCLUDE", [
+                new File(vcVersionDir, "include"),
+                new File(jdkHome, "include"),
+                new File(jdkHome, "include/win32"),
+                new File(sdkVersionDir, "ucrt"),
+                new File(sdkVersionDir, "shared"),
+                new File(sdkVersionDir, "um"),
+                new File(sdkVersionDir, "winrt"),
+                new File(sdkVersionDir, "cppwinrt")
+            ].collect{ it.absolutePath }.join(";"))
+            compilerEnv.put("LIB", [
+                new File(vcVersionDir, "lib/x64"),
+                new File(kitsRoot, "Lib/${sdkVersionDir.name}/ucrt/x64"),
+                new File(kitsRoot, "Lib/${sdkVersionDir.name}/um/x64")
+            ].collect{ it.absolutePath }.join(";"))
+            compilerEnv.put("PATH", new File(vcVersionDir, "bin/Hostx64/x64").absolutePath + ";" + env.get("PATH"))
+
+            def nativeSource = file("src/orbital/graphics/ParticleSimdNative.cpp")
+            def avxSource = file("src/orbital/graphics/ParticleSimdAvx2.cpp")
+            def nativeObject = new File(objectDir, "ParticleSimdNative.obj")
+            def avxObject = new File(objectDir, "ParticleSimdAvx2.obj")
+            def dll = new File(outputDir, "orbital_particlesimd.dll")
+            def commonArgs = ["/nologo", "/c", "/O2", "/MT", "/fp:strict", "/EHsc", "/std:c++17", "/I${jniInclude.absolutePath}", "/I${new File(jniInclude, 'win32').absolutePath}"]
+
+            def execOps = project.services.get(org.gradle.process.ExecOperations)
+            execOps.exec{
+                environment compilerEnv
+                commandLine([clPath] + commonArgs + [nativeSource.absolutePath, "/Fo${nativeObject.absolutePath}"])
+            }
+            execOps.exec{
+                environment compilerEnv
+                commandLine([clPath] + commonArgs + ["/arch:AVX2", avxSource.absolutePath, "/Fo${avxObject.absolutePath}"])
+            }
+            execOps.exec{
+                environment compilerEnv
+                commandLine([clPath, "/nologo", "/LD", "/MT", nativeObject.absolutePath, avxObject.absolutePath, "/link", "/OUT:${dll.absolutePath}", "/IMPLIB:${new File(objectDir, 'orbital_particlesimd.lib').absolutePath}", "/MACHINE:X64"])
+            }
+        }
+    }
+
+    tasks.named("processResources"){
+        dependsOn tasks.named("buildParticleSimdNative")
+    }
 
     task preGen{
         outputs.upToDateWhen{ false }
@@ -448,10 +572,16 @@ project(":tests"){
 
     dependencies{
         testImplementation project(":core")
+        testImplementation project(":desktop")
+        // SDL backs the windowed Vulkan path, so the suite that renders into a swapchain has to
+        // open a real window the same way the game does.
+        testImplementation arcModule("backends:backend-sdl")
         testImplementation "org.junit.jupiter:junit-jupiter-params:5.7.1"
         testImplementation "org.junit.jupiter:junit-jupiter-api:5.7.1"
         testImplementation arcModule("backends:backend-headless")
         testImplementation "org.json:json:20230618"
+        testRuntimeOnly "org.lwjgl:lwjgl:3.4.3:natives-windows"
+        testRuntimeOnly "org.lwjgl:lwjgl-shaderc:3.4.3:natives-windows"
         testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.7.1"
         testRuntimeOnly "org.junit.platform:junit-platform-launcher"
     }
@@ -471,6 +601,15 @@ project(":tests"){
         testLogging{
             exceptionFormat = 'full'
             showStandardStreams = true
+        }
+
+        // An ICD given as -Pvulkan.icd=<json> reaches the workers through the JVM arguments, and
+        // the bridge applies it before the instance is created. Without it the suites skip
+        // themselves on machines whose only driver is a software one, which is correct - OpenGL is
+        // the shipping backend - but leaves the Vulkan path unverified.
+        def icd = project.findProperty("vulkan.icd")
+        if(icd){
+            jvmArgs = jvmArgs + ["-Dorbital.vulkan.icd=" + icd]
         }
     }
 }

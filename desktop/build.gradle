@@ -1,5 +1,121 @@
 sourceSets.main.java.srcDirs = ["src/"]
 
+def vulkanResourceDir = layout.buildDirectory.dir("generated/resources/vulkan")
+sourceSets.main.resources.srcDir(vulkanResourceDir)
+
+// Native sources for one DLL: VulkanBootstrap.cpp backs VulkanSupport (device discovery) and
+// VulkanDevice.cpp backs VulkanDevice (offscreen rendering core).
+def vulkanSources = ["VulkanBootstrap", "VulkanDevice"].collect{ name ->
+    file("src/orbital/desktop/vulkan/${name}.cpp")
+}
+
+tasks.register("buildVulkanNative"){
+    inputs.files vulkanSources
+    outputs.dir vulkanResourceDir
+
+    doLast{
+        if(!System.getProperty("os.name").toLowerCase().contains("windows")) return
+
+        def env = System.getenv()
+        def clPath = project.findProperty("simdCl") ?: env.get("SIMD_CL")
+        def vcRoot = null
+        def vswhere = new File(env.get("ProgramFiles(x86)") ?: "C:/Program Files (x86)", "Microsoft Visual Studio/Installer/vswhere.exe")
+
+        if(clPath == null && vswhere.isFile()){
+            def process = new ProcessBuilder(vswhere.absolutePath, "-latest", "-products", "*",
+                "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                "-property", "installationPath").redirectErrorStream(true).start()
+            vcRoot = process.inputStream.getText("UTF-8").trim()
+            if(process.waitFor() != 0) vcRoot = null
+        }
+
+        if(clPath == null && vcRoot){
+            def toolRoot = new File(vcRoot, "VC/Tools/MSVC")
+            def versions = toolRoot.listFiles()?.findAll{ it.isDirectory() }?.sort{ a, b -> b.name <=> a.name }
+            def candidate = versions ? new File(versions[0], "bin/Hostx64/x64/cl.exe") : null
+            if(candidate?.isFile()) clPath = candidate.absolutePath
+        }
+
+        if(clPath == null){
+            logger.lifecycle("Vulkan native probe skipped: cl.exe unavailable; OpenGL remains active.")
+            return
+        }
+
+        if(vcRoot == null){
+            def compilerDir = new File(clPath).parentFile.parentFile.parentFile.parentFile
+            vcRoot = compilerDir.parentFile.parentFile.parentFile.parentFile.absolutePath
+        }
+        def vcVersionDir = new File(vcRoot, "VC/Tools/MSVC").listFiles()?.findAll{ it.isDirectory() }?.sort{ a, b -> b.name <=> a.name }?.first()
+        if(vcVersionDir == null){
+            logger.lifecycle("Vulkan native probe skipped: MSVC tools unavailable; OpenGL remains active.")
+            return
+        }
+
+        def jdkHome = new File(env.get("JAVA_HOME") ?: System.getProperty("java.home"))
+        if(!new File(jdkHome, "include/jni.h").isFile()) jdkHome = jdkHome.parentFile
+        def jniInclude = new File(jdkHome, "include")
+        if(!new File(jniInclude, "jni.h").isFile()){
+            logger.lifecycle("Vulkan native probe skipped: JNI headers unavailable; OpenGL remains active.")
+            return
+        }
+
+        def kitsRoot = new File(env.get("ProgramFiles(x86)") ?: "C:/Program Files (x86)", "Windows Kits/10")
+        def sdkVersionDir = new File(kitsRoot, "Include").listFiles()?.findAll{ it.isDirectory() }?.sort{ a, b -> b.name <=> a.name }?.first()
+        if(sdkVersionDir == null){
+            logger.lifecycle("Vulkan native probe skipped: Windows SDK unavailable; OpenGL remains active.")
+            return
+        }
+
+        def outputDir = vulkanResourceDir.get().dir("native/windows-x86_64").asFile
+        def objectDir = layout.buildDirectory.dir("vulkan-objects").get().asFile
+        def objects = vulkanSources.collect{ source ->
+            new File(objectDir, source.name.replace(".cpp", ".obj"))
+        }
+        outputDir.mkdirs()
+        objectDir.mkdirs()
+
+        def compilerEnv = new HashMap(env)
+        compilerEnv.put("INCLUDE", [
+            new File(vcVersionDir, "include"), jniInclude, new File(jniInclude, "win32"),
+            new File(sdkVersionDir, "ucrt"), new File(sdkVersionDir, "shared"),
+            new File(sdkVersionDir, "um"), new File(sdkVersionDir, "winrt"),
+            new File(sdkVersionDir, "cppwinrt"),
+            // Vendored Vulkan headers (VulkanDevice.cpp includes <vulkan/vulkan_core.h>).
+            new File(projectDir, "src/orbital/desktop/vulkan/include")
+        ].collect{ it.absolutePath }.join(";"))
+        compilerEnv.put("LIB", [
+            new File(vcVersionDir, "lib/x64"),
+            new File(kitsRoot, "Lib/${sdkVersionDir.name}/ucrt/x64"),
+            new File(kitsRoot, "Lib/${sdkVersionDir.name}/um/x64")
+        ].collect{ it.absolutePath }.join(";"))
+        compilerEnv.put("PATH", new File(vcVersionDir, "bin/Hostx64/x64").absolutePath + ";" + env.get("PATH"))
+
+        def dll = new File(outputDir, "orbital_vulkan.dll")
+        def execOps = project.services.get(org.gradle.process.ExecOperations)
+        vulkanSources.indices.each{ index ->
+            execOps.exec{
+                environment compilerEnv
+                commandLine([clPath, "/nologo", "/c", "/O2", "/MT", "/EHsc", "/std:c++17",
+                    "/I${jniInclude.absolutePath}", "/I${new File(jniInclude, 'win32').absolutePath}",
+                    vulkanSources[index].absolutePath, "/Fo${objects[index].absolutePath}"])
+            }
+        }
+        execOps.exec{
+            environment compilerEnv
+            commandLine([clPath, "/nologo", "/LD", "/MT"] + objects.collect{ it.absolutePath } + ["/link",
+                "/OUT:${dll.absolutePath}", "/IMPLIB:${new File(objectDir, 'orbital_vulkan.lib').absolutePath}",
+                // user32 provides FindWindowA, used to attach a Vulkan surface to the game's
+                // own SDL window; it is always present on Windows.
+                "user32.lib",
+                "/MACHINE:X64"])
+        }
+    }
+}
+
+tasks.named("processResources"){
+    dependsOn tasks.named("buildVulkanNative")
+}
+
 project.ext.mainClassName = "orbital.desktop.DesktopLauncher"
 project.ext.assetsDir = new File("../core/assets")
 

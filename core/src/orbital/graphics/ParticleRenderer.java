@@ -171,7 +171,47 @@ public class ParticleRenderer{
         buffer.position(0);
     }
 
+    private static volatile boolean nativeSimdAvailable = loadNativeSimd();
+
+    private static boolean loadNativeSimd(){
+        String arch = System.getProperty("os.arch", "").toLowerCase(java.util.Locale.ROOT);
+        if(!OS.isWindows || !(arch.equals("amd64") || arch.equals("x86_64"))) return false;
+
+        String resource = "/native/windows-x86_64/orbital_particlesimd.dll";
+        java.nio.file.Path library = null;
+        try(var input = ParticleRenderer.class.getResourceAsStream(resource)){
+            if(input == null) return false;
+            library = java.nio.file.Files.createTempFile("orbital-particlesimd-", ".dll");
+            java.nio.file.Files.copy(input, library, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            library.toFile().deleteOnExit();
+            System.load(library.toAbsolutePath().toString());
+            return true;
+        }catch(Exception | LinkageError ignored){
+            if(library != null){
+                try{
+                    java.nio.file.Files.deleteIfExists(library);
+                }catch(Exception ignoredDelete){
+                }
+            }
+            return false;
+        }
+    }
+
+    private static native int updateNative(float[] data, int count, float delta);
+
     static int update(float[] data, int count, float delta){
+        if(nativeSimdAvailable){
+            try{
+                int updated = updateNative(data, count, delta);
+                if(updated >= 0) return updated;
+            }catch(LinkageError ignored){
+            }
+            nativeSimdAvailable = false;
+        }
+        return updateScalar(data, count, delta);
+    }
+
+    static int updateScalar(float[] data, int count, float delta){
         int head = count * particleSize;
 
         float dragValue = Math.max(1f - globalDrag * delta, 0f);
