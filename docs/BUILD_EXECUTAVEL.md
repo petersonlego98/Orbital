@@ -96,8 +96,16 @@ jpackage --type app-image `
   --icon "deploy\orbital.ico" `
   --dest "deploy\windows64" `
   --java-options "-Djpackage.app-version=1.0" `
+  --java-options "-Xmx1536m" `
   --java-options "-XX:+ShowCodeDetailsInExceptionMessages"
 ```
+
+> **`-Xmx1536m` é obrigatório.** Sem um teto explícito, a JVM do jogo pode
+> reservar até 1/4 da RAM física da máquina (perto de 4 GB em um PC de 16 GB),
+> o que estoura máquinas com pouca memória livre. O teto de 1,5 GB foi medido
+> em jogo real: ~550 MB de uso normal durante uma partida. Ajuste o número se
+> um mapa muito grande estourar a heap (suba para `2048m`), nunca para "sem
+> limite".
 
 ### Passo 4: Copiar licenças, créditos e avisos
 A GPLv3 exige que a licença e os avisos acompanhem os binários. Copie os arquivos versionados na raiz para a pasta do executável:
@@ -149,8 +157,8 @@ Remove-Item -Path "desktop\build\exe*", "desktop\build\jpackage", "deploy\window
 # 2. Build do JAR
 .\gradlew.bat :desktop:dist
 
-# 3. Empacotamento do .exe
-jpackage --type app-image --name "Orbital" --input "desktop\build\libs" --main-jar "Orbital.jar" --main-class "orbital.desktop.DesktopLauncher" --icon "deploy\orbital.ico" --dest "deploy\windows64" --java-options "-Djpackage.app-version=1.0" --java-options "-XX:+ShowCodeDetailsInExceptionMessages"
+# 3. Empacotamento do .exe (o -Xmx1536m limita a heap do jogo, ver nota acima)
+jpackage --type app-image --name "Orbital" --input "desktop\build\libs" --main-jar "Orbital.jar" --main-class "orbital.desktop.DesktopLauncher" --icon "deploy\orbital.ico" --dest "deploy\windows64" --java-options "-Djpackage.app-version=1.0" --java-options "-Xmx1536m" --java-options "-XX:+ShowCodeDetailsInExceptionMessages"
 
 # 4. Licenças e créditos
 $dest = "deploy\windows64\Orbital"
