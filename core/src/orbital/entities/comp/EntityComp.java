@@ -5,6 +5,8 @@ import orbital.annotations.Annotations.*;
 import orbital.entities.*;
 import orbital.gen.*;
 
+import arc.graphics.Color;
+
 import static orbital.Vars.*;
 
 @Component
@@ -12,6 +14,14 @@ import static orbital.Vars.*;
 abstract class EntityComp{
     private transient boolean added;
     transient int id = EntityGroup.nextId();
+
+    /** Colour tinted onto the hull by active dorsal wall plates; white when none. */
+    public Color wallColor = Color.white;
+
+    /** Sets the hull tint from active wall plates. Called from WeaponsComp each frame. */
+    public void wallColor(Color color){
+        this.wallColor.set(color);
+    }
 
     boolean isAdded(){
         return added;

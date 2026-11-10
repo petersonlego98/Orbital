@@ -1686,6 +1686,8 @@ public class UnitType extends UnlockableContent implements Senseable{
         if(!isPayload){
             drawLight(unit);
         }
+        //reset colour tint after hull parts are drawn
+        Draw.color();
 
         if(unit.shieldAlpha > 0 && drawShields){
             drawShield(unit);
@@ -2214,6 +2216,11 @@ public class UnitType extends UnlockableContent implements Senseable{
         //this is horribly scuffed.
         if(renderer != null && renderer.overlays != null){
             renderer.overlays.checkApplySelection(unit);
+        }
+
+        //tint hull with active wall plate colour
+        if(unit.wallColor != null && !unit.wallColor.equals(Color.white)){
+            Draw.color(unit.wallColor);
         }
     }
 

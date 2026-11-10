@@ -30,12 +30,14 @@ import orbital.world.blocks.environment.*;
 import orbital.world.blocks.payloads.*;
 import orbital.world.meta.*;
 
+import arc.graphics.Color;
+
 import static java.lang.Float.NaN;
 import static orbital.Vars.*;
 import static orbital.logic.GlobalVars.*;
 
 @Component(base = true)
-abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, Itemsc, Rotc, Unitc, Weaponsc, Drawc, Syncc, Shieldc, Displayable, Ranged, Minerc, Builderc, Senseable, Settable{
+public abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, Itemsc, Rotc, Unitc, Weaponsc, Drawc, Syncc, Shieldc, Displayable, Ranged, Minerc, Builderc, Senseable, Settable{
     private static final Vec2 tmp1 = new Vec2(), tmp2 = new Vec2();
     static final float warpDst = 8f;
 

@@ -96,12 +96,21 @@ public class WallMount{
 
     /** Initializes shared unit state owned by this effect (for example the shield pool). */
     public void created(Unit unit){
-        if(active && ability != null && unit != null) ability.created(unit);
+        if(active && ability != null && unit != null){
+            ability.created(unit);
+            //tint the hull with this plate's material colour
+            unit.wallColor.set(ability.wallColor);
+        }
     }
 
     /** Ticks the effect. Called from the unit's per-frame update, alongside weapon and support mounts. */
     public void update(Unit unit){
-        if(active && ability != null && unit != null) ability.update(unit);
+        if(active && ability != null && unit != null){
+            ability.update(unit);
+            unit.wallColor.set(ability.wallColor);
+        }else if(!active && unit != null){
+            unit.wallColor.set(Color.white);
+        }
     }
 
     /** Draws the effect with the same convention as native abilities. */
@@ -111,7 +120,12 @@ public class WallMount{
 
     /** Releases shared unit state when the plate is removed or deactivated. */
     public void removed(Unit unit){
-        if(ability == null || ability.shieldHealth <= 0f || unit == null) return;
+        if(ability == null || unit == null) return;
+
+        //clear hull tint when the plate is removed
+        unit.wallColor.set(Color.white);
+
+        if(ability.shieldHealth <= 0f) return;
 
         //unit.shield is shared state: never clear a pool owned by a native ability or by
         //another active force module

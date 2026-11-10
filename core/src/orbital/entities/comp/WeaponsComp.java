@@ -1,6 +1,7 @@
 package orbital.entities.comp;
 
 import arc.Core;
+import arc.graphics.Color;
 import arc.math.geom.*;
 import arc.struct.*;
 import arc.util.*;
@@ -690,5 +691,15 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         for(WallMount mount : walls()){
             if(mount != null) mount.update(self());
         }
+
+        //tint the hull with the colour of the first active wall plate
+        Color wallTint = Color.white;
+        for(WallMount mount : walls()){
+            if(mount != null && mount.active && mount.wallColor != null){
+                wallTint.set(mount.wallColor);
+                break;
+            }
+        }
+        self().wallColor(wallTint);
     }
 }

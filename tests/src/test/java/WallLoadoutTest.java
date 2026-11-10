@@ -1,3 +1,4 @@
+import arc.graphics.Color;
 import orbital.content.*;
 import orbital.entities.abilities.*;
 import orbital.entities.units.*;
@@ -309,6 +310,45 @@ public class WallLoadoutTest{
 
         plate.setActive(unit, true);
         assertTrue(plate.active);
+    }
+
+    @Test
+    void wallPlateTintsHullColour(){
+        Unit unit = UnitTypes.quad.create(Team.sharded);
+        //tungsten wall colour
+        Color tungsten = Items.tungsten.color.cpy();
+
+        WallMount plate = unit.mountWall(Blocks.tungstenWallLarge);
+        assertNotNull(plate);
+        plate.update(unit);
+        //hull takes the wall's material colour
+        assertEquals(tungsten.r, unit.wallColor.r, 0.001f);
+        assertEquals(tungsten.g, unit.wallColor.g, 0.001f);
+        assertEquals(tungsten.b, unit.wallColor.b, 0.001f);
+
+        //removing the plate restores white
+        assertTrue(unit.removeWallMount(plate));
+        assertEquals(Color.white.r, unit.wallColor.r, 0.001f);
+        assertEquals(Color.white.g, unit.wallColor.g, 0.001f);
+        assertEquals(Color.white.b, unit.wallColor.b, 0.001f);
+    }
+
+    @Test
+    void deactivatedPlateClearsHullColour(){
+        Unit unit = UnitTypes.quad.create(Team.sharded);
+        Color copper = Items.copper.color.cpy();
+
+        WallMount plate = unit.mountWall(Blocks.copperWallLarge);
+        assertNotNull(plate);
+        plate.update(unit);
+        assertEquals(copper.r, unit.wallColor.r, 0.001f);
+
+        plate.setActive(unit, false);
+        plate.update(unit);
+        //deactivated plate no longer tints the hull
+        assertEquals(Color.white.r, unit.wallColor.r, 0.001f);
+        assertEquals(Color.white.g, unit.wallColor.g, 0.001f);
+        assertEquals(Color.white.b, unit.wallColor.b, 0.001f);
     }
 
     @Test
