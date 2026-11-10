@@ -343,6 +343,11 @@ public class Weapon implements Cloneable{
 
         Draw.xscl = 1f;
 
+        //applyColor() sets the draw colour (including any hull tint); without a reset here that
+        //colour survives this method and tints whatever is drawn next: UI cards, terrain, other
+        //units. Every other unit-drawing method resets; this one must too.
+        Draw.reset();
+
         Draw.z(z);
     }
 

@@ -1962,7 +1962,7 @@ public class UnitType extends UnlockableContent implements Senseable{
         Draw.reset();
 
         if(Core.atlas.isFound(outlineRegion)){
-            applyWallTint(unit);
+            applyColor(unit);
             applyOutlineColor(unit);
             Draw.rect(outlineRegion, unit.x, unit.y, unit.rotation - 90);
             Draw.reset();
@@ -1970,7 +1970,12 @@ public class UnitType extends UnlockableContent implements Senseable{
     }
 
     public void drawBody(Unit unit){
-        applyWallTint(unit);
+        applyColor(unit);
+
+        //wall plate tint: set immediately before the sprite, cleared immediately after, so the
+        //colour can never leak into the next draw call (menus, cards, terrain, other units)
+        boolean tint = unit.wallColor != null && !unit.wallColor.equals(Color.white);
+        if(tint) Draw.color(unit.wallColor);
 
         if(unit instanceof UnderwaterMovec){
             Draw.alpha(1f);
@@ -1979,6 +1984,7 @@ public class UnitType extends UnlockableContent implements Senseable{
 
         Draw.rect(region, unit.x, unit.y, unit.rotation - 90);
 
+        if(tint) Draw.color();
         Draw.reset();
     }
 
@@ -2008,7 +2014,7 @@ public class UnitType extends UnlockableContent implements Senseable{
     }
 
     public <T extends Unit & Tankc> void drawTank(T unit){
-        applyWallTint(unit);
+        applyColor(unit);
         Draw.rect(treadRegion, unit.x, unit.y, unit.rotation - 90);
 
         if(treadRegion.found()){
@@ -2030,7 +2036,7 @@ public class UnitType extends UnlockableContent implements Senseable{
     }
 
     public <T extends Unit & Legsc> void drawLegs(T unit){
-        applyWallTint(unit);
+        applyColor(unit);
         Tmp.c3.set(Draw.getMixColor());
 
         Leg[] legs = unit.legs();
@@ -2107,7 +2113,7 @@ public class UnitType extends UnlockableContent implements Senseable{
 
     public void drawCrawl(Crawlc crawl){
         Unit unit = (Unit)crawl;
-        applyWallTint(unit);
+        applyColor(unit);
 
         float crawlTime =
             crawl instanceof Segmentc seg && seg.headSegment() instanceof Crawlc head ? head.crawlTime() + seg.segmentIndex() * segmentPhase * segments :
@@ -2191,6 +2197,12 @@ public class UnitType extends UnlockableContent implements Senseable{
         }
     }
 
+    /**
+     * Applies the base unit colour. This is the only "which colour is the unit drawn in" hook,
+     * and it deliberately does NOT tint the hull: wall plate colour is applied locally around the
+     * body/cell sprites (see {@link #drawBody}) so it can never leak into menus, cards, terrain
+     * or other draws.
+     */
     public void applyColor(Unit unit){
         Draw.color();
         if(healFlash){
@@ -2205,21 +2217,6 @@ public class UnitType extends UnlockableContent implements Senseable{
         if(renderer != null && renderer.overlays != null){
             renderer.overlays.checkApplySelection(unit);
         }
-
-        //tint hull with active wall plate colour
-        if(unit.wallColor != null && !unit.wallColor.equals(Color.white)){
-            Draw.color(unit.wallColor);
-        }
-    }
-
-    /**
-     * Applies the base unit colour plus the wall plate tint. This is just
-     * {@link #applyColor(Unit)} with an explicit name at the hull-drawing call sites; it exists
-     * so the "where does the wall colour apply" question has one obvious answer.
-     * Every caller must end with {@code Draw.reset()} so the tint never leaks to other draws.
-     */
-    public void applyWallTint(Unit unit){
-        applyColor(unit);
     }
 
     //endregion
