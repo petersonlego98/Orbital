@@ -6,6 +6,7 @@ import orbital.type.*;
 import orbital.world.Block;
 
 import arc.graphics.Color;
+import arc.util.Nullable;
 
 import static orbital.Vars.tilesize;
 
@@ -35,8 +36,16 @@ public class WallMount{
     /** Gameplay effect driven each frame. Transient by ownership, never written to saves or sync. */
     public transient WallModuleAbility ability;
 
+    /**
+     * Colour the player picked for the wall plates this session, applied to every plate
+     * mounted while it is set; {@code null} keeps each wall block's own material colour.
+     * Chosen in the loadout dialog's colour selector. Session-only: never saved and never
+     * synchronized.
+     */
+    public static @Nullable Color sessionTint;
+
     /** Material colour of the wall - applied as a tint on the mounted plate, not the whole hull. */
-    public Color wallColor = Color.white;
+    public Color wallColor = new Color(Color.white);
 
     /**
      * Whether the effect is running. A deactivated plate stays mounted, keeps its slot and keeps
@@ -51,7 +60,25 @@ public class WallMount{
         this.y = y;
         this.visualScale = visualScale > 0f ? Math.min(1f, visualScale) : 1f;
         this.ability = new WallModuleAbility(block);
-        this.wallColor = ability != null ? ability.wallColor : Color.white;
+        //own instances: both colours are mutated by the tint pipeline; never alias shared statics
+        this.wallColor = new Color(this.ability.wallColor);
+        //plates added while a colour is picked arrive already in that colour
+        if(sessionTint != null) applyTint(sessionTint);
+    }
+
+    /**
+     * Recolours this plate. {@code null} restores the wall block's own material colour.
+     * Applied at mount time (from {@link #sessionTint}) and by the loadout dialog's colour
+     * selector, which recolours every plate already installed on the hull.
+     */
+    public void applyTint(@Nullable Color tint){
+        if(ability == null) return;
+        if(tint == null){
+            ability.resetWallColor();
+        }else{
+            ability.wallColor.set(tint);
+        }
+        wallColor.set(ability.wallColor);
     }
 
     /** @return the square physical footprint side length, in world units. Never scaled. */

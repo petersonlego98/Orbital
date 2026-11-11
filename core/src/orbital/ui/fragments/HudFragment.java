@@ -1081,9 +1081,25 @@ public class HudFragment{
         float cellSize = mobile ? 56f : 54f;
         float cellPad = mobile ? 2f : 2f;
 
+        //Two tables, on purpose. A cell in a table's first column sets that column's width for
+        //every row of that table, so the wide supply bar sitting in the same table as the
+        //modules left the gap seen between the first module and the second: the first column
+        //became as wide as the bar. Stacking the bars in their own table keeps the modules
+        //evenly spaced and lets the bars be as wide as they need to be.
+        Table bars = new Table();
+        bars.left();
+        Table modules = new Table();
+        modules.left();
+
+        //the bars are read, never clicked, so they take the room of five module cells; the width
+        //is set on the cell itself, exactly as a label's is, so the bars growX to fill it
+        float supplyWidth = 5f * (cellSize + cellPad * 2f);
+        //the extra bottom padding is the air between the bars and the modules below
+        bars.add(supplyCell(unit)).width(supplyWidth).left().padBottom(cellPad + 8f).row();
+
         for(WeaponMount mount : unit.mounts){
             if(mount.weapon.isTurretMount()){
-                table.add(turretCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(turretTooltip(mount.weapon));
+                modules.add(turretCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(turretTooltip(mount.weapon));
             }
         }
 
@@ -1092,27 +1108,31 @@ public class HudFragment{
         if(unit.supportMounts != null){
             for(SupportMount mount : unit.supportMounts){
                 if(mount == null || mount.block == null) continue;
-                table.add(supportCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(supportTooltip(mount));
+                modules.add(supportCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(supportTooltip(mount));
             }
         }
 
-        //wall plates occupy turret slots, but their effect is a module toggle like the support
-        //cells above - the badge says whether the plate is defending
+        //wall plates occupy turret slots and always defend while installed - no badge, no
+        //click; the icon shows the plate's own colour
         if(unit.wallMounts != null){
             for(WallMount mount : unit.wallMounts){
                 if(mount == null || mount.block == null) continue;
-                table.add(wallCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(wallTooltip(mount));
+                modules.add(wallCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(wallTooltip(mount));
             }
         }
 
         //a slot is only free when no turret and no plate sits in it
         if(unit.mountedTurrets() + unit.wallMounts.length < unit.type.turretSlots.size){
-            table.add(actionCell(unit, Icon.add, Core.bundle.get("turret.loadout.add")))
+            modules.add(actionCell(unit, Icon.add, Core.bundle.get("turret.loadout.add")))
                 .size(cellSize).pad(cellPad).tooltip(Core.bundle.get("turret.loadout.add"));
         }
 
-        table.add(actionCell(unit, Icon.hammer, Core.bundle.get("turret.loadout.title")))
+        modules.add(actionCell(unit, Icon.hammer, Core.bundle.get("turret.loadout.title")))
             .size(cellSize).pad(cellPad).tooltip(Core.bundle.get("turret.loadout.title"));
+
+        //bars above, modules below, both left-aligned in the same column
+        table.add(bars).left().row();
+        table.add(modules).left().row();
     }
 
     private Table actionCell(Unit unit, Drawable icon, String tooltip){
@@ -1121,6 +1141,85 @@ public class HudFragment{
         cell.button(icon, Styles.clearNonei, () -> openTurretDialog(unit))
             .size(44f).tooltip(tooltip);
         return cell;
+    }
+
+    /** height of each of the three stacked supply bars: tall enough for the outline font */
+    private static final float barHeight = mobile ? 14f : 18f;
+
+    /**
+     * The hull's supply cell in the dorsal bar: three stacked bars - ammo, liquid and energy -
+     * each labelled with the pool it shows, coloured by that pool's chosen resource (the neutral
+     * grey when nothing feeds it) and carrying its numbers in a label of its own beside it.
+     *
+     * <p>The pool name is the bar's own label, so the bars are tall enough for the outline font
+     * that Bar draws; the amount cannot go in there as well - "Municao: Explosivo 80 / 40" needs
+     * more width than the dorsal bar should take - so it lives in a small label to the right. The
+     * full reading stays in the tooltip. Values are read live from the pools, which the loadout
+     * dialog rebuilds on every mount, removal and resource change.
+     */
+    private Table supplyCell(Unit unit){
+        ModuleSupply supply = unit.moduleSupply();
+
+        Table cell = new Table();
+        cell.background(Styles.black3);
+
+        //one row per pool, with air between the bars and a larger gap under the last one, so
+        //the cell reads as three separate meters and not as a single dark block
+        poolRow(cell, poolName("ammo"), supply::ammoColor, supply::ammoFraction,
+            () -> hudFraction(supply.ammo, supply.ammoCapacity),
+            Core.bundle.format("module.supply.ammo", hudAmmoName(supply.item), (int)supply.ammo, (int)supply.ammoCapacity), 5f);
+
+        poolRow(cell, poolName("liquid"), supply::liquidColor, supply::liquidFraction,
+            () -> hudFraction(supply.liquidAmount, supply.liquidCapacity),
+            Core.bundle.format("module.supply.liquid", hudAmmoName(supply.liquid), (int)supply.liquidAmount, (int)supply.liquidCapacity), 3f);
+
+        poolRow(cell, poolName("energy"), supply::energyColor, supply::energyFraction,
+            () -> hudFraction(supply.energy, supply.energyCapacity),
+            Core.bundle.format("module.supply.energy", (int)supply.energy, (int)supply.energyCapacity), 3f);
+
+        return cell;
+    }
+
+    /**
+     * One row of the supply cell: the labelled bar on the left and its numbers on the right.
+     *
+     * @param name localized pool name drawn inside the bar
+     * @param top padding of the row, which separates it from the one above
+     * @param tip tooltip text with the resource and the full reading of the pool
+     */
+    private void poolRow(Table cell, Prov<CharSequence> name, Prov<Color> color, Floatp fraction,
+        Prov<CharSequence> value, String tip, float top){
+        //the tooltip carries the resource and the full reading: the bar has room only for the
+        //pool name, and the numbers beside it only for the amount
+        cell.add(new Bar(name, color, fraction))
+            .growX().height(barHeight).padTop(top).padLeft(6f).tooltip(tip);
+        cell.add(hudValue(value, color)).left().padLeft(4f).padRight(6f).padTop(top).row();
+    }
+
+    /** @return the localized short name of a pool, the one written on its bar. */
+    private static Prov<CharSequence> poolName(String pool){
+        return () -> Core.bundle.get("module.supply." + pool + ".short");
+    }
+
+    /**
+     * @return the small label that carries one bar's numbers. Its colour is the pool's own, so
+     * the reading belongs to the bar beside it.
+     */
+    private static Label hudValue(Prov<CharSequence> text, Prov<Color> color){
+        Label label = new Label(text);
+        label.setFontScale(0.75f);
+        label.update(() -> label.setColor(color.get()));
+        return label;
+    }
+
+    /** @return the short label of a HUD pool bar: only the numbers, never the resource name. */
+    private static String hudFraction(float value, float capacity){
+        return (int)value + "/" + (int)capacity;
+    }
+
+    /** @return the localized name of an ammo resource, or the "none" placeholder. */
+    private static String hudAmmoName(@Nullable UnlockableContent resource){
+        return resource == null ? Core.bundle.get("module.supply.none") : resource.localizedName;
     }
 
     private static String turretTooltip(Weapon weapon){
@@ -1197,22 +1296,40 @@ public class HudFragment{
             () -> supportTooltip(mount));
     }
 
-    /** @return the tooltip of a wall plate cell: name, category, current state and hint. */
+    /** @return the tooltip of a wall plate cell: name, category and the always-on rule. */
     private static String wallTooltip(WallMount mount){
         return mount.block.localizedName
             + "\n[lightgray]" + Core.bundle.get("support.category.armor")
-            + " · " + Core.bundle.get(supportStateKey(mount.active))
-            + "\n" + Core.bundle.get("support.hud.toggle");
+            + "\n" + Core.bundle.get("wall.hud.tip");
     }
 
     /**
-     * A wall plate cell in the bottom dorsal bar. It reuses the support module cell - the same
-     * badge and the same click - because a plate is toggled, never uninstalled from here: it
-     * keeps its turret slot, its budget and its shape on the hull.
+     * A wall plate cell in the bottom dorsal bar. Plates have no on/off toggle: a plate defends
+     * while it is mounted, so there is no badge and no click. The icon stays untinted - the
+     * plate's colour shows on the hull itself, not on the HUD.
      */
     private Table wallCell(Unit unit, WallMount mount){
-        return moduleCell(unit, mount.block, () -> mount.active, () -> mount.setActive(unit, !mount.active),
-            () -> wallTooltip(mount));
+        float iconSize = 44f;
+        TextureRegion region = mount.block.uiIcon;
+        if(region == null || !region.found()) region = unit.type.uiIcon;
+
+        Table cell = new Table();
+        cell.background(Styles.black3);
+
+        BorderImage icon = new BorderImage(region, 3f);
+        icon.setScaling(Scaling.fit);
+        cell.add(icon).size(iconSize).pad(2f).row();
+
+        //a plate is always defending while installed
+        Bar status = new Bar(() -> "", () -> Pal.heal, () -> 1f);
+        cell.add(status).height(4f).growX().pad(0f, 2f, 2f, 2f).row();
+
+        cell.update(() -> {
+            icon.setColor(Color.white);
+            icon.border(Pal.accent);
+            icon.thickness = 3f;
+        });
+        return cell;
     }
 
     /** Shared body of every module cell: icon, live state badge, click toggle. */

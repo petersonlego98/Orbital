@@ -387,12 +387,147 @@ public class TurretLoadoutDialog extends BaseDialog{
             }
         }
 
+        //the hull's supply area comes after the slot boxes: the rail reads as a stack - slots,
+        //then support anchors, then the shared pool that feeds whatever was installed
+        supplyPanel(slots);
+
         //a single line that says what the rail is waiting for
         String hint = armedSlot >= 0
             ? Core.bundle.format("weapon.module.slot.armed", armedSlot + 1)
             : Core.bundle.get("weapon.module.slot.hint");
         slots.add(hint).width(slotWidth() - 12f).color(armedSlot >= 0 ? Pal.accent : Color.lightGray)
             .left().wrap().fontScale(0.9f).row();
+    }
+
+    /**
+     * The hull's shared supply area, below the slot boxes: the resource picker plus the one
+     * pool bar.
+     *
+     * <p>Ammo and liquid are a single pool, so the picker offers the one resource that feeds
+     * it - every item and liquid an installed turret accepts, in the order the loadout
+     * compatibility rule already allows. The bar under it is coloured by that resource, and
+     * falls back to the energy pool when no mounted module draws items.</p>
+     *
+     * <p>It is a framed area and not another loose row because the rail is a stack of headings
+     * and boxes: a panel with a background reads as a place, and the bar can be tall enough to
+     * read its numbers at a glance.</p>
+     */
+    private void supplyPanel(Table table){
+        table.add(Core.bundle.get("module.supply.title")).style(Styles.outlineLabel).left().row();
+
+        table.table(Styles.grayPanel, panel -> {
+            panel.left().margin(8f);
+
+            ModuleSupply supply = unit.moduleSupply();
+
+            //one picker per ammo pool: each turret kind draws only on its own resource, so a
+            //picker exists while some installed module accepts that kind
+            Seq<Item> items = unit.ammoItemOptions();
+            Seq<Liquid> liquids = unit.ammoLiquidOptions();
+
+            if(items.isEmpty() && liquids.isEmpty()){
+                panel.add(Core.bundle.get("module.supply.noammo")).color(Color.lightGray).left().wrap()
+                    .width(slotWidth() - 48f).padBottom(6f).row();
+            }
+
+            if(!items.isEmpty()){
+                panel.add(Core.bundle.get("module.supply.ammo.label")).color(Color.lightGray)
+                    .left().fontScale(0.9f).padBottom(2f).row();
+                panel.add(resourcePicker(items, supply.item)).left().padBottom(6f).row();
+            }
+
+            //the liquid group sits in its own space, after a separator: the two pickers read
+            //as separate decisions, not as one long row of buttons
+            if(!liquids.isEmpty()){
+                if(!items.isEmpty()){
+                    panel.image().color(Pal.accent).height(2f).growX().padBottom(8f).row();
+                }
+                panel.add(Core.bundle.get("module.supply.liquid.label")).color(Color.lightGray)
+                    .left().fontScale(0.9f).padBottom(2f).row();
+                panel.add(resourcePicker(liquids, supply.liquid)).left().padBottom(8f).row();
+            }
+
+            //three bars, tall enough to read, with air between them: each one is a pool of its own
+            panel.add(ammoBar()).growX().height(mobile ? 20f : 24f).padBottom(6f).row();
+            panel.add(liquidBar()).growX().height(mobile ? 20f : 24f).padBottom(6f).row();
+            panel.add(energyBar()).growX().height(mobile ? 20f : 24f).row();
+        }).growX().padBottom(8f).row();
+
+        table.image().color(Pal.accent).height(3f).growX().padBottom(4f).row();
+    }
+
+    /**
+     * <p>The checked state is set once, when the button is built, and never re-evaluated per
+     * frame: the pickers are rebuilt whenever the loadout or the resource changes, so a live
+     * provider would only repeat the same assignment - and any repeated re-assignment shows
+     * up on screen as flicker.</p>
+     */
+    private <T extends UnlockableContent> Table resourcePicker(Seq<T> resources, UnlockableContent chosen){
+        Table pick = new Table();
+        pick.left();
+
+        for(UnlockableContent resource : resources){
+            boolean active = chosen == resource;
+            pick.button(resourceIcon(resource), Styles.clearTogglei, () -> {
+                unit.moduleSupply().setResource(resource);
+                unit.refreshModuleSupply();
+                changed.run();
+                rebuild();
+            }).size(mobile ? 46f : 52f).checked(active)
+                .tooltip(resource.localizedName).pad(3f);
+        }
+
+        return pick;
+    }
+
+    /**
+     * @return the icon of a resource for the picker: its own sprite when the atlas carries
+     * one, and a flat swatch of the resource's colour otherwise. Liquids have no guaranteed UI
+     * sprite - {@code liquid-<name>-ui} may not be packed - so without the fallback their
+     * buttons would be invisible and the liquid pool would look unselectable.
+     */
+    private static Drawable resourceIcon(UnlockableContent resource){
+        if(resource.uiIcon != null && resource.uiIcon.found()){
+            return new TextureRegionDrawable(resource.uiIcon);
+        }
+
+        Color color = resource instanceof Item item ? item.color
+            : resource instanceof Liquid liquid && liquid.barColor != null ? liquid.barColor
+            : resource instanceof Liquid liquid ? liquid.color
+            : Color.gray;
+        return tinted(Tex.whiteui, color);
+    }
+
+    /** @return the hull's item-ammo bar, coloured by the chosen item. */
+    private Bar ammoBar(){
+        ModuleSupply supply = unit.moduleSupply();
+        return new Bar(
+            () -> Core.bundle.format("module.supply.ammo", itemName(supply.item), (int)supply.ammo, (int)supply.ammoCapacity),
+            supply::ammoColor,
+            supply::ammoFraction);
+    }
+
+    /** @return the hull's liquid bar, coloured by the chosen liquid. */
+    private Bar liquidBar(){
+        ModuleSupply supply = unit.moduleSupply();
+        return new Bar(
+            () -> Core.bundle.format("module.supply.liquid", itemName(supply.liquid), (int)supply.liquidAmount, (int)supply.liquidCapacity),
+            supply::liquidColor,
+            supply::liquidFraction);
+    }
+
+    /** @return the hull's energy bar. */
+    private Bar energyBar(){
+        ModuleSupply supply = unit.moduleSupply();
+        return new Bar(
+            () -> Core.bundle.format("module.supply.energy", (int)supply.energy, (int)supply.energyCapacity),
+            supply::energyColor,
+            supply::energyFraction);
+    }
+
+    /** @return the localized name of an ammo resource, or the "none" placeholder. */
+    private static String itemName(@Nullable UnlockableContent resource){
+        return resource == null ? text("@module.supply.none") : resource.localizedName;
     }
 
     /**

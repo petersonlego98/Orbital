@@ -101,7 +101,19 @@ public class WallModuleAbility extends Ability{
             shieldCooldown = shield.breakCooldown;
         }
 
-        wallColor = wallColorFor(block);
+        //copy: wallColorFor returns the item's own shared static colour - keeping the alias
+        //would let any future set() recolour the item itself
+        wallColor = new Color(wallColorFor(block));
+    }
+
+    /** Restores the material colour of the wall block this module was built from. */
+    public void resetWallColor(){
+        wallColor = new Color(wallColorFor(block));
+    }
+
+    /** @return the material colour of a wall block, or white when unknown. Public for UI palettes. */
+    public static Color materialColorOf(Block block){
+        return wallColorFor(block);
     }
 
     /** @return the dominant material colour of a wall block, or white when unknown. */

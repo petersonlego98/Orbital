@@ -7,6 +7,7 @@ import arc.struct.*;
 import arc.util.*;
 import orbital.annotations.Annotations.*;
 import orbital.content.*;
+import orbital.ctype.UnlockableContent;
 import orbital.entities.units.*;
 import orbital.gen.*;
 import orbital.type.*;
@@ -33,6 +34,12 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * {@code supportMounts}.
      */
     transient WallMount[] wallMounts = {};
+    /**
+     * Runtime-only supply pool shared by every dorsal module of this unit: one ammo/liquid
+     * resource plus energy, with the values derived from the blocks the modules come from.
+     * Deliberately transient, exactly like the loadout arrays that decide its size.
+     */
+    transient ModuleSupply moduleSupply = new ModuleSupply();
     @ReadOnly transient boolean isRotate;
     @NoSerialize float aimX, aimY;
     boolean isShooting;
@@ -48,6 +55,9 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         for(int i = 0; i < mounts.length; i++){
             mounts[i] = def.weapons.get(i).mountType.get(def.weapons.get(i));
         }
+        //content-defined removable modules (the Duo of the mono) exist before any runtime
+        //mounting, so the pool is built from the spawn-time loadout as well
+        refreshModuleSupply();
     }
 
     /** @return the dorsal cost of all removable modules currently mounted on this unit. */
@@ -68,6 +78,102 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
             if(mount.weapon.removable) count++;
         }
         return count;
+    }
+
+    /** @return this unit's shared module supply pool; never null. */
+    public ModuleSupply moduleSupply(){
+        if(moduleSupply == null) moduleSupply = new ModuleSupply();
+        return moduleSupply;
+    }
+
+    /**
+     * @return every item accepted as item ammo by a mounted module, in content order and
+     * without repeats.
+     *
+     * <p>This is the list the loadout menu offers for the item-ammo bar. It mirrors what the
+     * compatibility rule already allows: a turret that shares no ammo with the rest of the
+     * loadout cannot be mounted, so the pool can never be fed by something the ship does not
+     * carry.</p>
+     */
+    public Seq<Item> ammoItemOptions(){
+        Seq<Item> options = new Seq<>(Item.class);
+        for(WeaponMount mount : mounts){
+            if(!(mount.weapon instanceof TurretWeapon turret)) continue;
+            for(Item item : ModuleSupplies.items(turret.turret)){
+                if(!options.contains(item, true)) options.add(item);
+            }
+        }
+        for(SupportMount mount : supports()){
+            if(mount.block == null) continue;
+            for(Item item : ModuleSupplies.items(mount.block)){
+                if(!options.contains(item, true)) options.add(item);
+            }
+        }
+        return options;
+    }
+
+    /**
+     * @return every liquid accepted as ammo by a mounted module, in content order and without
+     * repeats. Liquid support modules (wave, tsunami) and liquid turrets feed the liquid bar.
+     */
+    public Seq<Liquid> ammoLiquidOptions(){
+        Seq<Liquid> options = new Seq<>(Liquid.class);
+        for(WeaponMount mount : mounts){
+            if(!(mount.weapon instanceof TurretWeapon turret)) continue;
+            for(Liquid liquid : ModuleSupplies.liquids(turret.turret)){
+                if(!options.contains(liquid, true)) options.add(liquid);
+            }
+        }
+        for(SupportMount mount : supports()){
+            if(mount.block == null) continue;
+            for(Liquid liquid : ModuleSupplies.liquids(mount.block)){
+                if(!options.contains(liquid, true)) options.add(liquid);
+            }
+        }
+        return options;
+    }
+
+    /**
+     * Recomputes the three supply pools from the modules installed right now: each ammo pool
+     * sums the buffers of the modules that use it, and the energy pool sums every module's
+     * power drain. Called after every mount and removal, so the bars never disagree with the
+     * loadout.
+     *
+     * <p>A chosen resource survives while it is still on offer; a pool whose resource stopped
+     * being carried (its turret was removed) falls back to the first remaining one.</p>
+     */
+    public void refreshModuleSupply(){
+        ModuleSupply supply = moduleSupply();
+
+        Seq<Item> items = ammoItemOptions();
+        if(supply.item == null || !items.contains(supply.item, true)){
+            supply.item = items.size > 0 ? items.first() : null;
+        }
+
+        Seq<Liquid> liquids = ammoLiquidOptions();
+        if(supply.liquid == null || !liquids.contains(supply.liquid, true)){
+            supply.liquid = liquids.size > 0 ? liquids.first() : null;
+        }
+
+        float ammo = 0f, liquid = 0f, energy = 0f;
+        //every module of a kind adds to its own bar: turret modules and support modules alike
+        for(WeaponMount mount : mounts){
+            if(!(mount.weapon instanceof TurretWeapon turret)) continue;
+            if(ModuleSupplies.accepts(turret.turret, supply.item)) ammo += ModuleSupplies.ammoCapacity(turret.turret);
+            if(ModuleSupplies.accepts(turret.turret, supply.liquid)) liquid += ModuleSupplies.liquidCapacity(turret.turret);
+            energy += ModuleSupplies.energyCapacity(turret.turret);
+        }
+        for(SupportMount mount : supports()){
+            if(mount.block == null) continue;
+            if(ModuleSupplies.accepts(mount.block, supply.item)) ammo += ModuleSupplies.ammoCapacity(mount.block);
+            if(ModuleSupplies.accepts(mount.block, supply.liquid)) liquid += ModuleSupplies.liquidCapacity(mount.block);
+            energy += ModuleSupplies.energyCapacity(mount.block);
+        }
+
+        supply.ammoCapacity = ammo;
+        supply.liquidCapacity = liquid;
+        supply.energyCapacity = energy;
+        supply.clamp();
     }
 
     /**
@@ -228,6 +334,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         wallMounts = next;
 
         mount.created(self());
+        refreshModuleSupply();
         return mount;
     }
 
@@ -252,6 +359,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         //release shared state (the plate's shield pool) after the array has been updated,
         //so removed() can see whether another module still owns it
         mount.removed(self());
+        refreshModuleSupply();
         return true;
     }
 
@@ -326,6 +434,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         supportMounts = next;
         Unit unit = self();
         mount.created(unit);
+        refreshModuleSupply();
         return mount;
     }
 
@@ -349,6 +458,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         //release shared state (for example the force module's shield pool) after the array
         //has been updated, so removed() can see whether another module still owns it
         mount.removed(self());
+        refreshModuleSupply();
         return true;
     }
 
@@ -481,6 +591,8 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         weapon.y = slot.offsetY;
         weapon.slotIndex = slotIndex;
         addWeapon(weapon);
+        //the pool follows the loadout: the turret's own ammo buffer becomes hull storage
+        refreshModuleSupply();
         return weapon;
     }
 
@@ -542,6 +654,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         weapon.y = slot.offsetY;
         weapon.slotIndex = slotIndex;
         addWeapon(weapon);
+        refreshModuleSupply();
         return weapon;
     }
 
@@ -588,6 +701,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         }
 
         mounts = next;
+        refreshModuleSupply();
         return true;
     }
 
@@ -692,8 +806,9 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
             if(mount != null) mount.update(self());
         }
 
-        //tint the hull with the colour of the first active wall plate
-        Color wallTint = Color.white;
+        //tint the hull with the colour of the first active wall plate; Tmp.c2, never the
+        //shared Color.white - aliasing it was mutating the global static every frame
+        Color wallTint = Tmp.c2.set(Color.white);
         for(WallMount mount : walls()){
             if(mount != null && mount.active && mount.wallColor != null){
                 wallTint.set(mount.wallColor);

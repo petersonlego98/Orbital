@@ -1,0 +1,1 @@
+{version:1,fields:[{name:effectTimer,type:float},{name:intensity,type:float},{name:life,type:float},{name:opacity,type:float},{name:wallColor,type:arc.graphics.Color},{name:weather,type:orbital.type.Weather},{name:windVector,type:arc.math.geom.Vec2},{name:x,type:float},{name:y,type:float}]}

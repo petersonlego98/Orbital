@@ -15,8 +15,13 @@ abstract class EntityComp{
     private transient boolean added;
     transient int id = EntityGroup.nextId();
 
-    /** Colour tinted onto the hull by active dorsal wall plates; white when none. */
-    public Color wallColor = Color.white;
+    /**
+     * Colour tinted onto the hull by active dorsal wall plates; white when none.
+     * Must be its own instance: aliasing {@code Color.white} (a shared static in arc) here made
+     * every {@code set()} mutate the global white, which broke the tint guard in
+     * {@code UnitType.applyColor} and leaked the wall colour into every UI drawn in white.
+     */
+    public Color wallColor = new Color(Color.white);
 
     /** Sets the hull tint from active wall plates. Called from WeaponsComp each frame. */
     public void wallColor(Color color){

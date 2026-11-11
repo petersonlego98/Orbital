@@ -1,0 +1,1 @@
+{version:1,fields:[{name:health,type:float},{name:items,type:orbital.world.modules.ItemModule},{name:liquids,type:orbital.world.modules.LiquidModule},{name:power,type:orbital.world.modules.PowerModule},{name:team,type:orbital.game.Team},{name:wallColor,type:arc.graphics.Color},{name:x,type:float},{name:y,type:float}]}
