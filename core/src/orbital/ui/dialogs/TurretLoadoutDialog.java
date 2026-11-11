@@ -15,6 +15,7 @@ import arc.util.*;
 import orbital.content.Blocks;
 import orbital.content.WeaponModules;
 import orbital.ctype.*;
+import orbital.entities.abilities.WallModuleAbility;
 import orbital.entities.units.*;
 import orbital.gen.*;
 import orbital.graphics.*;
@@ -59,10 +60,49 @@ public class TurretLoadoutDialog extends BaseDialog{
     private final Seq<Table> slotBoxes = new Seq<>();
     /** slot highlighted by the drag in progress, -1 when none */
     private int hoverSlot = -1;
+    /** colour selector group (swatch + button); visible only while a wall plate is installed */
+    private @Nullable Table colorPick;
 
     public TurretLoadoutDialog(){
         super("@turret.loadout.title");
         cont.top();
+
+        //header with the plate colour selector, pinned to the top right of the menu: one pick
+        //colours every plate already installed on the hull and every plate mounted afterwards.
+        //The selector only exists while a wall plate is on the hull - its options come from
+        //the plates that are installed
+        cont.table(header -> {
+            header.top().right();
+
+            //The picker's contents are built BEFORE it is added to the header. A cell added with
+            //an empty Table is measured 0x0, and adding children afterwards does not invalidate
+            //the parent layout - the picker then stays at zero size no matter what, which is why
+            //the button never showed up.
+            Table pick = new Table();
+            pick.left();
+
+            Image swatch = new Image(Tex.whiteui);
+            pick.add(swatch).size(26f).padRight(8f);
+            swatch.update(() -> swatch.setColor(WallMount.sessionTint != null
+                ? WallMount.sessionTint : Color.lightGray));
+
+            pick.button(Icon.fill, Styles.clearNonei, this::showWallColorPicker).size(48f)
+                .tooltip(Core.bundle.get("wall.color.select"));
+
+            header.add().growX();
+            colorPick = pick;
+            header.add(colorPick).top().right();
+
+            //visible only while a plate is installed; flipping visibility relayouts the cell so
+            //it is never left measuring zero
+            colorPick.update(() -> {
+                boolean show = unit != null && unit.wallMounts != null && unit.wallMounts.length > 0;
+                if(colorPick.visible != show){
+                    colorPick.visible = show;
+                    colorPick.invalidateHierarchy();
+                }
+            });
+        }).growX().row();
 
         //the dialog is split in two columns: the scrolling catalogue on the left and the fixed
         //slot rail on the right, which fills the empty area beside the module grid
@@ -789,7 +829,8 @@ public class TurretLoadoutDialog extends BaseDialog{
         }
 
         //wall plates are installed with the turrets, not on support anchors, so they get their
-        //own rows with the same toggle and remove affordance
+        //own rows; a plate has no on/off state - it defends while mounted - so the only affordance
+        //here is removal; icons stay untinted, the colour shows on the hull itself
         for(WallMount mount : unit.wallMounts){
             if(mount == null || mount.block == null) continue;
 
@@ -799,16 +840,6 @@ public class TurretLoadoutDialog extends BaseDialog{
                 cell.add(mount.block.localizedName).left().growX().ellipsis(false).wrap();
                 cell.add(Core.bundle.format("support.loadout.size", mount.block.size, mount.block.size))
                     .color(Color.lightGray).padLeft(8f).padRight(8f);
-                Label state = cell.label(() -> Core.bundle.get(mount.active
-                    ? "support.hud.active" : "support.hud.inactive"))
-                    .padLeft(8f).padRight(8f).get();
-                state.update(() -> state.setColor(mount.active ? Pal.heal : Pal.remove));
-                //the plate stays mounted and keeps its slot when switched off
-                cell.button(Icon.power, Styles.clearNonei, () -> {
-                    mount.setActive(unit, !mount.active);
-                    changed.run();
-                }).size(48f).padLeft(4f).tooltip(Core.bundle.get("support.hud.toggle"))
-                    .get().getStyle().imageUpColor = mount.active ? Pal.heal : Pal.remove;
                 cell.button(Icon.cancel, Styles.clearNonei, () -> {
                     unit.removeWallMount(mount);
                     changed.run();
@@ -819,7 +850,7 @@ public class TurretLoadoutDialog extends BaseDialog{
         }
     }
 
-    /** live state line under the support heading */
+    /** live state line under the support heading; wall plates have no state - they always defend */
     private String supportStateKey(){
         boolean hasSupport = false, anyActive = false;
         if(unit.supportMounts != null){
@@ -829,14 +860,77 @@ public class TurretLoadoutDialog extends BaseDialog{
                 if(support.active) anyActive = true;
             }
         }
-        if(unit.wallMounts != null){
-            for(WallMount mount : unit.wallMounts){
-                if(mount == null || mount.block == null) continue;
-                hasSupport = true;
-                if(mount.active) anyActive = true;
-            }
-        }
         return hasSupport && !anyActive ? "support.loadout.inactive" : "support.loadout.active";
+    }
+
+    /**
+     * The plate colour selector: one swatch per distinct material colour among the plates
+     * installed on this hull, plus the "original" option. Picking a colour applies it to every
+     * plate already installed; plates mounted afterwards arrive in it
+     * ({@link WallMount#sessionTint}). The selector is only reachable while a plate is
+     * installed, so an empty hull offers no colour choice at all.
+     */
+    private void showWallColorPicker(){
+        Seq<Color> palette = new Seq<>();
+        for(WallMount mount : unit.wallMounts){
+            if(mount == null || mount.block == null) continue;
+            Color color = WallModuleAbility.materialColorOf(mount.block);
+            if(!palette.contains(c -> c.equals(color))) palette.add(new Color(color));
+        }
+
+        BaseDialog dialog = new BaseDialog("@wall.color.title");
+        dialog.cont.pane(p -> {
+            p.top();
+            p.add(Core.bundle.get("wall.color.hint")).color(Color.lightGray).wrap().width(460f)
+                .pad(10f).center().row();
+            Table grid = p.table().pad(6f).get();
+            int count = 0;
+            //the leftmost swatch restores each wall block's own material colour
+            addSwatch(grid, dialog, null, Core.bundle.get("wall.color.original"));
+            if(++count % 5 == 0) grid.row();
+            for(Color color : palette){
+                addSwatch(grid, dialog, color, tintName(color));
+                if(++count % 5 == 0) grid.row();
+            }
+        }).grow().row();
+        dialog.addCloseListener();
+        dialog.show();
+    }
+
+    /** @return the localized name of the item carrying this material colour, or empty. */
+    private static String tintName(Color color){
+        for(Item item : content.items()){
+            if(item.color.equals(color)) return item.localizedName;
+        }
+        return "";
+    }
+
+    /** One square of the colour palette. */
+    private void addSwatch(Table grid, BaseDialog dialog, @Nullable Color color, String name){
+        Cell<Table> swatchCell = grid.table(Styles.black6, b -> {
+            b.margin(6f);
+            b.image(Tex.whiteui).size(36f).color(color == null ? Color.lightGray : color);
+        }).size(52f).pad(3f);
+        swatchCell.tooltip(name);
+        Table swatch = swatchCell.get();
+
+        swatch.addListener(new ClickListener(){
+            @Override
+            public void clicked(InputEvent event, float x, float y){
+                WallMount.sessionTint = color == null ? null : new Color(color);
+                applyWallTint();
+                dialog.hide();
+            }
+        });
+    }
+
+    /** Applies the picked colour to every plate installed on this hull and refreshes the UI. */
+    private void applyWallTint(){
+        for(WallMount mount : unit.wallMounts){
+            if(mount != null) mount.applyTint(WallMount.sessionTint);
+        }
+        changed.run();
+        rebuild();
     }
 
     private static boolean hasNativeSupport(UnitType type){
