@@ -93,9 +93,13 @@ public class TurretLoadoutDialog extends BaseDialog{
             colorPick = pick;
             header.add(colorPick).top().right();
 
-            //visible only while a plate is installed; flipping visibility relayouts the cell so
-            //it is never left measuring zero
-            colorPick.update(() -> {
+            //The visibility toggle is driven from the header, which is always visible.
+            //Element.update() only executes from Element.act(), and Group.act() skips invisible
+            //children - so an actor that hides itself from inside its own update callback
+            //deadlocks: it hides once and the callback never runs again, which is why the
+            //picker stayed invisible under every condition. Driving it from the always-visible
+            //header keeps evaluating the condition every frame.
+            header.update(() -> {
                 boolean show = unit != null && unit.wallMounts != null && unit.wallMounts.length > 0;
                 if(colorPick.visible != show){
                     colorPick.visible = show;
