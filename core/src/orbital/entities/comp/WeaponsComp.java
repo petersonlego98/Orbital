@@ -1155,8 +1155,13 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
                 //a weapon that picks its own target keeps it: clearing it every frame would
                 //throw away the target it just found, and it would re-search on the next one
                 if(clearTarget && !mountSelfTargets(mount)) mount.target = null;
-                mount.aimX = x;
-                mount.aimY = y;
+                //...and keeps its own aim point. The pilot's hand is the aiming input of a manual
+                //module: an automatic one that inherits it aims at the mouse whenever it has no
+                //target of its own, which is exactly what "auto-aim points at the cursor" is.
+                if(!mountSelfTargets(mount)){
+                    mount.aimX = x;
+                    mount.aimY = y;
+                }
             }
         }
 

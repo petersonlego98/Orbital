@@ -20,6 +20,11 @@ public class BaseDialog extends Dialog{
     public BaseDialog(String title, DialogStyle style){
         super(title, style);
         setFillParent(true);
+        //this dialog is the whole stage: centring it is not only meaningless, it is harmful. While
+        //the Android system bars show, the stage carries insets, and centring a full-screen dialog
+        //against those insets shifted the menu up by half the inset on every frame - the title and
+        //the first rows ended up off the top of the screen.
+        setCentered(false);
         this.title.setAlignment(Align.center);
         titleTable.row();
         titleImage = titleTable.image(Tex.whiteui, Pal.accent).growX().height(3f).pad(4f).get();
@@ -46,6 +51,19 @@ public class BaseDialog extends Dialog{
     public void setTitleColor(Color color){
         titleImage.setColor(color);
         title.setColor(color);
+    }
+
+    /**
+     * Puts the dialog at the origin of the stage.
+     *
+     * <p>The stock implementation centres the dialog between the stage margins, which is what
+     * every caller wants for a floating window. This dialog fills the stage, so its place is the
+     * origin - and on Android the margins are non-zero while the system bars are up, so the stock
+     * centring quietly moved the whole menu off the top of the screen.</p>
+     */
+    @Override
+    public void centerWindow(){
+        setPosition(0f, 0f);
     }
 
     /** Places the buttons as an overlay on top of the content. Used when the content can be scrolled through.*/

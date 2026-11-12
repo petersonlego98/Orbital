@@ -1236,9 +1236,11 @@ public class TurretLoadoutDialog extends BaseDialog{
             float unit = 1f / Scl.scl(1f);
             //Four cards to a row, and the four fill the row: the card is a quarter of the
             //catalogue column, so the names and the shot types have room to be read instead of
-            //breaking in the middle of a word. The floor only guards a phone so small that a
-            //quarter of the column would be unreadable.
-            cardWidth = Math.max(84f * unit, catalogueWidth() / 4f - 8f);
+            //breaking in the middle of a word. The pane is laid out the frame the menu opens, so
+            //the first pass works from the computed column width and the second - the one that
+            //sticks - from the pane's own measured width, which never disagrees with the screen.
+            float available = list.getWidth() > 1f ? list.getWidth() - Scl.scl(12f) : catalogueWidth();
+            cardWidth = Math.max(84f * unit, available / 4f - 8f);
             btnSize = Mathf.clamp(cardWidth * 0.62f, 36f, 190f);
             imgSize = btnSize;
             //two text lines under the icon, so one- and two-line labels still line up

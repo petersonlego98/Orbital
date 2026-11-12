@@ -310,6 +310,42 @@ em `x=0, w=340`, com as caixas de 104 e as fileiras de 330 dentro da coluna.
 As legendas das caixas de encaixe também não cabiam: `width(boxSize - 12)` com
 `fontScale(1)` no toque quebrava "Sobrecarga" no meio ("Sobrecar ga"). Agora a legenda é
 `width(boxSize - 6)` com `fontScale(0.6)` no toque, e o nome quebra entre palavras.
+`cardMetrics()` passou a medir a colina do catálogo pelo `list.getWidth()` (o painel já
+desenhado) em vez de calcular pela largura do palco: no Android os dois números não são iguais, e
+um card calculado pelo palco grande demais era cortado na quarta coluna.
+
+### 3.9 O menu que fugia da tela no Android
+
+**[FATO]** `BaseDialog` herda de `arc.scene.ui.Dialog`, e o `Dialog.act()` chama
+**`centerWindow()` todo frame** (enquanto `center && !isMovable && sem ações`). O
+`centerWindow()` centraliza a caixa entre `Core.scene.marginLeft/Right/Top/Bottom`. No Android
+essas margens são as barras do sistema, e um diálogo que **preenche a tela** centrado contra
+elas é empurrado para cima por metade do inset — o título e as primeiras linhas saem por cima
+da tela. É o "menu desalinhado" das fotos: o mesmo menu, deslocado.
+
+**[DECISÃO]** `BaseDialog` agora liga `setCentered(false)` e sobrescreve `centerWindow()` para
+`setPosition(0, 0)`: um diálogo que preenche o palco já está onde deve estar, e a margem do
+sistema não pode deslocá-lo. Vale para todos os diálogos do jogo (todos passam por
+`BaseDialog`).
+
+### 3.10 Mira automática não aponta para o mouse
+
+**[FATO]** O usuário relatou nos dois sistemas: com a mira automática ligada, a arma aponta para
+onde o mouse está. A ordem real de um frame é: entidades primeiro (a arma automática escolhe o
+alvo e mira nele) e **o manipulador de entrada escreve a mira do piloto depois**, todo frame
+(`DesktopInput.updateMovement` / `MobileInput`). Um módulo automático que herdasse essa escrita
+ficaria apontando para o mouse sempre que não tivesse alvo próprio — e esse ponto de mira é o
+que um **laser contínuo desenha** (`PointLaserBulletType` usa `b.aimX/aimY`) e do que uma
+bala com `scaleLife` mede a vida.
+
+**[FATO]** Medido com teste de frame real (`AutoAimAimingTest`): o módulo automático fica a 3°
+do inimigo e a 114° do mouse — a rotação já era a do alvo. O que estava errado era o **ponto de
+mira herdado**.
+
+**[IMPLEMENTADO]** `WeaponsComp.aim(x, y, clearTarget)` não escreve mais `mount.aimX/aimY` de um
+mount que escolhe o próprio alvo (`mountSelfTargets`): a mão do piloto é entrada de mira de
+módulo manual. Um módulo automático mantém a mira que já tinha (o alvo, quando achou) e sem
+alvo não passa a seguir o cursor.
 
 ### 3.6 Mira automática x manual
 
@@ -428,6 +464,11 @@ grafias do Arc (`ControllerInput.firing()` testa `Binding.controllerFire` antes 
 ---
 
 ## 5. Testes
+
+**Arquivo novo:** `tests/src/test/java/AutoAimAimingTest.java` (3 testes, todos passando): dirige
+o pipeline na ordem real de um frame — armas primeiro, `unit.aim(mouse)` depois — e prova que o
+módulo automático mira no próprio alvo (3° do inimigo, 114° do mouse), que o manual continua
+seguindo o piloto e que o automático mantém a mira quando o alvo desaparece.
 
 **Arquivo novo:** `tests/src/test/java/ControlsMenuTest.java` (4 testes, todos passando).
 
