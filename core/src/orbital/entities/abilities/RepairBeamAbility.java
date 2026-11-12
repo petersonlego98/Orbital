@@ -19,12 +19,26 @@ import static orbital.Vars.*;
  * {@code repairSpeed} hit points per tick with a beam; the module reproduces exactly
  * that, without power or coolant. Created by {@link orbital.entities.units.SupportMount};
  * never serialized and lives only in the mount.</p>
+ *
+ * <p>When {@link #buildings} is set, damaged allied constructions are valid targets too,
+ * so a dorsal repair module also patches the base it is defending.</p>
  */
-public class RepairBeamAbility extends Ability{
+public class RepairBeamAbility extends Ability implements AimingModule{
     public float range = 60f, repairSpeed = 0.3f, beamWidth = 1f;
     public Color color = Color.valueOf("98ffa9");
+    /** When true only flying units are healed: the carrier's beam serves its own wing. */
+    public boolean airOnly = false;
+    /** When true damaged allied buildings can also be repaired. */
+    public boolean buildings = false;
+    /** How fast the module's turret turns toward the repaired target, in degrees per tick. */
+    public float rotateSpeed = 10f;
+    /** hull-local dock of the module, in world units. */
+    public float anchorX, anchorY;
+    /** current aim, relative to the hull, in degrees. */
+    public float rotation = 90f;
 
     protected @Nullable Unit target;
+    protected @Nullable Building buildingTarget;
     protected float strength;
     /** How often to re-acquire the closest damaged ally. */
     public float retargetTime = 10f;
@@ -37,31 +51,95 @@ public class RepairBeamAbility extends Ability{
     }
 
     @Override
+    public void anchor(float anchorX, float anchorY){
+        this.anchorX = anchorX;
+        this.anchorY = anchorY;
+    }
+
+    @Override
+    public float rotation(){
+        return rotation;
+    }
+
+    @Override
+    public float moduleX(Unit unit){
+        return ModuleDock.worldX(unit, anchorX, anchorY);
+    }
+
+    @Override
+    public float moduleY(Unit unit){
+        return ModuleDock.worldY(unit, anchorX, anchorY);
+    }
+
+    @Override
     public void update(Unit unit){
         retimer += Time.delta;
-        if(retimer >= retargetTime || target == null){
+        if(retimer >= retargetTime || (target == null && buildingTarget == null)){
             retimer = 0f;
-            target = Units.closest(unit.team, unit.x, unit.y, u -> u.damaged());
+            //the beam starts at the module, so it measures the block's radius from the module:
+            //ally across the other side of the hull is out of the beam's reach, as with the block
+            float dockX = moduleX(unit), dockY = moduleY(unit);
+            target = Units.closest(unit.team, dockX, dockY, u -> u.damaged() && (!airOnly || u.isFlying()));
+            buildingTarget = buildings
+                ? Units.closestBuilding(unit.team, dockX, dockY, range, b -> b.damaged() && !b.isHealSuppressed())
+                : null;
+
+            //keep only the closest candidate, so the beam goes to whatever needs it most
+            if(target != null && buildingTarget != null){
+                float unitDst = target.dst(dockX, dockY) - target.hitSize / 2f;
+                float buildingDst = buildingTarget.dst(dockX, dockY) - buildingTarget.hitSize() / 2f;
+                if(unitDst <= buildingDst){
+                    buildingTarget = null;
+                }else{
+                    target = null;
+                }
+            }
         }
 
-        if(target != null && target.within(unit, range)){
+        float dockX = moduleX(unit), dockY = moduleY(unit);
+        boolean unitValid = target != null && target.dst(dockX, dockY) - target.hitSize / 2f <= range;
+        boolean buildingValid = buildingTarget != null
+            && buildingTarget.dst(dockX, dockY) - buildingTarget.hitSize() <= range && buildingTarget.isValid();
+
+        if(unitValid || buildingValid){//no else
+            //what the beam is pointed at, so the turret can turn to face it
+            float aimX, aimY;
+            if(unitValid){
+                aimX = target.x;
+                aimY = target.y;
+            }else{
+                aimX = buildingTarget.x;
+                aimY = buildingTarget.y;
+            }
+            rotation = ModuleDock.turn(rotation, ModuleDock.aimAt(unit, dockX, dockY, aimX, aimY),
+                rotateSpeed, Time.delta);
+        }
+
+        if(unitValid){
             target.heal(repairSpeed * Time.delta);
+            strength = Mathf.lerpDelta(strength, 1f, 0.1f);
+        }else if(buildingValid){
+            buildingTarget.heal(repairSpeed * Time.delta);
             strength = Mathf.lerpDelta(strength, 1f, 0.1f);
         }else{
             target = null;
+            buildingTarget = null;
             strength = Mathf.lerpDelta(strength, 0f, 0.1f);
         }
     }
 
     @Override
     public void draw(Unit unit){
-        if(target == null || strength <= 0.02f) return;
+        if((target == null && buildingTarget == null) || strength <= 0.02f) return;
 
+        float dockX = moduleX(unit), dockY = moduleY(unit);
+        float tx = target != null ? target.x : buildingTarget.x;
+        float ty = target != null ? target.y : buildingTarget.y;
         float z = unit.type != null && unit.type.lowAltitude ? Layer.flyingUnitLow + 0.1f : Layer.flyingUnit + 0.1f;
         Draw.z(z);
         Draw.color(color, strength);
         Lines.stroke(beamWidth * strength);
-        Lines.line(unit.x, unit.y, target.x, target.y, false);
+        Lines.line(dockX, dockY, tx, ty, false);
         Lines.stroke(1f);
         Draw.color(Color.white);
         Draw.reset();

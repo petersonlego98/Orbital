@@ -60,8 +60,6 @@ public class HudFragment{
     private Table hudLabel;
     private float coreAttackTime;
 
-    /** currently highlighted turret icon in the selected-unit loadout bar. */
-    private @Nullable Weapon highlightedTurret;
     /** last unit shown in the loadout bar, used to avoid rebuilding it every frame. */
     private Unit turretBarUnit;
     /** identity signature of the turret mounts currently drawn in the loadout bar. */
@@ -299,7 +297,6 @@ public class HudFragment{
             if(hudLabel != null){
                 hudLabel.color.a = 0f;
             }
-            highlightedTurret = null;
             turretBarUnit = null;
             turretBarSignature = Long.MIN_VALUE;
             showHudText = false;
@@ -754,6 +751,18 @@ public class HudFragment{
             }).padLeft(mobile ? 175f : 0f).padBottom(mobile ? 12f : 8f);
         });
 
+        //analog stick (touch controls only): the hull answers it directly, so dragging the
+        //map with another finger and the stick never fight over the same finger. The switch
+        //lives in the controls menu; with it off, the original drag control is the only one.
+        parent.fill(t -> {
+            t.name = "analogstick";
+            t.bottom().right();
+            t.visible(() -> mobile && shown() && !state.isMenu() && !state.isEditor() && !player.dead()
+                && Core.settings.getBool(KeybindDialog.analogKey, true));
+            t.touchable = Touchable.childrenOnly;
+            t.add(buildAnalogStick()).size(Scl.scl(120f)).pad(Scl.scl(18f));
+        });
+
         buildTestFeaturesPanel(parent);
         blockfrag.build(parent);
     }
@@ -783,6 +792,9 @@ public class HudFragment{
                         if(++index % columns == 0) scroll.row();
                     }
                 }).size(mobile ? 188f : 248f, mobile ? 138f : 184f).top().left().row();
+                panel.button("@mode.testfeatures.setup.button", Icon.settings, TestNewFeaturesMode::openSetup)
+                    .width(mobile ? 188f : 248f).height(34f).padTop(4f).left()
+                    .visible(() -> !TestNewFeaturesMode.wavesStarted).row();
                 panel.add("@mode.testfeatures.modules").color(Pal.accent).left().padTop(6f).row();
                 panel.label(() -> {
                     Unit unit = selectedUnit();
@@ -1030,21 +1042,9 @@ public class HudFragment{
         return signature;
     }
 
+    /** Forces a rebuild of the bottom bar on the next frame (a mount was added or removed). */
     private void refreshTurretBar(){
         turretBarSignature = Long.MIN_VALUE;
-        if(highlightedTurret != null){
-            Unit unit = selectedUnit();
-            boolean found = false;
-            if(unit != null){
-                for(WeaponMount mount : unit.mounts){
-                    if(mount.weapon == highlightedTurret){
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            if(!found) highlightedTurret = null;
-        }
     }
 
     private void openTurretDialog(Unit unit){
@@ -1070,6 +1070,22 @@ public class HudFragment{
         return Mathf.clamp(1f - mount.reload / mount.weapon.reload);
     }
 
+    /**
+     * @return the analog stick of the touch controls, wired to the mobile input handler.
+     * Created once per HUD build; the handler side only reads the vector it writes.
+     */
+    private Table buildAnalogStick(){
+        if(!(control.input instanceof MobileInput mobile)){
+            //no mobile handler (desktop, headless): the stick would have nowhere to write
+            return new Table();
+        }
+
+        AnalogStick stick = new AnalogStick(mobile.analogVector, mobile::syncAnalog);
+        stick.name = "analogstick";
+        return stick;
+    }
+
+    /** Rebuilds the bottom bar: supply bars on top, one cell per module below. */
     private void rebuildTurretBar(Table table, @Nullable Unit unit){
         table.clearChildren();
         table.left();
@@ -1097,9 +1113,13 @@ public class HudFragment{
         //the extra bottom padding is the air between the bars and the modules below
         bars.add(supplyCell(unit)).width(supplyWidth).left().padBottom(cellPad + 8f).row();
 
+        //module numbering: the same order the number keys use, so key 1 is the first cell
+        int index = 0;
+
         for(WeaponMount mount : unit.mounts){
             if(mount.weapon.isTurretMount()){
-                modules.add(turretCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(turretTooltip(mount.weapon));
+                int moduleIndex = index++;
+                modules.add(turretCell(unit, mount, moduleIndex)).size(cellSize).pad(cellPad).tooltip(turretTooltip(unit, moduleIndex, mount.weapon));
             }
         }
 
@@ -1108,7 +1128,8 @@ public class HudFragment{
         if(unit.supportMounts != null){
             for(SupportMount mount : unit.supportMounts){
                 if(mount == null || mount.block == null) continue;
-                modules.add(supportCell(unit, mount)).size(cellSize).pad(cellPad).tooltip(supportTooltip(mount));
+                int moduleIndex = index++;
+                modules.add(supportCell(unit, mount, moduleIndex)).size(cellSize).pad(cellPad).tooltip(supportTooltip(unit, moduleIndex, mount));
             }
         }
 
@@ -1133,6 +1154,17 @@ public class HudFragment{
         //bars above, modules below, both left-aligned in the same column
         table.add(bars).left().row();
         table.add(modules).left().row();
+    }
+
+    /**
+     * Acts on one module of the bottom bar, with a toast naming it: this is the touch
+     * equivalent of the module number keys. A weapon module becomes the only one to fire; a
+     * support module is switched on or off, keeping its effect installed. The loadout dialog
+     * keeps the mount itself untouched.
+     */
+    private void selectModule(Unit unit, int index){
+        if(unit == null) return;
+        if(control.input != null) control.input.selectModule(unit, index);
     }
 
     private Table actionCell(Unit unit, Drawable icon, String tooltip){
@@ -1222,13 +1254,53 @@ public class HudFragment{
         return resource == null ? Core.bundle.get("module.supply.none") : resource.localizedName;
     }
 
-    private static String turretTooltip(Weapon weapon){
+    /** Tooltip of a weapon cell: name, module kind, firing state and the number key. */
+    private String turretTooltip(Unit unit, int index, Weapon weapon){
         boolean removable = weapon.removable;
         String state = removable ? Core.bundle.get("turret.hud.removable") : Core.bundle.get("turret.hud.native");
-        return turretName(weapon) + "\n[lightgray]" + state;
+        //the pilot's pick is the state worth reading: every other module stays silent
+        String power = Core.bundle.get(moduleSelected(unit, index) ? "module.hud.selected"
+            : (moduleActive(unit, index) ? "support.hud.active" : "module.hud.silent"));
+        return turretName(weapon)
+            + "\n[lightgray]" + state + " · " + power
+            + "\n" + Core.bundle.format("module.hint.select", moduleKeyName(index));
     }
 
-    private Table turretCell(Unit unit, WeaponMount mount){
+    private static boolean moduleActive(Unit unit, int index){
+        return unit != null && unit.moduleActive(index);
+    }
+
+    private static boolean moduleSelected(Unit unit, int index){
+        return unit != null && unit.moduleSelected(index);
+    }
+
+    /** @return the label of the number key that switches this module: 1..9, then 0. */
+    private static String moduleKeyName(int index){
+        return String.valueOf((index + 1) % 10);
+    }
+
+    /**
+     * @return the small number badge drawn on a module cell: the key (or the fingertip target)
+     * that switches the module on and off.
+     */
+    private static void moduleBadge(Stack stack, int index){
+        Table badge = new Table();
+        badge.top().left();
+        badge.touchable = Touchable.disabled;
+        Label label = badge.label(() -> moduleKeyName(index)).style(Styles.outlineLabel)
+            .fontScale(mobile ? 0.7f : 0.85f).get();
+        label.setColor(Pal.accent);
+        badge.pack();
+        stack.add(badge);
+    }
+
+    /**
+     * A weapon cell of the bottom bar: icon with the module number, reload and heat bars, and
+     * the pilot's selection. Clicking picks the module: from then on it is the only one that
+     * fires, every other module of the hull stays mounted and silent. Clicking the same cell
+     * again lets every module fire together.
+     */
+    private Table turretCell(Unit unit, WeaponMount mount, int index){
         Weapon weapon = mount.weapon;
         boolean removable = weapon.removable;
         float baseThickness = removable ? 3f : 2f;
@@ -1247,6 +1319,16 @@ public class HudFragment{
         icon.border(removable ? Pal.accent : Pal.gray);
         stack.add(icon);
 
+        moduleBadge(stack, index);
+
+        //the star is what a pilot reads at a glance: this module fires while the rest waits
+        Table mark = new Table();
+        mark.bottom().right();
+        mark.touchable = Touchable.disabled;
+        mark.visible(() -> moduleSelected(unit, index));
+        mark.image(Icon.star).size(13f).pad(1f).get().setColor(Pal.accent);
+        stack.add(mark);
+
         if(!removable){
             Table lock = new Table();
             lock.top().right();
@@ -1263,12 +1345,16 @@ public class HudFragment{
         Bar heat = new Bar(() -> "", () -> Pal.health, () -> Mathf.clamp(mount.heat));
         cell.add(heat).height(2f).growX().pad(0f, 2f, 2f, 2f).row();
 
-        cell.clicked(() -> highlightedTurret = highlightedTurret == weapon ? null : weapon);
+        cell.clicked(() -> selectModule(unit, index));
         cell.update(() -> {
-            boolean selected = highlightedTurret == weapon;
-            icon.border(selected ? Color.white : removable ? Pal.accent : Pal.gray);
-            icon.thickness = selected ? baseThickness + 1.5f : baseThickness;
-            cell.background(selected ? Styles.grayPanelDark : Styles.black3);
+            boolean selected = unit.moduleSelected(index);
+            boolean on = unit.moduleActive(index);
+            //the picked module wears the accent border at full thickness, and the rest of the
+            //loadout fades: armed but unpicked keeps its own border, a silenced module greys out
+            icon.border(selected || (on && removable) ? Pal.accent : Pal.gray);
+            icon.thickness = selected ? 4f : baseThickness;
+            icon.setColor(on ? Color.white : Color.gray);
+            cell.background(on ? Styles.black3 : Styles.black6);
         });
         return cell;
     }
@@ -1279,11 +1365,13 @@ public class HudFragment{
     }
 
     /** @return the tooltip of a support module cell: name, category, current state and hint. */
-    private static String supportTooltip(SupportMount mount){
+    private String supportTooltip(Unit unit, int index, SupportMount mount){
+        String aim = Core.bundle.get(mount.autoTarget ? "module.aim.auto" : "module.aim.manual");
         return mount.block.localizedName
             + "\n[lightgray]" + Core.bundle.get("support.category." + mount.category.name())
             + " · " + Core.bundle.get(supportStateKey(mount.active))
-            + "\n" + Core.bundle.get("support.hud.toggle");
+            + " · " + aim
+            + "\n" + Core.bundle.format("module.hint.key", moduleKeyName(index));
     }
 
     /**
@@ -1291,9 +1379,9 @@ public class HudFragment{
      * an ATIVO/INATIVO badge on top of the icon and toggles the effect on click. The module is
      * never removed here, so its anchor, category and footprint stay reserved.
      */
-    private Table supportCell(Unit unit, SupportMount mount){
-        return moduleCell(unit, mount.block, () -> mount.active, () -> mount.setActive(unit, !mount.active),
-            () -> supportTooltip(mount));
+    private Table supportCell(Unit unit, SupportMount mount, int index){
+        return moduleCell(unit, mount.block, () -> mount.active, () -> selectModule(unit, index),
+            () -> supportTooltip(unit, index, mount), index);
     }
 
     /** @return the tooltip of a wall plate cell: name, category and the always-on rule. */
@@ -1333,7 +1421,15 @@ public class HudFragment{
     }
 
     /** Shared body of every module cell: icon, live state badge, click toggle. */
-    private Table moduleCell(Unit unit, Block block, Boolp active, Runnable toggle, Prov<String> tooltip){
+    /**
+     * Shared body of every module cell that reports a running effect: icon, live state badge,
+     * the number of the key that acts on it, and the click action. This shape belongs to the
+     * <b>support</b> modules - the ones that have nothing to fire - so the click switches their
+     * effect on and off, exactly as the number key does.
+     *
+     * @param index position in the bar, used for the number badge; negative leaves it out.
+     */
+    private Table moduleCell(Unit unit, Block block, Boolp active, Runnable toggle, Prov<String> tooltip, int index){
         float iconSize = 44f;
         TextureRegion region = block.uiIcon;
         if(region == null || !region.found()) region = unit.type.uiIcon;
@@ -1345,6 +1441,17 @@ public class HudFragment{
         BorderImage icon = new BorderImage(region, 3f);
         icon.setScaling(Scaling.fit);
         stack.add(icon);
+
+        //the number of the key (or the fingertip target) that switches the module off
+        if(index >= 0){
+            Table number = new Table();
+            number.top().left();
+            number.touchable = Touchable.disabled;
+            Label label = number.label(() -> moduleKeyName(index)).style(Styles.outlineLabel)
+                .fontScale(mobile ? 0.7f : 0.85f).get();
+            label.setColor(Pal.accent);
+            stack.add(number);
+        }
 
         //the badge sits on top of the icon; a text supplier keeps it live after every click
         Table overlay = new Table();

@@ -68,6 +68,21 @@ public class Binding{
     categoryPrev = KeyBind.add("category_prev", KeyCode.comma, "blocks"),
     categoryNext = KeyBind.add("category_next", KeyCode.period),
 
+    //dorsal module hotkeys: they follow the order of the bottom module bar, so key 1 is the
+    //first module drawn there. They only act when the build grid is not using the number
+    //keys itself (see InputHandler.update), which is always the case in the module test
+    //mode and whenever the player cannot place blocks.
+    moduleToggle01 = KeyBind.add("module_toggle_01", KeyCode.num1, "modules"),
+    moduleToggle02 = KeyBind.add("module_toggle_02", KeyCode.num2),
+    moduleToggle03 = KeyBind.add("module_toggle_03", KeyCode.num3),
+    moduleToggle04 = KeyBind.add("module_toggle_04", KeyCode.num4),
+    moduleToggle05 = KeyBind.add("module_toggle_05", KeyCode.num5),
+    moduleToggle06 = KeyBind.add("module_toggle_06", KeyCode.num6),
+    moduleToggle07 = KeyBind.add("module_toggle_07", KeyCode.num7),
+    moduleToggle08 = KeyBind.add("module_toggle_08", KeyCode.num8),
+    moduleToggle09 = KeyBind.add("module_toggle_09", KeyCode.num9),
+    moduleToggle10 = KeyBind.add("module_toggle_10", KeyCode.num0),
+
     blockSelectLeft = KeyBind.add("block_select_left", KeyCode.left),
     blockSelectRight = KeyBind.add("block_select_right", KeyCode.right),
     blockSelectUp = KeyBind.add("block_select_up", KeyCode.up),
@@ -88,6 +103,11 @@ public class Binding{
     teleportCursor = KeyBind.add("teleport_cursor", KeyCode.unset),
     menu = KeyBind.add("menu", Vars.android ? KeyCode.back : KeyCode.escape),
     fullscreen = KeyBind.add("fullscreen", KeyCode.f11),
+
+    //gamepad (Android controller or desktop controller): the face button fires, the sticks
+    //move and aim. Arc names the same physical button differently per mapping, so every
+    //fire key is read directly instead of bound to a single rebindable key.
+    controllerFire = KeyBind.add("controller_fire", KeyCode.controllerA, "gamepad"),
     pause = KeyBind.add("pause", KeyCode.space),
     skipWave = KeyBind.add("skip_wave", KeyCode.unset),
     minimap = KeyBind.add("minimap", KeyCode.m),

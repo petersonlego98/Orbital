@@ -74,6 +74,19 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
     Binding.blockSelect09,
     Binding.blockSelect10
     };
+    /** Number keys, in the order the bottom module bar draws its cells. */
+    final static KeyBind[] moduleToggleBindings = {
+    Binding.moduleToggle01,
+    Binding.moduleToggle02,
+    Binding.moduleToggle03,
+    Binding.moduleToggle04,
+    Binding.moduleToggle05,
+    Binding.moduleToggle06,
+    Binding.moduleToggle07,
+    Binding.moduleToggle08,
+    Binding.moduleToggle09,
+    Binding.moduleToggle10
+    };
 
     /** If true, there is a cutscene currently occurring in logic. */
     public boolean logicCutscene;
@@ -937,6 +950,14 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
         lastPlans.clear();
         player.shooting = false;
         player.pingTime = 0f;
+
+        //a new round starts with every module armed and manual: the pilot's selection belongs
+        //to the unit it was made on, and that unit is gone
+        Unit unit = player == null ? null : player.unit();
+        if(unit != null){
+            unit.releaseSelection();
+            unit.autoAimModules.clear();
+        }
     }
 
     public void getSyncedPlans(Seq<BuildPlan> out){
@@ -991,6 +1012,26 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
 
         player.typing = ui.chatfrag.shown();
 
+        //dorsal module hotkeys: the number keys pick the module of the bottom bar that fires
+        //alone, in the order they are drawn there. They only act when nothing else owns the
+        //number keys - the build grid takes them while a block menu is up (see below), which
+        //leaves the module test mode and every non-builder with the keys free - and when the
+        //hotkeys themselves are left on in the controls menu.
+        if(state.isGame() && !player.dead() && !commandMode && !Core.scene.hasKeyboard()
+        && !Core.scene.hasField() && !Core.scene.hasDialog() && !locked()
+        && !(player.isBuilder() && !TestNewFeaturesMode.active() && ui.hudfrag.shown())
+        && Core.settings.getBool("module-hotkeys", true)){
+            Unit unit = player.unit();
+            if(unit != null && unit.moduleCount() > 0){
+                for(int i = 0; i < moduleToggleBindings.length && i < unit.moduleCount(); i++){
+                    if(Core.input.keyTap(moduleToggleBindings[i])){
+                        selectModule(unit, i);
+                        break;
+                    }
+                }
+            }
+        }
+
         if(player.dead()){
             droppingItem = false;
         }
@@ -1026,6 +1067,42 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
                 }
             }
         }
+    }
+
+    /**
+     * Picks one module of the bottom bar as the only one to fire, with a toast naming it: this
+     * is the touch equivalent of the module number keys, and it is the same gesture the keys
+     * make, so the two never disagree. A support module, which has nothing to fire, is only
+     * switched on or off. The selection is remembered until the hull is swapped or the round
+     * restarts; the loadout dialog keeps the mount itself untouched.
+     *
+     * @param index position in the bar: weapon modules first, then support modules.
+     */
+    public void selectModule(@Nullable Unit unit, int index){
+        if(unit == null || index < 0 || index >= unit.moduleCount()) return;
+
+        boolean on = unit.selectModule(index);
+        if(headless || !ui.hudfrag.shown()) return;
+
+        String name = unit.moduleName(index) == null ? "" : unit.moduleName(index);
+        //a weapon module reports whether it now fires alone; a support one whether it runs
+        String message = unit.moduleFires(index)
+            ? Core.bundle.format(on ? "module.select" : "module.released", name,
+                Core.bundle.get("module.hud.selected"))
+            : Core.bundle.format("module.toggle", name,
+                Core.bundle.get(on ? "support.hud.active" : "support.hud.inactive"));
+        ui.showInfoToast(message, 3f);
+    }
+
+    /**
+     * Picks one module of the bottom bar as the only one to fire, with a toast naming it: this
+     * is the touch equivalent of the module number keys, and the loadout dialog keeps the mount
+     * itself untouched.
+     *
+     * @param index position in the bar: weapon modules first, then support modules.
+     */
+    public void toggleModule(@Nullable Unit unit, int index){
+        selectModule(unit, index);
     }
 
     public void checkUnit(){

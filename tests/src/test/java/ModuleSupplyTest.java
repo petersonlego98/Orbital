@@ -1,4 +1,6 @@
 import arc.*;
+import arc.struct.Seq;
+import arc.util.*;
 import orbital.content.*;
 import orbital.ctype.UnlockableContent;
 import orbital.entities.units.*;
@@ -163,6 +165,114 @@ public class ModuleSupplyTest{
         unit.refreshModuleSupply();
         assertNotEquals(Items.blastCompound, unit.moduleSupply().item);
         assertNotNull(unit.moduleSupply().item, "the pool falls back to an offered resource");
+    }
+
+    @Test
+    void liquidOptionIsOfferedBeforeALiquidModuleIsInstalled(){
+        //the liquid picker must be available from the first module added: the hull offers the
+        //liquids of the liquid support modules it could still host
+        Unit unit = supportCarrier().create(Team.sharded);
+        assertNotNull(unit.mountTurret((Turret)Blocks.foreshadow), "the hull's own 4x4 slot");
+
+        Seq<Liquid> options = unit.ammoLiquidOptions();
+        assertTrue(options.size > 0,
+            "the liquid picker must be offered with only a turret mounted; quad can host wave/tsunami");
+        assertNotNull(unit.moduleSupply().liquid, "the liquid pool has a resource to be fed by");
+
+        //a hull that cannot host any liquid module offers nothing, even with a module mounted
+        Unit light = UnitTypes.mono.create(Team.sharded);
+        assertTrue(light.mountedTurrets() > 0, "mono ships the Duo out of the box");
+        assertTrue(light.ammoLiquidOptions().isEmpty(),
+            "mono has no liquid anchor, so no liquid picker is offered");
+    }
+
+    @Test
+    void energyIsReadNotConsumed(){
+        //a dorsal module has no power line: its energy bar sizes what the module would draw,
+        //and nothing is ever taken out of the pool
+        Unit unit = supportCarrier().create(Team.sharded);
+        assertNotNull(unit.mountTurret((Turret)Blocks.lancer));
+
+        ModuleSupply supply = unit.moduleSupply();
+        assertTrue(supply.energyCapacity > 0f, "lancer's drain must size the energy bar");
+
+        supply.energy = supply.energyCapacity / 2f;
+        float delta = Time.delta;
+        try{
+            Time.delta = 1f;
+            for(int i = 0; i < 600; i++) unit.update();
+        }finally{
+            Time.delta = delta;
+        }
+        assertTrue(supply.energy >= supply.energyCapacity / 2f,
+            "no tick of the game may take energy out of the pool");
+
+        //and the module keeps working, energy or no energy
+        int shots = unit.mounts[unit.mounts.length - 1].totalShots;
+        try{
+            Time.delta = 1f;
+            unit.update();
+        }finally{
+            Time.delta = delta;
+        }
+        assertTrue(unit.mounts[unit.mounts.length - 1].totalShots >= shots, "the turret keeps updating");
+    }
+
+    @Test
+    void emptyEnergyNeverSilencesAModule(){
+        //regression for the bug the player found: with the energy drain live, wave/tsunami
+        //(power consumers) emptied the pool and the module went dark for good. The pool is a
+        //reading, so a zero must not stop anything.
+        Unit unit = supportCarrier().create(Team.sharded);
+        assertNotNull(unit.mountTurret((Turret)Blocks.lancer));
+
+        ModuleSupply supply = unit.moduleSupply();
+        supply.energy = 0f;
+
+        int shots = unit.mounts[unit.mounts.length - 1].totalShots;
+        float delta = Time.delta;
+        try{
+            Time.delta = 1f;
+            for(int i = 0; i < 30; i++) unit.update();
+        }finally{
+            Time.delta = delta;
+        }
+        assertTrue(unit.mounts[unit.mounts.length - 1].totalShots >= shots,
+            "an empty energy pool must not silence a module");
+    }
+
+    @Test
+    void poolRechargesOnItsOwn(){
+        Unit unit = carrier().create(Team.sharded);
+        assertNotNull(unit.mountTurret((Turret)Blocks.duo));
+
+        ModuleSupply supply = unit.moduleSupply();
+        supply.ammo = 10f;
+        float capacity = supply.ammoCapacity;
+
+        float delta = Time.delta;
+        try{
+            Time.delta = ModuleSupply.refillTicks;
+            unit.update();
+        }finally{
+            Time.delta = delta;
+        }
+        assertEquals(capacity, supply.ammo, "an empty pool refills to capacity in refillTicks");
+    }
+
+    @Test
+    void everyShotSpendsItsAmmo(){
+        Unit unit = carrier().create(Team.sharded);
+        assertNotNull(unit.mountTurret((Turret)Blocks.duo));
+
+        ModuleSupply supply = unit.moduleSupply();
+        float before = supply.ammo;
+
+        //a shot pays the block's own ammo per shot
+        unit.spendAmmo(unit.mounts[unit.mounts.length - 1].weapon);
+
+        assertEquals(before - ModuleSupplies.ammoPerShot((Turret)Blocks.duo), supply.ammo, 0.001f,
+            "a shot must take the block's ammo per shot out of the pool");
     }
 
     @Test

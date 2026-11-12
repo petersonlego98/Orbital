@@ -53,106 +53,50 @@ public class MassDriverAbility extends Ability{
         timer += Time.delta;
         if(timer < reload) return;
 
-        //1) deliver whatever the carrier itself is carrying
-        if(unit.hasItem()){
-            Item item = unit.stack().item;
-            int amount = unit.stack().amount;
-            Building target = Units.closestBuilding(unit.team, unit.x, unit.y, range,
-                b -> b.items != null && b.block.itemCapacity > 0
-                    && b.items.total() < b.block.itemCapacity && b.acceptStack(item, 1, unit) > 0);
-            if(target != null){
-                int accepted = Math.min(amount, target.acceptStack(item, amount, unit));
-                if(accepted > 0){
-                    Call.transferItemTo(unit, item, accepted,
-                        unit.x + Mathf.range(4f), unit.y + Mathf.range(4f), target);
-                    unit.clearItem();
-                    bolt(target.x, target.y, item.color);
-                }
-                timer = 0f;
-                return;
-            }
+        //1) launch from the hull's own supply pool. The carrier keeps whatever it is holding:
+        //a logistics module ships the hull's stores, not the unit's cargo
+        ModuleSupply supply = unit.moduleSupply();
+        Item item = supply != null ? supply.item : null;
+        if(item == null || supply.ammo < 1f){
+            timer = 0f;
+            return;
+        }
 
-            //no building accepts it: hand it to an allied unit instead
-            Unit receiver = null;
-            float best = Float.MAX_VALUE;
-            for(Unit u : Groups.unit){
-                if(u == unit || u.team() != unit.team || u.maxAccepted(item) <= 0) continue;
-                float d = u.dst2(unit);
-                if(d < best && d < range * range){
-                    receiver = u;
-                    best = d;
-                }
+        int amount = Math.min(launchMax, (int)supply.ammo);
+        Building target = Units.closestBuilding(unit.team, unit.x, unit.y, range,
+            b -> b.items != null && b.block.itemCapacity > 0
+                && b.items.total() < b.block.itemCapacity && b.acceptStack(item, 1, unit) > 0);
+        if(target != null){
+            int accepted = Math.min(amount, target.acceptStack(item, amount, unit));
+            if(accepted > 0){
+                Call.transferItemTo(unit, item, accepted,
+                    unit.x + Mathf.range(4f), unit.y + Mathf.range(4f), target);
+                supply.ammo -= accepted;
+                bolt(target.x, target.y, item.color);
             }
-            if(receiver != null){
-                int accepted = Math.min(amount, receiver.maxAccepted(item));
-                if(!receiver.hasItem()){
-                    receiver.stack().item = item;
-                }
+            timer = 0f;
+            return;
+        }
+
+        //no building accepts it: hand it to an allied unit instead
+        Unit receiver = null;
+        float best = Float.MAX_VALUE;
+        for(Unit u : Groups.unit){
+            if(u == unit || u.team() != unit.team || u.maxAccepted(item) <= 0) continue;
+            float d = u.dst2(unit);
+            if(d < best && d < range * range){
+                receiver = u;
+                best = d;
+            }
+        }
+        if(receiver != null){
+            int accepted = Math.min(amount, receiver.maxAccepted(item));
+            if(accepted > 0){
+                if(!receiver.hasItem()) receiver.stack().item = item;
                 receiver.stack().amount += accepted;
-                unit.stack().amount -= accepted;
-                if(unit.stack().amount <= 0) unit.clearItem();
+                supply.ammo -= accepted;
                 bolt(receiver.x, receiver.y, item.color);
             }
-            timer = 0f;
-            return;
-        }
-
-        //2) otherwise pull from the core and resupply targets that have free capacity
-        Building core = unit.team.core();
-        if(core == null || core.items == null || core.items.total() == 0){
-            timer = 0f;
-            return;
-        }
-
-        Item chosen = null;
-        for(Item candidate : content.items()){
-            if(core.items.get(candidate) > 0){
-                chosen = candidate;
-                break;
-            }
-        }
-        if(chosen == null){
-            timer = 0f;
-            return;
-        }
-
-        final Item item = chosen;
-        final int max = Math.min(launchMax, core.items.get(item));
-
-        //buildings first, then allied units
-        Building target = Units.closestBuilding(unit.team, unit.x, unit.y, range,
-            b -> b != core && b.items != null && b.block.itemCapacity > 0
-                && b.items.total() < b.block.itemCapacity && b.acceptStack(item, 1, unit) > 0);
-        Unit receiver = null;
-        int accepted = 0;
-
-        if(target != null){
-            accepted = Math.min(max, target.acceptStack(item, max, unit));
-        }
-
-        if(accepted <= 0){
-            receiver = Units.closest(unit.team, unit.x, unit.y, range,
-                u -> u != unit && u.maxAccepted(item) > 0);
-            if(receiver != null){
-                accepted = Math.min(max, receiver.maxAccepted(item));
-            }
-        }
-
-        if(accepted <= 0){
-            timer = 0f;
-            return;
-        }
-
-        core.items.remove(item, accepted);
-        if(target != null){
-            target.handleStack(item, accepted, unit);
-            bolt(target.x, target.y, item.color);
-        }else if(receiver != null){
-            if(!receiver.hasItem()){
-                receiver.stack().item = item;
-            }
-            receiver.stack().amount += accepted;
-            bolt(receiver.x, receiver.y, item.color);
         }
         timer = 0f;
     }

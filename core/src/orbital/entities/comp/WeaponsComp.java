@@ -14,6 +14,8 @@ import orbital.type.*;
 import orbital.world.Block;
 import orbital.world.blocks.defense.turrets.*;
 
+import static orbital.Vars.*;
+
 @Component
 abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     @Import float x, y;
@@ -40,6 +42,41 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * Deliberately transient, exactly like the loadout arrays that decide its size.
      */
     transient ModuleSupply moduleSupply = new ModuleSupply();
+    /**
+     * Runtime-only, client-side pilot selection for this hull's own weapons: every weapon in
+     * this set is <b>switched off</b>. It stays mounted, keeps its slot and its dorsal budget
+     * entry and keeps rotating with the hull, but it never fires until it is switched back on
+     * from the bottom module bar or with the module number keys.
+     *
+     * <p>The set is keyed by weapon identity, and the entry dies with the weapon: removing a
+     * module drops it (see {@link #removeWeapon}). Deliberately transient: this is the local
+     * pilot's choice, so it never enters a save or the network stream.</p>
+     */
+    public transient ObjectSet<Weapon> disarmedModules = new ObjectSet<>();
+    /**
+     * Runtime-only, client-side pilot selection: the dorsal weapon module the pilot picked as
+     * the <b>only one to fire</b>. While it is set, every other weapon module of this hull is
+     * silenced (see {@link #disarmedModules}) - a weapon module the pilot did not pick stays
+     * mounted and keeps tracking the aim, it just never shoots. {@code null} means no module is
+     * picked and every weapon module fires together, which is the state a fresh hull starts in.
+     *
+     * <p>Support modules are not part of the selection: they have nothing to fire, so the same
+     * gesture only switches their effect on and off (see {@link #toggleModule}). Deliberately
+     * transient, for the same reason as {@link #disarmedModules}: it is the local pilot's
+     * choice, made on the hull it was made with, and it dies with both.</p>
+     */
+    public transient @Nullable Weapon selectedModule;
+    /**
+     * Runtime-only, client-side targeting mode for this hull's own weapons: every weapon in
+     * this set picks its own target inside its own range and bullet filters, instead of firing
+     * where the pilot aims. A weapon outside the set is <b>manual</b>: it fires toward the
+     * pilot's aim point, which is what the default mobile and desktop controls produce.
+     *
+     * <p>Transient for the same reason as {@link #disarmedModules}. Support modules are not
+     * affected: their effects run on their own (see {@link SupportMount#autoTarget}), except
+     * the liquid jets of {@code wave} and {@code tsunami}, which the pilot drives manually.</p>
+     */
+    public transient ObjectSet<Weapon> autoAimModules = new ObjectSet<>();
     @ReadOnly transient boolean isRotate;
     @NoSerialize float aimX, aimY;
     boolean isShooting;
@@ -55,6 +92,11 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         for(int i = 0; i < mounts.length; i++){
             mounts[i] = def.weapons.get(i).mountType.get(def.weapons.get(i));
         }
+        //a fresh hull starts with every module armed and in manual mode: the pilot's choice
+        //belongs to the unit it was made on, and a previous hull's weapons are gone with it
+        disarmedModules.clear();
+        autoAimModules.clear();
+        selectedModule = null;
         //content-defined removable modules (the Duo of the mono) exist before any runtime
         //mounting, so the pool is built from the spawn-time loadout as well
         refreshModuleSupply();
@@ -95,7 +137,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * loadout cannot be mounted, so the pool can never be fed by something the ship does not
      * carry.</p>
      */
-    public Seq<Item> ammoItemOptions(){
+    private Seq<Item> acceptedItems(){
         Seq<Item> options = new Seq<>(Item.class);
         for(WeaponMount mount : mounts){
             if(!(mount.weapon instanceof TurretWeapon turret)) continue;
@@ -114,9 +156,14 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
 
     /**
      * @return every liquid accepted as ammo by a mounted module, in content order and without
-     * repeats. Liquid support modules (wave, tsunami) and liquid turrets feed the liquid bar.
+     * repeats.
+     *
+     * <p>The liquids of the liquid modules the hull could still host come along, so the pool's
+     * resource can be chosen before one is installed - the menu offers the liquid picker from
+     * the first module added, not only after a wave or a tsunami is mounted. Liquid modules
+     * draw from no item supply, so listing them in advance strands nothing.</p>
      */
-    public Seq<Liquid> ammoLiquidOptions(){
+    private Seq<Liquid> acceptedLiquids(){
         Seq<Liquid> options = new Seq<>(Liquid.class);
         for(WeaponMount mount : mounts){
             if(!(mount.weapon instanceof TurretWeapon turret)) continue;
@@ -130,7 +177,46 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
                 if(!options.contains(liquid, true)) options.add(liquid);
             }
         }
+        for(Block block : content.blocks()){
+            if(!(block instanceof LiquidTurret) || !SupportModuleCategory.isSupport(block)) continue;
+            SupportModuleCategory category = SupportModuleCategory.of(block);
+            if(category == null || type == null) continue;
+            //a category already taken cannot gain a second module, so its liquids are not on
+            //offer - picking one would leave a pool no installed module can draw from
+            if(hasSupportCategory(category) || type.hasNativeSupport(category)) continue;
+            if(!type.hasAnchorFor(category, block.size)) continue;
+            for(Liquid liquid : ModuleSupplies.liquids(block)){
+                if(!options.contains(liquid, true)) options.add(liquid);
+            }
+        }
         return options;
+    }
+
+    /**
+     * @return every item the hull can feed its item-ammo pool with, in <b>content order</b>:
+     * copper before graphite, and so on. The accepted map order is a hash order, which would
+     * hand the pool an arbitrary default.
+     */
+    public Seq<Item> ammoItemOptions(){
+        return inContentOrder(acceptedItems(), content.items());
+    }
+
+    /** @return every liquid the hull can feed its liquid pool with, in content order. */
+    public Seq<Liquid> ammoLiquidOptions(){
+        return inContentOrder(acceptedLiquids(), content.liquids());
+    }
+
+    /** @return the offered resources, reordered by the content's own order. */
+    private static <T extends UnlockableContent> Seq<T> inContentOrder(Seq<T> offered, Seq<T> order){
+        Seq<T> ordered = new Seq<>();
+        for(T resource : order){
+            if(offered.contains(resource, true)) ordered.add(resource);
+        }
+        //anything modded in after the content sweep keeps its place at the end
+        for(T resource : offered){
+            if(!ordered.contains(resource, true)) ordered.add(resource);
+        }
+        return ordered;
     }
 
     /**
@@ -174,6 +260,55 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         supply.liquidCapacity = liquid;
         supply.energyCapacity = energy;
         supply.clamp();
+    }
+
+    /**
+     * Recharges one tick of the hull's supply; it takes nothing out of the pools.
+     *
+     * <p><b>Energy is never consumed.</b> A power consumer's drain defines the size of its
+     * energy bar, and nothing comes out of it: a dorsal module has no power line to run on, so
+     * charging for energy would only take the module away from the player - which is exactly
+     * what happened when the drain was real, because the recharge could not keep up and the
+     * module went dark for good. Ammo and liquid stay per-shot costs (see {@link #spendAmmo}
+     * and {@code LiquidSupportAbility}), because those pools describe what the module carries.</p>
+     *
+     * <p>The pools recharge slowly on their own - there is no supply chain carrying items or
+     * liquid to a dorsal module yet - so a hull that stops firing recovers, and one that fires
+     * continuously settles at the level its per-shot cost and recharge balance out to.</p>
+     */
+    private void upkeepModuleSupply(){
+        ModuleSupply supply = moduleSupply();
+        if(!supply.usesAmmo() && !supply.usesLiquid() && !supply.usesEnergy()) return;
+
+        //recharge: the placeholder supply chain, until something real feeds these pools
+        float recharge = Time.delta / ModuleSupply.refillTicks;
+        supply.ammo = Math.min(supply.ammoCapacity, supply.ammo + supply.ammoCapacity * recharge);
+        supply.liquidAmount = Math.min(supply.liquidCapacity, supply.liquidAmount + supply.liquidCapacity * recharge);
+        supply.energy = Math.min(supply.energyCapacity, supply.energy + supply.energyCapacity * recharge);
+    }
+
+    /**
+     * @return whether this mount can fire right now. The hull's own native weapons never draw
+     * on the pool; a dorsal turret needs the ammo of its next shot. Energy never gates a
+     * module: a dorsal module has no power line, so its energy bar is a reading, not a bill.
+     */
+    private boolean moduleHasAmmo(WeaponMount mount){
+        if(!(mount.weapon instanceof TurretWeapon turret)) return true;
+
+        ModuleSupply supply = moduleSupply();
+        //energy never gates a module: a dorsal module has no power line to run on, so its
+        //energy bar is a reading, not a bill
+        if(!ModuleSupplies.accepts(turret.turret, supply.item)) return true;
+        return supply.ammo >= ModuleSupplies.ammoPerShot(turret.turret);
+    }
+
+    /** @return charges the pool for one shot of a dorsal turret, if its ammo is the pool's. */
+    public void spendAmmo(Weapon weapon){
+        if(!(weapon instanceof TurretWeapon turret)) return;
+
+        ModuleSupply supply = moduleSupply();
+        if(!ModuleSupplies.accepts(turret.turret, supply.item)) return;
+        supply.ammo = Math.max(0f, supply.ammo - ModuleSupplies.ammoPerShot(turret.turret));
     }
 
     /**
@@ -701,9 +836,267 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         }
 
         mounts = next;
+        //the module is gone: its pilot selection goes with it
+        disarmedModules.remove(weapon);
+        autoAimModules.remove(weapon);
+        //the module the pilot picked no longer exists: the rest of the loadout keeps its
+        //selection only while the chosen module is still mounted, otherwise the hull would
+        //silence itself for a module that is no longer there
+        if(selectedModule == weapon){
+            selectedModule = null;
+            disarmedModules.clear();
+        }
         refreshModuleSupply();
         return true;
     }
+
+    //region pilot-facing module control (bottom module bar, number keys, loadout dialog)
+
+    /**
+     * @return how many switchable modules this unit carries, in the order the bottom module
+     * bar draws them: every weapon mount that occupies a dorsal position, then every support
+     * module. Wall plates are not counted - a plate defends while it is mounted, so it has
+     * nothing to switch.
+     */
+    public int moduleCount(){
+        int count = 0;
+        for(WeaponMount mount : mounts){
+            if(mount.weapon.isTurretMount()) count++;
+        }
+        for(SupportMount mount : supports()){
+            if(mount != null && mount.block != null) count++;
+        }
+        return count;
+    }
+
+    /** @return the name of the module at this position, or null when there is none. */
+    public @Nullable String moduleName(int index){
+        int i = 0;
+        for(WeaponMount mount : mounts){
+            if(!mount.weapon.isTurretMount()) continue;
+            if(i++ == index) return mount.weapon.moduleDisplayName != null && !mount.weapon.moduleDisplayName.isEmpty()
+                ? mount.weapon.moduleDisplayName : mount.weapon.name;
+        }
+        for(SupportMount mount : supports()){
+            if(mount == null || mount.block == null) continue;
+            if(i++ == index) return mount.block.localizedName;
+        }
+        return null;
+    }
+
+    /**
+     * @return whether the module at this position fires right now: a weapon module fires only
+     * while it is the pilot's pick, or while nothing is picked and every module fires together.
+     * A support module reports whether its effect runs.
+     */
+    public boolean moduleActive(int index){
+        int i = 0;
+        for(WeaponMount mount : mounts){
+            if(!mount.weapon.isTurretMount()) continue;
+            if(i++ == index) return !disarmedModules.contains(mount.weapon);
+        }
+        for(SupportMount mount : supports()){
+            if(mount == null || mount.block == null) continue;
+            if(i++ == index) return mount.active;
+        }
+        return false;
+    }
+
+    /**
+     * @return whether the module at this position is a weapon module - one that fires. Wall
+     * plates never reach this numbering, so a support module answers false, and so does an
+     * index past the end of the bar.
+     */
+    public boolean moduleFires(int index){
+        int i = 0;
+        for(WeaponMount mount : mounts){
+            if(!mount.weapon.isTurretMount()) continue;
+            if(i++ == index) return true;
+        }
+        return false;
+    }
+
+    /** @return the dorsal weapon module the pilot picked, or null when every module fires. */
+    public @Nullable Weapon selectedModule(){
+        return selectedModule;
+    }
+
+    /** @return whether the module at this position is the one the pilot picked to fire. */
+    public boolean moduleSelected(int index){
+        if(selectedModule == null) return false;
+        int i = 0;
+        for(WeaponMount mount : mounts){
+            if(!mount.weapon.isTurretMount()) continue;
+            if(i++ == index) return mount.weapon == selectedModule;
+        }
+        return false;
+    }
+
+    /**
+     * Picks the module at this position as the <b>only one to fire</b>: every other weapon
+     * module of this hull is silenced - it stays mounted, keeps its slot, anchor, category and
+     * dorsal budget and keeps tracking the aim, it just never shoots - while the chosen one is
+     * armed and fires. Picking the same module again releases the selection, and every weapon
+     * module fires together again.
+     *
+     * <p>The gesture is what the bottom bar cells and the module number keys both call, so the
+     * two always agree on which module is shooting.</p>
+     *
+     * @return true when this module now fires alone (weapon) or its effect now runs (support);
+     * false when the selection was released.
+     */
+    public boolean selectModule(int index){
+        if(!moduleFires(index)) return toggleModule(index);
+
+        int i = 0;
+        for(WeaponMount mount : mounts){
+            if(!mount.weapon.isTurretMount()) continue;
+            if(i++ != index) continue;
+
+            //the same module again: the pilot lets every weapon module fire again
+            if(mount.weapon == selectedModule){
+                releaseSelection();
+                return false;
+            }
+
+            //a fresh pick silences the rest of the loadout and arms this one
+            for(WeaponMount other : mounts){
+                if(!other.weapon.isTurretMount()) continue;
+                if(other.weapon == mount.weapon){
+                    disarmedModules.remove(other.weapon);
+                }else{
+                    disarmedModules.add(other.weapon);
+                }
+            }
+            selectedModule = mount.weapon;
+            return true;
+        }
+        return false;
+    }
+
+    /** Drops the pilot selection and lets every weapon module fire again. */
+    public void releaseSelection(){
+        selectedModule = null;
+        disarmedModules.clear();
+    }
+
+    /**
+     * Acts on the module at this position the way the bottom bar and the number keys do: a
+     * <b>weapon</b> module follows the selection rule of {@link #selectModule} - the pilot picks
+     * the one that fires alone - while a <b>support</b> module is switched on or off, keeping it
+     * installed: its effect stops and starts while slot, anchor, category and dorsal budget stay
+     * reserved.
+     *
+     * @return true when the module is now armed and firing (weapon) or running (support).
+     */
+    public boolean toggleModule(int index){
+        if(moduleFires(index)) return selectModule(index);
+
+        int i = 0;
+        for(WeaponMount mount : mounts){
+            if(mount.weapon.isTurretMount()) i++;
+        }
+        for(SupportMount mount : supports()){
+            if(mount == null || mount.block == null) continue;
+            if(i++ == index){
+                mount.setActive(self(), !mount.active);
+                return mount.active;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return whether the module at this position aims by itself.
+     *
+     * <p>Weapon modules default to manual - they fire where the pilot aims. Support modules
+     * default to automatic, the liquid jets ({@code wave}, {@code tsunami}) included, because
+     * each one reproduces a block that acts on its own; manual aim is opt-in from the loadout
+     * dialog.</p>
+     */
+    public boolean moduleAuto(int index){
+        int i = 0;
+        for(WeaponMount mount : mounts){
+            if(!mount.weapon.isTurretMount()) continue;
+            if(i++ == index) return autoAimModules.contains(mount.weapon);
+        }
+        for(SupportMount mount : supports()){
+            if(mount == null || mount.block == null) continue;
+            if(i++ == index) return mount.autoTarget;
+        }
+        return false;
+    }
+
+    /**
+     * Switches the module at this position between automatic targeting (it picks its own
+     * target inside its own range and filters) and manual targeting (it fires where the pilot
+     * aims). Support modules only change their aim, never their on/off state.
+     *
+     * @return true when the mode actually changed.
+     */
+    public boolean setModuleAuto(int index, boolean auto){
+        int i = 0;
+        for(WeaponMount mount : mounts){
+            if(!mount.weapon.isTurretMount()) continue;
+            if(i++ == index){
+                if(auto){
+                    return autoAimModules.add(mount.weapon);
+                }else{
+                    return autoAimModules.remove(mount.weapon);
+                }
+            }
+        }
+        for(SupportMount mount : supports()){
+            if(mount == null || mount.block == null) continue;
+            if(i++ == index){
+                if(mount.autoTarget == auto) return false;
+                //the effect follows the flag: the liquid jet reads its own copy
+                mount.setAutoTarget(auto);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return whether this mount aims by itself instead of following the pilot's aim point.
+     * Read by {@link Weapon#update} to decide who picks the target.
+     */
+    public boolean mountSelfTargets(WeaponMount mount){
+        return autoAimModules.contains(mount.weapon);
+    }
+
+    /** @return whether this weapon aims by itself (automatic targeting). */
+    public boolean weaponAimsSelf(Weapon weapon){
+        return autoAimModules.contains(weapon);
+    }
+
+    /** Switches one weapon between automatic targeting and manual targeting. */
+    public boolean setWeaponAimsSelf(Weapon weapon, boolean auto){
+        if(weapon == null) return false;
+        return auto ? autoAimModules.add(weapon) : autoAimModules.remove(weapon);
+    }
+
+    /** @return whether this weapon is switched off: mounted, tracking, but never firing. */
+    public boolean weaponDisarmed(Weapon weapon){
+        return disarmedModules.contains(weapon);
+    }
+
+    /**
+     * Silences one mount when its module is switched off, leaving the rotation order alone: a
+     * disarmed module keeps tracking the aim, it just never fires. Called from {@link #update}
+     * before the weapon runs, so nothing - a controller, a manual aim or an automatic target -
+     * can put a shot out of a module the pilot switched off.
+     *
+     * <p>Switched off here means "not the one the pilot picked": while {@link #selectModule}
+     * holds a selection, every other weapon module is in {@link #disarmedModules} and only the
+     * selected one fires.</p>
+     */
+    public void applyDisarmed(WeaponMount mount){
+        if(mount != null && disarmedModules.contains(mount.weapon)) mount.shoot = false;
+    }
+
+    //endregion
 
     void controlWeapons(boolean rotateShoot){
         controlWeapons(rotateShoot, rotateShoot);
@@ -759,7 +1152,9 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
 
         for(WeaponMount mount : mounts){
             if(mount.weapon.controllable){
-                if(clearTarget) mount.target = null;
+                //a weapon that picks its own target keeps it: clearing it every frame would
+                //throw away the target it just found, and it would re-search on the next one
+                if(clearTarget && !mountSelfTargets(mount)) mount.target = null;
                 mount.aimX = x;
                 mount.aimY = y;
             }
@@ -790,8 +1185,21 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     /** Update shooting, rotation and the effects of installed support modules. */
     @Override
     public void update(){
+        //the pools pay for the modules: ammo as shots happen and liquid while a liquid module
+        //sprays; energy is never taken out of (see upkeepModuleSupply)
+        upkeepModuleSupply();
+
         for(WeaponMount mount : mounts){
+            //a module the pilot switched off keeps tracking the aim but never fires; it is
+            //checked before the weapon update, so nothing can shoot behind the pilot's back
+            applyDisarmed(mount);
+
+            //a module out of ammo stays loaded but silent instead of firing for free
+            if(!moduleHasAmmo(mount)) continue;
+
+            int shots = mount.totalShots;
             mount.weapon.update(self(), mount);
+            if(mount.totalShots > shots) spendAmmo(mount.weapon);
         }
 
         //support abilities are not part of UnitType.abilities, so they must be ticked here;

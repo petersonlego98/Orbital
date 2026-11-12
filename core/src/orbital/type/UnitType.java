@@ -1906,25 +1906,84 @@ public class UnitType extends UnlockableContent implements Senseable{
      * <p>Sprites use the hull's visual scale so the pods sit on the hull instead of covering it.
      * Only the drawing size changes: anchors, footprints, effect ranges and the compatibility
      * list still use the full block size.</p>
+     *
+     * <p>Turret blocks are two sprites, not one: a <b>base</b> that never turns and a
+     * <b>head</b> that turns with the barrel (see {@code DrawTurret.draw}). A module has to
+     * reproduce that split, or rotating the whole tile makes the block's square texture spin
+     * around the anchor - which is what the blue rectangle on {@code wave} and {@code tsunami}
+     * was: the liquid tanks are part of the head, and with no base under them the sprite reads
+     * as a floating blue square every time it swings toward a target.</p>
+     *
+     * <p>The liquid tank is drawn the way the block draws it: the chosen liquid at the pool's
+     * current level, so the tank visibly falls every time a jet goes out and refills while the
+     * module rests. The block divides by its own {@code liquidCapacity}, and the module's pool
+     * is the same number, so the level reads exactly like the block's.</p>
      */
     public void drawSupportModules(Unit unit){
         if(unit.supportMounts == null || unit.supportMounts.length == 0) return;
 
         //same hull-local rotation convention as Weapon#draw
-        float rotation = unit.rotation - 90f;
+        float hull = unit.rotation - 90f;
 
         for(SupportMount mount : unit.supportMounts){
-            if(mount == null || mount.block == null || mount.block.region == null || !mount.block.region.found()) continue;
+            if(mount == null || mount.block == null) continue;
 
-            float wx = unit.x + Angles.trnsx(rotation, mount.x, mount.y);
-            float wy = unit.y + Angles.trnsy(rotation, mount.x, mount.y);
+            float wx = unit.x + Angles.trnsx(hull, mount.x, mount.y);
+            float wy = unit.y + Angles.trnsy(hull, mount.x, mount.y);
+
+            //the hull's rotation for area modules, the hull plus the module's own aim for
+            //turret-like ones: both stay relative to the hull, so they follow it as it rolls
+            float headRotation = hull;
+            if(mount.ability instanceof orbital.entities.abilities.AimingModule aim){
+                headRotation += aim.rotation();
+            }
 
             //reproduce Draw.rect(region, x, y, rotation)'s native sizing, then shrink it.
             //region.scl()/Draw.xscl are kept so the current flip/mirror state is honored.
-            var region = mount.block.region;
-            float w = region.width * region.scl() * Draw.xscl * mount.visualScale;
-            float h = region.height * region.scl() * Draw.yscl * mount.visualScale;
-            Draw.rect(region, wx, wy, w, h, rotation);
+            Block block = mount.block;
+
+            if(block instanceof Turret){
+                //a turret block is two sprites: a base that never turns and a head that turns
+                //with the barrel (DrawTurret.draw). Rotating the single tile instead makes the
+                //square block texture spin around its anchor - the blue rectangle on wave and
+                //tsunami was exactly that, with the liquid tanks as the head and no base under.
+                var base = Core.atlas.find(block.name + "-base", block.region);
+                if(base.found() && base != block.region){
+                    float bw = base.width * base.scl() * Draw.xscl * mount.visualScale;
+                    float bh = base.height * base.scl() * Draw.yscl * mount.visualScale;
+                    Draw.rect(base, wx, wy, bw, bh, hull);
+                }
+                Draw.color();
+            }
+
+            if(block.region.found()){
+                float w = block.region.width * block.region.scl() * Draw.xscl * mount.visualScale;
+                float h = block.region.height * block.region.scl() * Draw.yscl * mount.visualScale;
+                Draw.rect(block.region, wx, wy, w, h, headRotation);
+            }
+
+            //the liquid overlay, drawn on top of the head exactly like the block's tank
+            if(block instanceof Turret){
+                var tank = Core.atlas.find(block.name + "-liquid", block.region);
+                if(tank.found() && tank != block.region){
+                    orbital.type.ModuleSupply supply = unit.moduleSupply();
+                    orbital.type.Liquid toDraw = supply != null ? supply.liquid : null;
+
+                    if(toDraw != null && supply.liquidCapacity > 0f && supply.liquidAmount > 0f){
+                        //the block divides its tank by its own capacity, and the module's pool
+                        //is the same number, so the level reads like the block's does
+                        float level = Mathf.clamp(supply.liquidAmount / supply.liquidCapacity, 0f, 1f);
+                        if(level > 1f/255f){
+                            Color color = toDraw.color.write(Tmp.c1).a(1f);
+                            float tw = tank.width * tank.scl() * Draw.xscl * mount.visualScale;
+                            float th = tank.height * tank.scl() * Draw.yscl * mount.visualScale;
+                            Draw.color(color, level * color.a);
+                            Draw.rect(tank, wx, wy, tw, th, headRotation);
+                            Draw.color();
+                        }
+                    }
+                }
+            }
         }
     }
 

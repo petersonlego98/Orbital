@@ -677,6 +677,22 @@ public class TurretLoadoutDialog extends BaseDialog{
                 cell.add(removable ? "@turret.hud.removable" : "@turret.hud.native")
                     .color(Color.lightGray).padLeft(8f).padRight(8f);
 
+                //aim mode: automatic lets the module pick its own target inside its own range;
+                //manual fires where the pilot aims, which is the default. The button carries
+                //the mode in its icon and its checked state, so no extra text has to fit.
+                boolean aims = unit.weaponAimsSelf(weapon);
+                cell.button(aims ? Icon.filter : Icon.move, Styles.clearNoneTogglei, () -> {
+                    unit.setWeaponAimsSelf(weapon, !unit.weaponAimsSelf(weapon));
+                    changed.run();
+                    rebuild();
+                }).size(48f).padLeft(4f).checked(b -> {
+                    b.setChecked(unit.weaponAimsSelf(weapon));
+                    return unit.weaponAimsSelf(weapon);
+                })
+                    .tooltip(Core.bundle.get(aims ? "module.aim.auto" : "module.aim.manual")
+                        + "\n[lightgray]" + Core.bundle.get("module.aim.hint"))
+                    .get().getStyle().imageUpColor = aims ? Pal.accent : Pal.gray;
+
                 if(removable){
                     cell.button(Icon.cancel, Styles.clearNonei, () -> {
                         unit.removeWeapon(weapon);

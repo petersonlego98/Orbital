@@ -67,6 +67,62 @@ public class MobileInput extends InputHandler implements GestureListener{
     /** Whether manual shooting (point with finger) is enabled. */
     public boolean manualShooting = false;
 
+    /**
+     * Analog stick state, written by the HUD widget while a finger is on it. The vector is
+     * local to the stick: (0, -1) is fully up, unit length is full tilt.
+     */
+    public final Vec2 analogVector = new Vec2();
+    /** Whether a finger is on the analog stick right now. */
+    public boolean analogActive;
+    /** Reused scratch vector for the direct-steering read, so no vector is allocated per frame. */
+    private final Vec2 directVec = new Vec2();
+
+    /** Called by the stick widget when a finger lands on it or leaves it. */
+    public void syncAnalog(){
+        analogActive = analogVector.len2() > 0.0001f;
+    }
+
+    /**
+     * @return whether the hull is being steered directly this frame - by the analog stick or
+     * by the gamepad's left stick/d-pad. When it is, the hull answers the input instead of
+     * chasing the camera, which is what removes the lag of dragging the map around.
+     */
+    public boolean directSteering(){
+        return analogActive || ControllerInput.moving();
+    }
+
+    /** Writes the steering vector into {@code out}: the stick when it is live, otherwise the gamepad. */
+    public Vec2 directVector(Vec2 out){
+        if(analogActive){
+            out.set(analogVector);
+        }else{
+            ControllerInput.movement(out);
+        }
+        return out;
+    }
+
+    /**
+     * Keeps the hull inside the camera while it is steered directly.
+     *
+     * <p>The camera only moves once the hull leaves a box in the middle of the screen, so it
+     * never lags behind the finger and dragging the map with another finger is never fought
+     * by a follow-the-unit correction.</p>
+     */
+    protected void followCameraBox(Posc unit){
+        Vec2 cameraPos = Core.camera.position;
+        float limitX = Core.camera.width * 0.28f, limitY = Core.camera.height * 0.28f;
+
+        float dx = unit.getX() - cameraPos.x, dy = unit.getY() - cameraPos.y;
+        //clamping the offset keeps the dead zone: inside the box the excess is zero
+        float ex = Mathf.clamp(dx, -limitX, limitX), ey = Mathf.clamp(dy, -limitY, limitY);
+        float targetX = cameraPos.x + (dx - ex), targetY = cameraPos.y + (dy - ey);
+
+        //only when there is an excess: the common case (hull inside the box) skips the write
+        if(targetX != cameraPos.x || targetY != cameraPos.y){
+            cameraPos.lerp(Tmp.v3.set(targetX, targetY), 0.25f);
+        }
+    }
+
     /** Current thing being shot at. */
     public @Nullable Teamc target;
     /** Payload target being moved to. Can be a position (for dropping), or a unit/block. */
@@ -756,6 +812,8 @@ public class MobileInput extends InputHandler implements GestureListener{
     public void reset(){
         super.reset();
         manualShooting = down = false;
+        analogActive = false;
+        analogVector.setZero();
     }
 
     @Override
@@ -812,7 +870,13 @@ public class MobileInput extends InputHandler implements GestureListener{
         if(!Core.settings.getBool("keyboard") && !locked && !scene.hasKeyboard()){
             //move camera around
             float camSpeed = 6f;
-            Vec2 delta = Tmp.v1.setZero().add(Core.input.axis(Binding.moveX), Core.input.axis(Binding.moveY)).nor().scl(Time.delta * camSpeed);
+            //a connected controller reports the same axes: its left stick pans the view when
+            //the hull is not being steered by it
+            ControllerInput.movement(Tmp.v2);
+            Vec2 delta = Tmp.v1.setZero().add(
+                Core.input.axis(Binding.moveX) + (directSteering() ? 0f : Tmp.v2.x),
+                Core.input.axis(Binding.moveY) + (directSteering() ? 0f : Tmp.v2.y)
+            ).nor().scl(Time.delta * camSpeed);
             Core.camera.position.add(delta);
             if(!delta.isZero()){
                 spectating = null;
@@ -1063,28 +1127,61 @@ public class MobileInput extends InputHandler implements GestureListener{
             payloadTarget = null;
         }
 
-        movement.set(targetPos).sub(player).limit(speed);
-        movement.setAngle(Mathf.slerp(movement.angle(), unit.vel.angle(), 0.05f));
+        //direct steering (analog stick or gamepad): the hull answers the input at once, with
+        //no camera step in between and no direction smoothing, so the ship feels like it has
+        //no delay. The tilt is the throttle: half tilt is half speed.
+        boolean direct = directSteering();
+        if(direct){
+            directVector(directVec);
+            float tilt = Math.min(directVec.len(), 1f);
+            movement.set(directVec).setLength(speed * tilt);
+            //the camera keeps the hull on screen without ever fighting the finger
+            followCameraBox(unit);
+        }else{
+            //original control: drag the map, the hull chases the middle of the screen
+            movement.set(targetPos).sub(player).limit(speed);
+            movement.setAngle(Mathf.slerp(movement.angle(), unit.vel.angle(), 0.05f));
 
-        if(player.within(targetPos, attractDst)){
-            movement.setZero();
-            unit.vel.approachDelta(Vec2.ZERO, unit.speed() * type.accel / 2f);
+            if(player.within(targetPos, attractDst)){
+                movement.setZero();
+                unit.vel.approachDelta(Vec2.ZERO, unit.speed() * type.accel / 2f);
+            }
         }
 
         unit.hitbox(rect);
         rect.grow(4f);
 
-        player.boosting = collisions.overlapsTile(rect, EntityCollisions::solid) || !unit.within(targetPos, 85f);
+        if(direct){
+            //a fully tilted stick reads as a boost, like a held boost key
+            player.boosting = directVec.len() > 0.9f;
+        }else{
+            player.boosting = collisions.overlapsTile(rect, EntityCollisions::solid) || !unit.within(targetPos, 85f);
+        }
 
         unit.movePref(movement);
 
         //update shooting if not building + not mining
         if(!unit.activelyBuilding() && unit.mineTile == null && !state.isEditor()){
 
+            //the right stick aims, at the hull's own range: a manual module fires exactly
+            //where the stick points, which is the desktop mouse behaviour on a controller
+            Vec2 stickAim = ControllerInput.aim();
+            boolean controllerFire = ControllerInput.firing();
+
             //autofire targeting
             if(manualShooting){
                 player.shooting = !boosted;
                 unit.aim(player.mouseX = Core.input.mouseWorldX(), player.mouseY = Core.input.mouseWorldY(), true);
+            }else if(stickAim != null || controllerFire){
+                //controller: the aim point is the stick direction, and the face button fires
+                float distance = Math.max(unit.range(), 80f);
+                player.shooting = !boosted && (controllerFire || stickAim != null);
+                if(stickAim != null){
+                    unit.aim(player.mouseX = unit.x + stickAim.x * distance,
+                        player.mouseY = unit.y + stickAim.y * distance, true);
+                }else{
+                    unit.aim(player.mouseX = Core.input.mouseWorldX(), player.mouseY = Core.input.mouseWorldY(), true);
+                }
             }else if(target == null){
                 player.shooting = false;
                 if(Core.settings.getBool("autotarget") && !(player.unit() instanceof BlockUnitUnit u && u.tile() instanceof ControlBlock c && !c.shouldAutoTarget())){

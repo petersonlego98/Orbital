@@ -100,8 +100,9 @@ inventário global e para a expansão das colônias.
   unidades **Mono** e **Flare**.
 - **Identidade visual própria** no tema espacial: tela de carregamento, menu e
   ícone do aplicativo com o emblema orbital da key-art.
-- **Modo Teste Novos Recursos**, um mapa isolado para testar unidades, torres e
-  balanceamento sem criar um save de campanha.
+- **Ambiente de teste de módulos**, um mapa isolado para escolher uma fuselagem
+  aérea, montar módulos dorsais e defender o núcleo contra ondas aéreas, sem
+  criar um save de campanha.
 - **Base herdada do Mindustry** para automação, transporte, defesa, editor de
   mapas, mods e multiplayer.
 Atualmente, **Quatia** é o setor pacífico de produção e **Gier** é a frente de
@@ -110,25 +111,29 @@ desativadas; os corpos continuam no mapa estelar como elementos visuais.
 
 ---
 
-## Modo Teste Novos Recursos
+## Ambiente de teste de módulos
 
 Mapa de areia isolado (160×160), **não persistente** — nada é gravado no save da
 campanha. É acessado pelo botão **Novidades** no menu principal e serve para
-testar unidades, torres dorsais e balanceamento sem sujar o progresso.
+validar módulos dorsais em combate, sem sujar o progresso.
 
-O modo inicia com uma unidade **Mono** sob controle do jogador e oferece três
-conjuntos de recursos:
+Ao entrar, o modo abre um assistente em três etapas:
 
-- **Unidades aéreas (sem custo).** Painel no canto inferior direito que gera
-  qualquer unidade aérea da lista de conteúdo, ignorando o estado de
-  desbloqueio e sem consumir recursos.
-- **Módulos.** Com uma unidade selecionada, o botão *Gerenciar torretas* abre o
-  catálogo de torres dorsais por tamanho (**1x1** a **5x5**), as armas nativas do
-  casco e os encaixes de suporte (**Reparo**, **Domo de Sobrecarga** e **Campo de
-  Força**), respeitando orçamento dorsal, número de slots e silhueta.
-- **Construções inimigas.** Escolha de time (**Crux**, **Malis**, **Greer** ou
-  **Blue**), escolha de bloco e toque no mapa para posicionar, remover ou limpar
-  construções daquele time.
+1. **Escolha da fuselagem aérea.** Qualquer unidade aérea do conteúdo pode ser
+   selecionada, ignorando o estado de desbloqueio; ela substitui a Mono inicial.
+2. **Instalação dos módulos.** O botão *Gerenciar torretas* abre o catálogo de
+   torres dorsais por tamanho (**1x1** a **5x5**), as armas nativas do casco e os
+   encaixes de suporte (**Reparo**, **Domo de Sobrecarga** e **Campo de Força**),
+   respeitando orçamento dorsal, número de slots e silhueta.
+3. **Início da defesa.** As ondas só são liberadas nesta etapa. A primeira chega
+   após 12 segundos e as seguintes a cada 45 segundos, sempre com unidades
+   aéreas de **Serpulo e Erekir**.
+
+O núcleo recebe **todos os recursos dos dois planetas** (itens ocultos ficam de
+fora), então a defesa pode ser construída sem mineração. Fora do assistente, o
+painel inferior direito continua permitindo gerar unidades aéreas sem custo, e a
+ferramenta de construções inimigas permite escolher o time (**Crux**, **Malis**,
+**Greer** ou **Blue**) e posicionar, remover ou limpar estruturas no mapa.
 
 ---
 
@@ -233,6 +238,7 @@ Os documentos de design ficam em:
 - [Visão de jogo](docs/VISAO_DE_JOGO_ORBITAL.md)
 - [Sistema de setores](docs/RELATORIO_SISTEMA_DE_SETORES.md)
 - [Torres como módulos](docs/RELATORIO_TORRES_COMO_MODULOS.md)
+- [Controles do jogador e módulos dorsais](docs/CONTROLES_JOGADOR_E_MODULOS.md)
 - [Valores de construção dos módulos](docs/CATALOGO_VALORES_CONSTRUCAO_MODULOS.md)
 - [Suprimento dos módulos (munição/líquido e energia)](docs/SUPRIMENTO_MODULOS.md)
 - [Unidades de Orbital](docs/RELATORIO_UNIDADES_ORBITAL.md)

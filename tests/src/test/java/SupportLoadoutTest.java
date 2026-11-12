@@ -572,7 +572,7 @@ public class SupportLoadoutTest{
         LiquidSupportAbility wave = (LiquidSupportAbility)mount.ability;
         assertEquals(waveBlock.range, wave.range, 0.001f);
         assertEquals(waveBlock.reload, wave.reload, 0.001f);
-        assertEquals(StatusEffects.wet, wave.status);
+        assertTrue(wave.ammoTypes.containsKey(Liquids.water), "wave sprays water by default");
         assertTrue(unit.removeSupportMount(mount));
 
         LiquidTurret tsunamiBlock = (LiquidTurret)Blocks.tsunami;
@@ -635,6 +635,8 @@ public class SupportLoadoutTest{
             SupportMount mount = carrier.mountSupport(Blocks.wave);
             assertNotNull(mount);
 
+            //the module aims by itself like its block; the pilot's fire control is not needed
+            carrier.isShooting(true);
             Time.delta = ((LiquidTurret)Blocks.wave).reload + 1f;
             mount.update(carrier);
 
@@ -663,6 +665,8 @@ public class SupportLoadoutTest{
             SupportMount mount = carrier.mountSupport(Blocks.wave);
             assertNotNull(mount);
 
+            //the module aims by itself like its block; the pilot's fire control is not needed
+            carrier.isShooting(true);
             Time.delta = ((LiquidTurret)Blocks.wave).reload + 1f;
             mount.update(carrier);
 
@@ -728,25 +732,33 @@ public class SupportLoadoutTest{
     }
 
     @Test
-    void massDriverModuleDeliversCarriedItemsToAnAlly(){
+    void massDriverModuleLaunchesTheHullStoresAndKeepsTheUnitCargo(){
         Unit carrier = UnitTypes.quad.spawn(Team.sharded, 0f, 0f);
         Unit ally = UnitTypes.mono.spawn(Team.sharded, 10f, 0f);
         float delta = Time.delta;
 
         try{
             state.teams.updateTeamStats();
-            carrier.stack.item = Items.copper;
-            carrier.stack.amount = 10;
-
+            //the hull's stores feed the module; set after mounting, because mounting recomputes
             SupportMount mount = carrier.mountSupport(Blocks.massDriver);
             assertNotNull(mount);
+            carrier.moduleSupply().item = Items.copper;
+            carrier.moduleSupply().ammo = 40f;
+            carrier.stack.item = Items.lead;
+            carrier.stack().amount = 7;
 
             Time.delta = ((MassDriver)Blocks.massDriver).reload + 1f;
             mount.update(carrier);
 
             assertTrue(ally.hasItem(), "the mass driver must hand carried items to an allied unit");
-            assertEquals(10, ally.stack().amount);
-            assertFalse(carrier.hasItem(), "the carrier must be empty after the launch");
+            assertEquals(Items.copper, ally.stack().item, "the launched item comes from the pool");
+            //the unit's own cargo is never touched by the module
+            assertTrue(carrier.hasItem(), "the carrier keeps its own item");
+            assertEquals(Items.lead, carrier.stack().item);
+            assertEquals(7, carrier.stack().amount, "the carrier's amount must not decrease");
+
+            //and the hull's pool pays for the launch
+            assertTrue(carrier.moduleSupply().ammo < 40f, "the launch must spend the pool");
         }finally{
             Time.delta = delta;
             ally.remove();

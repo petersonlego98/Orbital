@@ -19,10 +19,16 @@ import static orbital.Vars.*;
  * {@link orbital.entities.units.SupportMount} when a {@code parallax} support module
  * is installed; it is never serialized and lives only in the mount.</p>
  */
-public class TractorAbility extends Ability{
+public class TractorAbility extends Ability implements AimingModule{
     public float range = 100f, force = 0.3f, scaledForce = 0f, damage = 0f;
     public Color color = Color.white;
     public float laserWidth = 0.6f;
+    /** how fast the module's turret turns toward the pulled unit, in degrees per tick. */
+    public float rotateSpeed = 10f;
+    /** hull-local dock of the module, in world units. */
+    public float anchorX, anchorY;
+    /** current aim, relative to the hull, in degrees. */
+    public float rotation = 90f;
 
     protected @Nullable Unit target;
     protected float strength;
@@ -35,10 +41,37 @@ public class TractorAbility extends Ability{
     }
 
     @Override
-    public void update(Unit unit){
-        target = Units.closestEnemy(unit.team, unit.x, unit.y, range, u -> u.checkTarget(true, false));
+    public void anchor(float anchorX, float anchorY){
+        this.anchorX = anchorX;
+        this.anchorY = anchorY;
+    }
 
-        if(target != null && target.within(unit, range + target.hitSize() / 2f)){
+    @Override
+    public float rotation(){
+        return rotation;
+    }
+
+    @Override
+    public float moduleX(Unit unit){
+        return ModuleDock.worldX(unit, anchorX, anchorY);
+    }
+
+    @Override
+    public float moduleY(Unit unit){
+        return ModuleDock.worldY(unit, anchorX, anchorY);
+    }
+
+    @Override
+    public void update(Unit unit){
+        float dockX = moduleX(unit), dockY = moduleY(unit);
+        //range and filters are the block's own, measured from the module's dock - a beam that
+        //leaves the module must also reach what the block could reach from where it stands
+        target = Units.closestEnemy(unit.team, dockX, dockY, range, u -> u.checkTarget(true, false));
+
+        if(target != null && Mathf.dst(target.x, target.y, dockX, dockY) <= range + target.hitSize() / 2f){
+            //the turret tracks the unit it is pulling, so the beam and the sprite turn together
+            rotation = ModuleDock.turn(rotation, ModuleDock.aimAt(unit, dockX, dockY, target.x, target.y),
+                rotateSpeed, Time.delta);
             strength = Mathf.lerpDelta(strength, 1f, 0.1f);
 
             if(damage > 0){
@@ -57,11 +90,12 @@ public class TractorAbility extends Ability{
     public void draw(Unit unit){
         if(target == null || strength <= 0.02f) return;
 
+        float dockX = moduleX(unit), dockY = moduleY(unit);
         float z = unit.type != null && unit.type.lowAltitude ? Layer.flyingUnitLow + 0.1f : Layer.flyingUnit + 0.1f;
         Draw.z(z);
         Draw.color(color, strength);
         Lines.stroke(laserWidth * strength);
-        Lines.line(unit.x, unit.y, target.x, target.y, false);
+        Lines.line(dockX, dockY, target.x, target.y, false);
         Lines.stroke(1f);
         Draw.color(Color.white);
         Draw.reset();

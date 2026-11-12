@@ -353,9 +353,10 @@ public class SettingsMenuDialog extends BaseDialog{
         }
         menu.button("@settings.sound", Icon.volumeUp, style, isize, () -> visible(3)).marginLeft(marg).row();
         menu.button("@settings.language", Icon.chat, style, isize, ui.language::show).marginLeft(marg).row();
-        if(!mobile || Core.settings.getBool("keyboard")){
-            menu.button("@settings.controls", Icon.move, style, isize, ui.controls::show).marginLeft(marg).row();
-        }
+        //the controls menu is now relevant on the phone too: the analog stick, the module
+        //number keys and the gamepad switches live there, and a Bluetooth keyboard or a
+        //controller is the only thing missing to rebind
+        menu.button("@settings.controls", Icon.move, style, isize, ui.controls::show).marginLeft(marg).row();
 
         menu.button("@settings.data", Icon.save, style, isize, () -> dataDialog.show()).marginLeft(marg).row();
         menu.button("@settings.dev", Icon.fileCode, style, isize, () -> visible(4)).marginLeft(marg).row();

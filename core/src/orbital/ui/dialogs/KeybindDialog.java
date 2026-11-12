@@ -4,6 +4,7 @@ import arc.*;
 import arc.graphics.*;
 import arc.input.*;
 import arc.input.KeyBind.*;
+import arc.scene.*;
 import arc.scene.event.*;
 import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
@@ -18,6 +19,12 @@ import java.util.*;
 import static arc.Core.*;
 
 public class KeybindDialog extends Dialog{
+    /** Settings keys of Orbital's own control switches, shown at the top of this dialog. */
+    public static final String
+        analogKey = "analogstick",
+        moduleHotkeysKey = "module-hotkeys",
+        controllerKey = ControllerInput.enabledKey;
+
     protected KeyBind rebindKey = null;
     protected boolean rebindAxis = false;
     protected boolean rebindMin = true;
@@ -38,6 +45,22 @@ public class KeybindDialog extends Dialog{
         pane.setFadeScrollBars(false);
 
         top();
+
+        //Orbital's own control switches, above the rebindable keys: they belong to the same
+        //menu, because a player looking for "how do I move" also wants the analog stick, the
+        //module hotkeys and the controller here.
+        cont.table(Styles.grayPanel, settings -> {
+            settings.left().margin(6f);
+            settings.add(bundle.get("controls.orbital.title")).style(Styles.outlineLabel).left().padBottom(4f).row();
+
+            check(settings, "analogstick");
+            check(settings, "module-hotkeys");
+            check(settings, "gamepad");
+
+            settings.row();
+            settings.add(bundle.get("controls.orbital.hint")).color(Color.lightGray).left().wrap()
+                .width(340f).padTop(6f);
+        }).fillX().padBottom(6f).row();
 
         cont.table(table -> {
             table.left();
@@ -67,6 +90,27 @@ public class KeybindDialog extends Dialog{
         keyDown(key -> {
             if(key == KeyCode.escape || key == KeyCode.back) hide();
         });
+    }
+
+    /**
+     * One checkbox of Orbital's control switches: the label and the description come from the
+     * same {@code setting.<key>} bundle entries the settings menu uses, so both menus read
+     * identically. Writing the value registers the default, like
+     * {@code SettingsMenuDialog.SettingsTable#checkPref} does.
+     */
+    private void check(Table table, String key){
+        //all three switches ship on: a player turns one off only on purpose
+        boolean def = true;
+        settings.defaults(key, def);
+
+        Button box = Elems.check(Core.bundle.get("setting." + key + ".name"),
+            () -> settings.getBool(key, def),
+            value -> settings.put(key, value));
+
+        Cell<Button> cell = table.add(box).left().minWidth(340f).padTop(3f).padBottom(3f);
+        String description = Core.bundle.getOrNull("setting." + key + ".description");
+        if(description != null) orbital.Vars.ui.addDescTooltip(cell.get(), description);
+        table.row();
     }
 
     private void rebuildBinds(){

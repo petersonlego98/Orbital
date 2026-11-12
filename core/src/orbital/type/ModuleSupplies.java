@@ -115,7 +115,7 @@ public final class ModuleSupplies{
      * @return ammo spent per shot, in the block's own units. Zero for turrets with no ammo.
      */
     public static float ammoPerShot(Turret turret){
-        return usesAmmoPool(turret) ? Math.max(1, turret.ammoPerShot) : 0f;
+        return ammoPerShot((Block)turret);
     }
 
     /** @return power this block drains per tick, or 0 when it runs on no power. */
@@ -126,6 +126,31 @@ public final class ModuleSupplies{
     /** @return power this turret drains per tick, or 0 when it runs on no power. */
     public static float powerUsage(Turret turret){
         return powerUsage((Block)turret);
+    }
+
+    /**
+     * @return liquid this block drains per tick, derived from its own liquid ammo: a liquid
+     * turret sprays one liquid unit per shot, and {@code ReloadTurret.reload} ticks pass
+     * between shots, so the rate is {@code 1 / reload}. Blocks that are not liquid turrets
+     * drain nothing.
+     */
+    public static float liquidUsage(Block block){
+        if(block instanceof LiquidTurret liquid) return 1f / Math.max(1f, liquid.reload);
+        return 0f;
+    }
+
+    /** @return liquid this turret drains per tick. */
+    public static float liquidUsage(Turret turret){
+        return liquidUsage((Block)turret);
+    }
+
+    /**
+     * @return ammo a shot costs, in the block's own units ({@link Turret#ammoPerShot}). Zero
+     * for turrets with no item ammo - those run on energy or on liquid and never draw items.
+     */
+    public static float ammoPerShot(Block block){
+        if(block instanceof ItemTurret item) return Math.max(1, item.ammoPerShot);
+        return 0f;
     }
 
     /**

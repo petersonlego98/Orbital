@@ -388,6 +388,46 @@ public class Weapon implements Cloneable{
         return bullet.range;
     }
 
+    /**
+     * Lets this mount pick its own target and fire at it, inside its own range and bullet
+     * filters.
+     *
+     * <p>Runs for uncontrollable {@link #autoTarget} weapons and for dorsal modules the pilot
+     * switched to automatic targeting. It overrides {@code mount.shoot} / {@code mount.rotate}
+     * for this frame, so an order coming from the controller only survives while there is a
+     * target to shoot.</p>
+     */
+    protected void updateAutoTarget(Unit unit, WeaponMount mount, float mountX, float mountY){
+        if((mount.retarget -= Time.delta) <= 0f){
+            mount.target = findTarget(unit, mountX, mountY, bullet.range, bullet.collidesAir, bullet.collidesGround);
+            mount.retarget = mount.target == null ? targetInterval : targetSwitchInterval;
+        }
+
+        if(mount.target != null && checkTarget(unit, mount.target, mountX, mountY, bullet.range)){
+            mount.target = null;
+        }
+
+        boolean shoot = false;
+
+        if(mount.target != null){
+            shoot = mount.target.within(mountX, mountY, bullet.range + Math.abs(shootY) + (mount.target instanceof Sized s ? s.hitSize()/2f : 0f)) && unit.canShoot();
+
+            if(predictTarget){
+                Vec2 to = Predict.intercept(unit, mount.target, bullet);
+                mount.aimX = to.x;
+                mount.aimY = to.y;
+            }else{
+                mount.aimX = mount.target.x();
+                mount.aimY = mount.target.y();
+            }
+        }
+
+        mount.shoot = mount.rotate = shoot;
+
+        //note that shooting state is not affected, as these cannot be controlled
+        //logic will return shooting as false even if these return true, which is fine
+    }
+
     public void update(Unit unit, WeaponMount mount){
         boolean can = unit.canShoot();
         float lastReload = mount.reload;
@@ -414,35 +454,11 @@ public class Weapon implements Cloneable{
         mountY = unit.y + Angles.trnsy(unit.rotation - 90, x, y);
 
         //find a new target
-        if(!controllable && autoTarget){
-            if((mount.retarget -= Time.delta) <= 0f){
-                mount.target = findTarget(unit, mountX, mountY, bullet.range, bullet.collidesAir, bullet.collidesGround);
-                mount.retarget = mount.target == null ? targetInterval : targetSwitchInterval;
-            }
-
-            if(mount.target != null && checkTarget(unit, mount.target, mountX, mountY, bullet.range)){
-                mount.target = null;
-            }
-
-            boolean shoot = false;
-
-            if(mount.target != null){
-                shoot = mount.target.within(mountX, mountY, bullet.range + Math.abs(shootY) + (mount.target instanceof Sized s ? s.hitSize()/2f : 0f)) && can;
-
-                if(predictTarget){
-                    Vec2 to = Predict.intercept(unit, mount.target, bullet);
-                    mount.aimX = to.x;
-                    mount.aimY = to.y;
-                }else{
-                    mount.aimX = mount.target.x();
-                    mount.aimY = mount.target.y();
-                }
-            }
-
-            mount.shoot = mount.rotate = shoot;
-
-            //note that shooting state is not affected, as these cannot be controlled
-            //logic will return shooting as false even if these return true, which is fine
+        //two owners can pick the target of this mount: the weapon itself, when it is an
+        //uncontrollable auto-targeting weapon (the classic case), and the pilot, when the
+        //module was switched to automatic targeting (see WeaponsComp.mountSelfTargets)
+        if(!controllable && autoTarget || unit.mountSelfTargets(mount)){
+            updateAutoTarget(unit, mount, mountX, mountY);
         }
 
         //rotate if applicable

@@ -145,6 +145,54 @@ public class TestNewFeaturesModeTest{
         }
     }
 
+    @Test
+    void resourceLoadoutCoversBothPlanetsWithoutHiddenItems(){
+        var loadout = TestNewFeaturesMode.resourceLoadout();
+        assertFalse(loadout.isEmpty());
+
+        for(var stack : loadout){
+            assertTrue(stack.amount > 0, stack.item.name + " has a non-positive amount");
+            assertFalse(stack.item.isHidden(), stack.item.name + " is hidden but was added to the loadout");
+        }
+
+        for(var item : Items.serpuloItems){
+            if(!item.isHidden()){
+                assertTrue(loadout.contains(stack -> stack.item == item), "missing Serpulo item " + item.name);
+            }
+        }
+        for(var item : Items.erekirItems){
+            if(!item.isHidden()){
+                assertTrue(loadout.contains(stack -> stack.item == item), "missing Erekir item " + item.name);
+            }
+        }
+    }
+
+    @Test
+    void airWaveGroupsOnlyContainFlyingUnits(){
+        var groups = TestNewFeaturesMode.airWaveGroups();
+        assertFalse(groups.isEmpty());
+        for(var group : groups){
+            assertNotNull(group.type);
+            assertTrue(group.type.flying, group.type.name + " is not an air unit");
+        }
+
+        //both planets' air fleets must be represented, otherwise the validation is incomplete
+        assertTrue(groups.contains(group -> group.type instanceof orbital.type.unit.ErekirUnitType),
+            "the Erekir air fleet is missing from the wave progression");
+        assertTrue(groups.contains(group -> !(group.type instanceof orbital.type.unit.ErekirUnitType)),
+            "the Serpulo air fleet is missing from the wave progression");
+    }
+
+    @Test
+    void setupIntervalsArePositiveAndWavesStayDisabledUntilStarted(){
+        assertTrue(TestNewFeaturesMode.initialWaveSpacing > 0f);
+        assertTrue(TestNewFeaturesMode.waveSpacing > TestNewFeaturesMode.initialWaveSpacing);
+        assertEquals(0.55f, TestNewFeaturesMode.waveDifficulty, 0.0001f);
+
+        //beginWaves must refuse to run outside the test environment
+        assertFalse(TestNewFeaturesMode.beginWaves());
+    }
+
     private static void createFlatMap(int width, int height){
         world.resize(width, height);
         world.beginMapLoad();

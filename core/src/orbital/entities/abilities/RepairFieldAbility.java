@@ -37,9 +37,17 @@ public class RepairFieldAbility extends Ability{
     public float smartInterval = 20f;
     /** Random initial reload multiplier to check for damaged units. Useful for desyncing healer timers once. */
     public float randDesync = -1f;
+    /**
+     * When true only flying units are healed. A dorsal repair module belongs to an air hull,
+     * so the carrier's own field heals the wing it flies with.
+     */
+    public boolean airOnly = false;
+    /** When true damaged allied constructions in range are repaired in the same pulse. */
+    public boolean buildings = false;
 
     //a high capacity is needed to account for t1 spam in custom gamemodes, but set too high it becomes expensive
     protected static Seq<Unit> targets = new Seq<>(50);
+    protected static Seq<Building> buildingTargets = new Seq<>(20);
     protected float healTimer, downTimer;
     protected float healthMissing, sumMaxHealth, sumTypeMult, healthChange;
     protected boolean hasHealed, healNow;
@@ -90,6 +98,7 @@ public class RepairFieldAbility extends Ability{
 
         if(healTimer >= reload){
             targets.clear();
+            buildingTargets.clear();
             hasHealed = healNow = false;
             healthChange = healthMissing;
             healthMissing = sumMaxHealth = sumTypeMult = 0f;
@@ -100,6 +109,8 @@ public class RepairFieldAbility extends Ability{
             Units.nearby(unit.team, unit.x, unit.y, range, other -> {
                 //check for 2 more targets just in case
                 if(limitTargets && targets.size >= maxTargets + 2) return;
+
+                if(airOnly && !other.isFlying()) return;
 
                 if(other.damaged()){
                     targets.add(other);
@@ -114,9 +125,27 @@ public class RepairFieldAbility extends Ability{
             });
             int targetCount = targets.size;
 
+            if(buildings){
+                Units.nearbyBuildings(unit.x, unit.y, range, other -> {
+                    if(limitTargets && targets.size + buildingTargets.size >= maxTargets + 2) return;
+                    if(other.team != unit.team || !other.damaged() || other.isHealSuppressed()) return;
+
+                    buildingTargets.add(other);
+                    if(smartHeal){
+                        float maxHealth = other.maxHealth();
+                        healthMissing += maxHealth - other.health();
+                        sumMaxHealth += maxHealth;
+                        sumTypeMult += 1f;
+                        if(other.healthf() < smartHealPercent) healNow = true;
+                    }
+                });
+            }
+            int buildingCount = buildingTargets.size;
+            int totalCount = targetCount + buildingCount;
+
             //mixed approach, care both about groups and single low hp units
-            float ratio = amount + healPercentMult * sumMaxHealth * (sumTypeMult / targetCount);
-            float requiredHeals = (healthMissing * 0.7f + healthMissing / (limitTargets ? maxTargets : targetCount) * 0.3f) / smartHealStrength / ratio;
+            float ratio = amount + healPercentMult * sumMaxHealth * (sumTypeMult / Math.max(totalCount, 1));
+            float requiredHeals = (healthMissing * 0.7f + healthMissing / (limitTargets ? Math.max(maxTargets, 1) : Math.max(totalCount, 1)) * 0.3f) / smartHealStrength / ratio;
 
             if(requiredHeals >= 1f || !smartHeal || healNow || downTimer >= smartDowntime){
 
@@ -124,6 +153,7 @@ public class RepairFieldAbility extends Ability{
                 if(limitTargets){
                     boolean isSameType = sameTypeHealMult < 1f;
                     targets.sort(u -> u.dst2(unit.x, unit.y) + (isSameType && u.type() == unit.type ? 6400f : 0f));
+                    buildingTargets.sort(b -> b.dst2(unit.x, unit.y));
                 }
 
                 int len = limitTargets ? Math.min(targetCount, maxTargets) : targetCount;
@@ -137,6 +167,19 @@ public class RepairFieldAbility extends Ability{
                         hasHealed = true;
                     }
                 }
+
+                int remaining = limitTargets ? Math.max(maxTargets - len, 0) : buildingCount;
+                int buildingLen = Math.min(buildingCount, remaining);
+                for(int i = 0; i < buildingLen; i++){
+                    Building other = buildingTargets.get(i);
+                    if(other.damaged() && !other.isHealSuppressed()){
+                        other.heal(amount + healPercentMult * other.maxHealth());
+                        other.recentlyHealed();
+                        healEffect.at(other, parentizeEffects);
+                        hasHealed = true;
+                    }
+                }
+
                 if(hasHealed){
                     healTimer = 0f;
                     activeEffect.at(unit, range);

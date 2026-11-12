@@ -50,6 +50,15 @@ public final class ModuleSupply{
      */
     public static final float energyTicks = 5f * 60f;
 
+    /**
+     * Ticks a pool takes to refill from empty while its modules are not drawing on it. There
+     * is no supply chain yet - nothing carries items, liquid or power to a dorsal module - so
+     * the pools recharge slowly and reach an equilibrium while their modules run. When the
+     * real chain exists (resupply from a core, an ammo drop, a power line), this is the number
+     * that gets replaced.
+     */
+    public static final float refillTicks = 600f;
+
     /** @return true when any installed module feeds the item-ammo pool. */
     public boolean usesAmmo(){
         return ammoCapacity > 0f;

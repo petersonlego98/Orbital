@@ -10,19 +10,35 @@ import orbital.game.EventType.*;
 import orbital.gen.*;
 import orbital.maps.*;
 import orbital.type.*;
+import orbital.type.unit.ErekirUnitType;
+import orbital.ui.dialogs.ModuleTestSetupDialog;
 import orbital.world.*;
 import orbital.world.meta.BuildVisibility;
 
 import static orbital.Vars.*;
 
-/** Isolated, fixed-map sandbox used to test newly-added unit and turret features. */
+/** Isolated, fixed-map environment used to validate aerial modules against waves of air units. */
 public final class TestNewFeaturesMode{
     public static final String rulesName = "test-new-features";
     public static final int mapSize = 160;
+    /** Grace period after the setup closes, in ticks. */
+    public static final float initialWaveSpacing = 12f * 60f;
+    /** Time between air waves, in ticks. */
+    public static final float waveSpacing = 45f * 60f;
+    /** Difficulty used to build the base air-only wave progression. */
+    public static final float waveDifficulty = 0.55f;
 
     private static Map testMap;
     private static boolean initializeMono;
     private static boolean listenerInstalled;
+    private static @Nullable ModuleTestSetupDialog setupDialog;
+
+    /** Air unit chosen in the setup menu, or null before a choice is made. */
+    public static @Nullable UnitType selectedType;
+    /** True while the setup menu is still open; waves stay disabled until it closes. */
+    public static boolean setupOpen;
+    /** True once the air-wave defense has started. */
+    public static boolean wavesStarted;
 
     /** Team that receives structures placed with the enemy-building tool. */
     public static Team enemyTeam = Team.crux;
@@ -55,6 +71,15 @@ public final class TestNewFeaturesMode{
                         tile.setFloor(Blocks.grass.asFloor());
                     }
                     tiles.getn(mapSize / 2, mapSize / 2).setBlock(Blocks.coreShard, Team.sharded);
+
+                    //Air waves need somewhere to enter. Four edge markers keep the whole border
+                    //in use instead of piling every wave on one side of the map.
+                    int center = mapSize / 2;
+                    int edge = 3;
+                    tiles.getn(center, edge).setOverlay(Blocks.spawn);
+                    tiles.getn(center, mapSize - edge - 1).setOverlay(Blocks.spawn);
+                    tiles.getn(edge, center).setOverlay(Blocks.spawn);
+                    tiles.getn(mapSize - edge - 1, center).setOverlay(Blocks.spawn);
                 });
             });
         }
@@ -68,9 +93,13 @@ public final class TestNewFeaturesMode{
         rules.planet = Planets.qatia;
         rules.waves = false;
         rules.waveTimer = false;
-        rules.loadout.clear();
+        rules.loadout = resourceLoadout();
         //unit creation is free, but the normal unit cap still applies
         rules.disableUnitCap = false;
+
+        selectedType = null;
+        setupOpen = true;
+        wavesStarted = false;
 
         initializeMono = true;
         //createSave = false: this is a disposable test session, it must never touch the save list
@@ -86,6 +115,128 @@ public final class TestNewFeaturesMode{
         player.unit(mono);
         player.set(mono);
         Core.camera.position.set(mono);
+        selectedType = UnitTypes.mono;
+
+        //the setup menu is the way into the environment: choose the hull, install modules,
+        //then let the air waves start. Nothing is persisted, so it must be shown every start.
+        Core.app.post(() -> {
+            if(!active() || !setupOpen) return;
+            openSetup();
+        });
+    }
+
+    /** Reopens the setup menu, unless the defense has already started. */
+    public static void openSetup(){
+        if(!active() || wavesStarted) return;
+        if(setupDialog == null) setupDialog = new ModuleTestSetupDialog();
+        setupDialog.openSetup();
+    }
+
+    /** @return the resources of both planets, one stack of each visible item. */
+    public static Seq<ItemStack> resourceLoadout(){
+        Seq<Item> items = new Seq<>();
+        for(Item item : Items.serpuloItems){
+            if(!item.isHidden() && !items.contains(item)) items.add(item);
+        }
+        for(Item item : Items.erekirItems){
+            if(!item.isHidden() && !items.contains(item)) items.add(item);
+        }
+
+        Seq<ItemStack> stacks = new Seq<>();
+        for(Item item : items){
+            //play() caps every stack at the core's storage capacity, so a large amount simply
+            //means "fill this resource to the brim"
+            stacks.add(new ItemStack(item, 9999));
+        }
+        return stacks;
+    }
+
+    /** @return the player unit, or null when it is missing or dead. */
+    public static @Nullable Unit playerUnit(){
+        return player == null || player.dead() || player.unit() == null ? null : player.unit();
+    }
+
+    /**
+     * Replaces the current player hull with the chosen air unit, keeping its position.
+     * Modules installed on the previous hull are intentionally not transferred: the setup
+     * menu asks for the modules only after this choice.
+     */
+    public static boolean selectUnit(UnitType type){
+        if(!active() || type == null || !type.flying || type.isHidden()) return false;
+
+        player.team(Team.sharded);
+        Unit previous = playerUnit();
+        float x = previous == null ? world.unitWidth() / 2f : previous.x;
+        float y = previous == null ? world.unitHeight() / 2f : previous.y;
+
+        if(previous != null && previous.type == type){
+            selectedType = type;
+            return true;
+        }
+
+        Unit unit = type.spawn(Team.sharded, x, y);
+        player.unit(unit);
+        player.set(unit);
+        if(previous != null && previous != unit) previous.remove();
+        Core.camera.position.set(unit);
+
+        selectedType = type;
+        return true;
+    }
+
+    /**
+     * Starts the defense phase: fills the rules with air-only spawn groups, enables the wave
+     * timer and resets the timer so the first wave arrives after the setup grace period.
+     */
+    public static boolean beginWaves(){
+        if(!active() || wavesStarted || playerUnit() == null) return false;
+
+        Rules rules = state.rules;
+        rules.spawns = airWaveGroups();
+        rules.waves = true;
+        rules.waveTimer = true;
+        rules.waveSending = true;
+        rules.waitEnemies = true;
+        rules.waveSpacing = waveSpacing;
+        rules.initialWaveSpacing = initialWaveSpacing;
+        rules.airUseSpawns = true;
+        rules.hideSpawns = false;
+
+        state.wave = 1;
+        state.wavetime = initialWaveSpacing;
+
+        selectedType = playerUnit().type;
+        setupOpen = false;
+        wavesStarted = true;
+        return true;
+    }
+
+    /**
+     * @return the air wave progression: the engine's air-only generator plus one late group
+     * for each visible Erekir air unit, so the defense covers both planets' air fleets.
+     */
+    public static Seq<SpawnGroup> airWaveGroups(){
+        Seq<SpawnGroup> groups = Waves.generate(waveDifficulty, new Rand(), false, true);
+
+        Seq<UnitType> erekirAir = content.units().select(type ->
+            type.flying && !type.isHidden() && type instanceof ErekirUnitType);
+        erekirAir.sort((a, b) -> Float.compare(a.health, b.health));
+
+        int index = 0;
+        for(UnitType type : erekirAir){
+            int tier = index++;
+            groups.add(new SpawnGroup(type){{
+                begin = 4 + tier * 2;
+                spacing = 3;
+                unitAmount = 1;
+                unitScaling = 18f;
+                max = 3;
+                shields = tier * 40f;
+                shieldScaling = 20f;
+            }});
+        }
+
+        return groups;
     }
 
     /** Spawns an aerial unit beside the player's unit, without taking control of it. */
