@@ -46,6 +46,8 @@ public class TurretLoadoutDialog extends BaseDialog{
     private Table list;
     /** the scrolling catalogue pane, kept to restore its offset across rebuilds */
     private @Nullable ScrollPane pane;
+    /** the scrolling slot rail, kept to open every visit at the top of the rail */
+    private @Nullable ScrollPane rail;
     /** fixed slot rail on the right of the dialog; never scrolls */
     private Table slots;
     private @Nullable Unit unit;
@@ -120,9 +122,11 @@ public class TurretLoadoutDialog extends BaseDialog{
                 - Scl.scl(140f)).row();
         pane = columns.pane(t -> list = t).grow().scrollX(false).get();
         //the rail scrolls in its own column: it is a stack that grows with the loadout, and it
-        //must not push the menu off the top of the screen
-        columns.pane(t -> t.add(slots = new Table()).growX().top()).growY().width(slotWidth())
-            .scrollX(false);
+        //must not push the menu off the top of the screen. The pane is the rail plus the room the
+        //scrollbar takes, and the pane's own table is left-aligned: a widget wider than the pane
+        //would otherwise be centred inside it and stick out of both sides.
+        rail = columns.pane(t -> t.left().add(slots = new Table()).growX().top().left()).growY()
+            .width(slotWidth() + railScrollWidth()).scrollX(false).get();
 
         buttons.button("@back", Icon.left, this::hide).size(210f, 64f);
         addCloseListener();
@@ -133,6 +137,21 @@ public class TurretLoadoutDialog extends BaseDialog{
         return mobile ? 340f : Mathf.clamp(Core.graphics.getWidth() * 0.34f, 380f, 620f);
     }
 
+    /**
+     * @return the width the rail's own vertical scrollbar takes out of its pane. The rail content
+     * is sized for {@link #slotWidth()}, so the pane has to be that much wider: without it the
+     * scrollbar squeezed the rail and the pane's table centred what no longer fitted, which is
+     * what made the whole rail look shifted out of its column.
+     */
+    private static float railScrollWidth(){
+        try{
+            ScrollPane.ScrollPaneStyle style = Core.scene.getStyle(ScrollPane.ScrollPaneStyle.class);
+            if(style != null && style.vScroll != null) return Math.max(style.vScroll.getMinWidth(), 4f);
+        }catch(Throwable ignored){
+        }
+        return 24f;
+    }
+
     public void show(Unit unit, Runnable changed){
         this.unit = unit;
         this.changed = changed;
@@ -141,6 +160,9 @@ public class TurretLoadoutDialog extends BaseDialog{
         //the player left behind, and starting mid-catalogue hid the hull name, the budget line
         //and the first heading under the top edge
         if(pane != null) pane.setScrollYForce(0f);
+        //the rail scrolls on its own now, so it opens at the slots too: a rail left where the
+        //player left it hid the dorsal slots and the native hardpoints
+        if(rail != null) rail.setScrollYForce(0f);
         rebuild();
         show();
         //the pane width is only known once it is laid out, so the grid is rebuilt with the
@@ -554,7 +576,10 @@ public class TurretLoadoutDialog extends BaseDialog{
             //whatever the aspect ratio of the block sprite
             cell.image(icon).size(slotImg).scaling(Scaling.fit).color(iconColor);
             cell.row();
-            cell.add(label).width(boxSize - 12f).wrap().center().fontScale(mobile ? 1f : 0.85f).color(Color.lightGray);
+            //the caption is as wide as the box allows, and its type is small enough that the
+            //longest category name ("Sobrecarga", "Ponto de defesa") breaks between words
+            //instead of in the middle of one
+            cell.add(label).width(boxSize - 6f).wrap().center().fontScale(mobile ? 0.6f : 0.85f).color(Color.lightGray);
         }).size(boxSize).pad(3f).get();
 
         if(click != null){
@@ -1209,15 +1234,16 @@ public class TurretLoadoutDialog extends BaseDialog{
             //A module card is a reading surface, so on phones it keeps a fixed physical size
             //instead of shrinking with the UI scale.
             float unit = 1f / Scl.scl(1f);
-            //Four cards to a row: the card is a quarter of the catalogue column, so four always
-            //fit, and the floor keeps the sprite and the two text lines readable on the smallest
-            //phone, where the cap keeps a tablet from stretching the card into a billboard
-            cardWidth = Mathf.clamp(catalogueWidth() / 4f - 8f, 84f * unit, 240f * unit);
-            btnSize = Math.max(36f, cardWidth * 0.62f);
+            //Four cards to a row, and the four fill the row: the card is a quarter of the
+            //catalogue column, so the names and the shot types have room to be read instead of
+            //breaking in the middle of a word. The floor only guards a phone so small that a
+            //quarter of the column would be unreadable.
+            cardWidth = Math.max(84f * unit, catalogueWidth() / 4f - 8f);
+            btnSize = Mathf.clamp(cardWidth * 0.62f, 36f, 190f);
             imgSize = btnSize;
             //two text lines under the icon, so one- and two-line labels still line up
-            nameLineHeight = Math.max(16f, cardWidth * 0.24f);
-            roleLineHeight = Math.max(14f, cardWidth * 0.22f);
+            nameLineHeight = Math.max(16f, cardWidth * 0.22f);
+            roleLineHeight = Math.max(14f, cardWidth * 0.2f);
             cardMinHeight = btnSize + nameLineHeight + roleLineHeight + 34f;
         }else{
             cardWidth = 168f;
@@ -1230,12 +1256,13 @@ public class TurretLoadoutDialog extends BaseDialog{
     }
 
     /**
-     * @return the width the catalogue column really has: the screen minus the slot rail and the
-     * pane's own margins. Both the rail and the stage are measured in the same units, so no UI
-     * scale enters this number - scaling the rail here double-counted it and cost a column.
+     * @return the width the catalogue column really has: the screen, minus the slot rail with the
+     * room its scrollbar takes, minus the margin the catalogue pane keeps for its own scrollbar.
+     * Rail, catalogue and stage are measured in the same units, so no UI scale enters this number
+     * - scaling the rail here double-counted it and cost a whole column.
      */
     private float catalogueWidth(){
-        return Core.graphics.getWidth() - slotWidth() - Scl.scl(24f);
+        return Core.graphics.getWidth() - slotWidth() - railScrollWidth() - Scl.scl(24f);
     }
 
     /** columns that fit the catalogue pane, not the whole screen: the slot rail takes the rest */

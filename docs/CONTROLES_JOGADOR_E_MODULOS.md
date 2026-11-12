@@ -283,18 +283,33 @@ inset. Sem faixa na tela (casco sem encaixes), a altura medida é 0 e o botão v
 ### 3.8 Menu de módulos: quatro cartões por linha e altura limitada
 
 **[DECISÃO]** Dois problemas de encaixe no Android, ambos corrigidos em
-`TurretLoadoutDialog`:
+`TurretLoadoutDialog`, e ambos medidos com um probe de layout de janela real
+(`ORBITAL_PROBE=1`, hoje removido):
 
 1. **Cartões.** O card media 295/`Scl.scl(1)` unidades e a contagem de colunas escalava a
    largura do trilho duas vezes (`slotWidth() * Scl.scl(1f)`), o que roubava uma coluna e
-   deixava só 3 por linha. Agora o card é `clamp(catalogueWidth()/4 - 8, 84/`Scl.scl(1)`,
-   240/`Scl.scl(1)`) e `columns()` devolve **4** no toque. `catalogueWidth()` subtrai o trilho
-   sem escalar — trilho e palco estão nas mesmas unidades.
+   deixava só 3 por linha. Agora o card é `max(84/`Scl.scl(1)`, catalogueWidth()/4 - 8)` e
+   `columns()` devolve **4** no toque: os quatro preenchem a linha, então o nome do módulo e o
+   tipo de tiro têm espaço e não quebam no meio da palavra. `catalogueWidth()` subtrai o trilho
+   **com o que a barra de rolagem dele toma** e sem escalar — trilho e palco estão nas mesmas
+   unidades, e escalar o trilho aqui cobrava a largura duas vezes.
 2. **Altura.** Um menu mais alto que a tela é cortado nas duas pontas: some o título em cima e
    os encaixes em baixo. O conteúdo agora tem `maxHeight(altura da cena - margens -
    Scl.scl(140))`, o trilho de encaixes rolha na própria coluna (`columns.pane`) em vez de
    empurrar o menu, e o menu abre no começo (`pane.setScrollYForce(0)` em `show`) — o offset
    guardado era do loadout anterior e escondia o nome do casco e o orçamento.
+
+**O trilho continuou desalinhado depois disso**, e o probe mostrou por quê: o `ScrollPane`
+do trilho media `slotWidth()` e a barra de rolagem vertical tomava ~24 unidades da área
+útil, então a área ficava menor que o conteúdo do trilho (340) e o `ScrollPane`
+**centralizava** o widget dentro da área (`slots` aparecia em `x=-11` e vazava dos dois
+lados). Agora o painel mede `slotWidth() + railScrollWidth()` (a largura da barra vem do
+`ScrollPaneStyle.vScroll`) e a tabela do painel é alinhada à esquerda: medido, `slots` fica
+em `x=0, w=340`, com as caixas de 104 e as fileiras de 330 dentro da coluna.
+
+As legendas das caixas de encaixe também não cabiam: `width(boxSize - 12)` com
+`fontScale(1)` no toque quebrava "Sobrecarga" no meio ("Sobrecar ga"). Agora a legenda é
+`width(boxSize - 6)` com `fontScale(0.6)` no toque, e o nome quebra entre palavras.
 
 ### 3.6 Mira automática x manual
 
