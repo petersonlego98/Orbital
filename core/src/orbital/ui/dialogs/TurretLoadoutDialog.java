@@ -46,6 +46,8 @@ public class TurretLoadoutDialog extends BaseDialog{
     private Table list;
     /** the scrolling catalogue pane, kept to restore its offset across rebuilds */
     private @Nullable ScrollPane pane;
+    /** pane width the current layout was built from, or -1 when it came from the estimate */
+    private float builtForPaneWidth = -1f;
     /** the scrolling slot rail, kept to open every visit at the top of the rail */
     private @Nullable ScrollPane rail;
     /** fixed slot rail on the right of the dialog; never scrolls */
@@ -152,6 +154,33 @@ public class TurretLoadoutDialog extends BaseDialog{
         return 24f;
     }
 
+    /**
+     * @return the width the catalogue content can occupy, in <b>cell units</b> - the units that
+     * {@code width()}, {@code size()} and {@code pad()} expect.
+     *
+     * <p>The scene is sized in raw pixels, but arc's {@code Cell.scl()} is {@code Scl.scl()}:
+     * every explicit cell size is multiplied by the UI scale when it is laid out. Measuring the
+     * pane in pixels and handing that number straight to {@code width()} therefore scales it
+     * twice - four cards become ~Scl times wider than the pane, the content table outgrows the
+     * screen, and the whole dialog is clipped on both sides (first card on the left, paragraph
+     * on the right). Dividing by Scl here puts both sides in the same unit.</p>
+     *
+     * <p>The pane's viewport, not the content table, is the reference: a wrapped label without
+     * an explicit width keeps its single-line preferred width and inflates that table past the
+     * pane.</p>
+     */
+    private float cataloguePaneWidth(){
+        float raw = pane != null && pane.getWidth() > 1f
+            ? pane.getWidth() - railScrollWidth()
+            : catalogueWidth();
+        return Math.max(100f, raw / Scl.scl(1f));
+    }
+
+    /** @return a safe width in cell units for a wrapping label inside the catalogue column. */
+    private float textWidth(){
+        return Math.max(100f, cataloguePaneWidth() - 24f);
+    }
+
     public void show(Unit unit, Runnable changed){
         this.unit = unit;
         this.changed = changed;
@@ -170,6 +199,25 @@ public class TurretLoadoutDialog extends BaseDialog{
         Core.app.post(() -> {
             if(isShown()) rebuild();
         });
+        //the post above still runs before the first layout, so both rebuilds work from the
+        //screen estimate; act() below fires the one built from the pane's measured width
+        builtForPaneWidth = -1f;
+    }
+
+    @Override
+    public void act(float delta){
+        super.act(delta);
+        //the rebuilds scheduled from show() run before the pane is ever laid out, so on phones
+        //the card grid and the wrapped paragraphs are built from the fallback estimate - screen
+        //minus rail - which overshoots the dialog because it ignores the title and button rows.
+        //Once the pane reports its real width, rebuild from it. Rotation and split-screen
+        //resizes change the width and retrigger the same path. Desktop is left alone: its
+        //estimate already matches the pane.
+        if(mobile && isShown() && pane != null && pane.getWidth() > 1f
+            && !Mathf.equal(pane.getWidth(), builtForPaneWidth)){
+            builtForPaneWidth = pane.getWidth();
+            rebuild();
+        }
     }
 
     /**
@@ -209,29 +257,35 @@ public class TurretLoadoutDialog extends BaseDialog{
 
         list.image().color(Pal.accent).height(3f).growX().padBottom(8f).row();
         //what the unit already carries, and the rule that follows from it - the catalogue below
-        //only offers turrets that run on that ammo
+        //only offers turrets that run on that ammo. Both lines carry an explicit width: arc's
+        //wrap() keeps the single-line preferred width, so on a narrow pane (phones) the text
+        //would run past the edge and inflate the whole content table instead of wrapping
         list.label(() -> Core.bundle.format("turret.loadout.ammo", ammoText(unit))).color(Color.lightGray)
-            .left().wrap().padBottom(2f).row();
-        list.add("@turret.loadout.ammo.rule").color(Color.lightGray).left().wrap().padBottom(6f).row();
+            .left().width(textWidth()).wrap().padBottom(2f).row();
+        list.add("@turret.loadout.ammo.rule").color(Color.lightGray).left().width(textWidth())
+            .wrap().padBottom(6f).row();
         heading("@turret.loadout.available", turretKeys());
         rebuildTurretGrid();
 
         list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
         heading("@weapon.module.available", weaponKeys());
-        list.add("@weapon.module.hint").color(Color.lightGray).left().wrap().padBottom(6f).row();
+        list.add("@weapon.module.hint").color(Color.lightGray).left().width(textWidth())
+            .wrap().padBottom(6f).row();
         rebuildWeaponGrid();
 
         //wall plates come after the turret catalogue because they take turret space: the player
         //reads the two grids as one budget decision
         list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
         heading("@support.loadout.available", wallKeys());
-        list.add("@support.category.armor.info").color(Color.lightGray).left().wrap().padBottom(6f).row();
+        list.add("@support.category.armor.info").color(Color.lightGray).left().width(textWidth())
+            .wrap().padBottom(6f).row();
         rebuildWallGrid();
 
         list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
         list.add("@support.loadout.installed").style(Styles.outlineLabel).left().padBottom(4f).row();
         //the HUD can switch modules off without reopening this dialog, so read the live state
-        list.label(() -> Core.bundle.get(supportStateKey())).color(Color.lightGray).left().wrap().padBottom(6f).row();
+        list.label(() -> Core.bundle.get(supportStateKey())).color(Color.lightGray)
+            .left().width(textWidth()).wrap().padBottom(6f).row();
         rebuildSupportInstalled();
 
         //A hull that already has an equivalent ability owns that effect permanently. Show it as
@@ -251,13 +305,15 @@ public class TurretLoadoutDialog extends BaseDialog{
                 }).growX().pad(3f).row();
             }
 
-            list.add("@support.loadout.native.locked").color(Color.lightGray).left().padBottom(4f).row();
+            list.add("@support.loadout.native.locked").color(Color.lightGray).left().width(textWidth())
+                .wrap().padBottom(4f).row();
         }
 
         //the catalogue comes last, under its own heading and rule text
         list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
         heading("@support.loadout.available", supportKeys());
-        list.add("@support.loadout.limit").color(Color.lightGray).left().wrap().padBottom(6f).row();
+        list.add("@support.loadout.limit").color(Color.lightGray).left().width(textWidth())
+            .wrap().padBottom(6f).row();
         rebuildSupportGrid();
 
         //restoring the offset keeps a mount or a section toggle from moving the page
@@ -576,10 +632,11 @@ public class TurretLoadoutDialog extends BaseDialog{
             //whatever the aspect ratio of the block sprite
             cell.image(icon).size(slotImg).scaling(Scaling.fit).color(iconColor);
             cell.row();
-            //the caption is as wide as the box allows, and its type is small enough that the
-            //longest category name ("Sobrecarga", "Ponto de defesa") breaks between words
-            //instead of in the middle of one
-            cell.add(label).width(boxSize - 6f).wrap().center().fontScale(mobile ? 0.6f : 0.85f).color(Color.lightGray);
+            //the caption is as wide as the box's inner area allows (the margin takes 4 a side),
+            //and its type is small enough that the longest category name ("Sobrecarga", "Ponto
+            //de defesa") breaks between words instead of in the middle of one
+            cell.add(label).width(boxSize - 12f).wrap().center().labelAlign(Align.center)
+                .fontScale(mobile ? 0.6f : 0.85f).color(Color.lightGray);
         }).size(boxSize).pad(3f).get();
 
         if(click != null){
@@ -1144,7 +1201,8 @@ public class TurretLoadoutDialog extends BaseDialog{
         list.table(row -> {
             row.left();
             row.image(Icon.lockSmall).size(26f).padRight(8f).get().setColor(Pal.gray);
-            row.add(text(key)).color(Color.lightGray).left().wrap();
+            //the width leaves room for the padlock on its left, so the row stays inside the pane
+            row.add(text(key)).color(Color.lightGray).left().width(textWidth() - 34f).wrap();
         }).left().padBottom(4f).row();
     }
 
@@ -1234,13 +1292,14 @@ public class TurretLoadoutDialog extends BaseDialog{
             //A module card is a reading surface, so on phones it keeps a fixed physical size
             //instead of shrinking with the UI scale.
             float unit = 1f / Scl.scl(1f);
-            //Four cards to a row, and the four fill the row: the card is a quarter of the
-            //catalogue column, so the names and the shot types have room to be read instead of
-            //breaking in the middle of a word. The pane is laid out the frame the menu opens, so
-            //the first pass works from the computed column width and the second - the one that
-            //sticks - from the pane's own measured width, which never disagrees with the screen.
-            float available = list.getWidth() > 1f ? list.getWidth() - Scl.scl(12f) : catalogueWidth();
-            cardWidth = Math.max(84f * unit, available / 4f - 8f);
+            //Four cards to a row, and the four must fit: the card is a quarter of the catalogue
+            //column, so the names and the shot types have room to be read instead of breaking in
+            //the middle of a word. The width comes from the pane's viewport - never from the
+            //content table, whose width is inflated by the longest line ever added to it. The
+            //extra subtraction leaves slack so rounding in the inner cells can never push the
+            //fourth card under the slot rail.
+            float available = cataloguePaneWidth() - 12f;
+            cardWidth = Math.max(84f * unit, available / 4f - 12f);
             btnSize = Mathf.clamp(cardWidth * 0.62f, 36f, 190f);
             imgSize = btnSize;
             //two text lines under the icon, so one- and two-line labels still line up
@@ -1258,13 +1317,12 @@ public class TurretLoadoutDialog extends BaseDialog{
     }
 
     /**
-     * @return the width the catalogue column really has: the screen, minus the slot rail with the
-     * room its scrollbar takes, minus the margin the catalogue pane keeps for its own scrollbar.
-     * Rail, catalogue and stage are measured in the same units, so no UI scale enters this number
-     * - scaling the rail here double-counted it and cost a whole column.
+     * @return an estimate of the catalogue column in raw pixels, used only before the first
+     * layout. The rail is a cell width, so it must be scaled before it is subtracted from the
+     * screen; the extra margin stands for the dialog padding the estimate cannot see.
      */
     private float catalogueWidth(){
-        return Core.graphics.getWidth() - slotWidth() - railScrollWidth() - Scl.scl(24f);
+        return Core.graphics.getWidth() - Scl.scl(slotWidth() + railScrollWidth() + 48f);
     }
 
     /** columns that fit the catalogue pane, not the whole screen: the slot rail takes the rest */
@@ -1376,16 +1434,18 @@ public class TurretLoadoutDialog extends BaseDialog{
             }
             cell.row();
             //the name and the role scale with the card: on phones the cards are narrow, and a
-            //full-size label would break the module name in the middle of a word
-            cell.add(name).colspan(2).width(cardWidth - 8f).height(nameLineHeight).wrap().center()
-                .fontScale(mobile ? 0.72f : 1f).padTop(2f).row();
+            //full-size label would break the module name in the middle of a word. The width is
+            //the card's inner width minus slack (the margin already takes 6 a side), and
+            //labelAlign centers the text: cell alignment alone leaves wrapped labels left-set
+            cell.add(name).colspan(2).width(cardWidth - 16f).height(nameLineHeight).wrap().center()
+                .labelAlign(Align.center).fontScale(mobile ? 0.72f : 1f).padTop(2f).row();
             //the role line carries the shot type or the support category, or the lock reason.
             //Both lines have an explicit width and height: a wrapped label without a width has
             //a preferred width of zero, so arc breaks the text after every glyph
             String line = locked != null ? locked : role;
-            cell.add(line == null ? "" : line).colspan(2).width(cardWidth - 8f).height(roleLineHeight)
+            cell.add(line == null ? "" : line).colspan(2).width(cardWidth - 16f).height(roleLineHeight)
                 .color(locked == null ? Color.lightGray : Pal.remove)
-                .fontScale(mobile ? 0.72f : 0.85f).center().wrap().row();
+                .fontScale(mobile ? 0.72f : 0.85f).center().labelAlign(Align.center).wrap().row();
             cell.add(Core.bundle.format("weapon.module.footprint", size, size)).colspan(2)
                 .color(sizeColor(size)).fontScale(mobile ? 0.7f : 0.85f).center();
         }).width(cardWidth).minHeight(cardMinHeight).pad(2f).tooltip(tooltip(name, role, size, cost))

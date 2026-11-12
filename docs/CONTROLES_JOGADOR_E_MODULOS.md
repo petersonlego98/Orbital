@@ -1,7 +1,8 @@
 # Controles do jogador e módulos dorsais — análise, implementação e manual
 
 **Tipo:** relatório de implementação
-**Data:** 11 de novembro de 2026
+**Data:** 11 de novembro de 2026 · **revisão 12 de novembro de 2026:** §3.11 registra o
+dimensionamento atual do menu de módulos/encaixes no Android e revoga três medidas do §3.8.
 **Escopo:** controles de toque para Android, controle físico (gamepad), teclas numéricas dos
 módulos, escolha de arma para atirar e regra de mira automática/manual.
 **Rótulos:** **[FATO]** = verificado no código, com arquivo/linha; **[IMPLEMENTADO]** = entregue
@@ -282,6 +283,10 @@ inset. Sem faixa na tela (casco sem encaixes), a altura medida é 0 e o botão v
 
 ### 3.8 Menu de módulos: quatro cartões por linha e altura limitada
 
+> **Nota de 12/11/2026:** este parágrafo é o registro da sessão de 11/11. As medidas de
+> largura, de legenda e de `cardMetrics()` aqui descritas foram **revistas**; o estado atual e o
+> motivo estão no §3.11. O histórico fica para não perder a cronologia dos diagnósticos.
+
 **[DECISÃO]** Dois problemas de encaixe no Android, ambos corrigidos em
 `TurretLoadoutDialog`, e ambos medidos com um probe de layout de janela real
 (`ORBITAL_PROBE=1`, hoje removido):
@@ -346,6 +351,62 @@ mira herdado**.
 mount que escolhe o próprio alvo (`mountSelfTargets`): a mão do piloto é entrada de mira de
 módulo manual. Um módulo automático mantém a mira que já tinha (o alvo, quando achou) e sem
 alvo não passa a seguir o cursor.
+
+### 3.11 Cuidado permanente: o menu de módulos e encaixes no Android (12/11/2026)
+
+**[FATO]** Três rodadas de screenshots do mesmo menu ("Torres da unidade") no Android, todas
+com o mesmo sintoma (texto de descrição cortado à direita, primeiro card cortado à esquerda,
+quarto card sob o trilho). A causa dominante, confirmada no bytecode do `arc-core`, é de
+**unidade de medida**:
+
+| Onde | Unidade |
+|---|---|
+| `Core.graphics.getWidth()`, `pane.getWidth()`, `list.getWidth()` | **pixel bruto** da cena (`UI.resize` → `scene.resize(largura, altura)` sem divisão) |
+| `Cell.width()`, `.size()`, `.pad()` | **unidade de célula**: `Cell.scl(v)` é `Scl.scl(v)`, aplicado no layout |
+
+Passar um pixel bruto direto para `Cell.width()` **escala duas vezes**. Medido no dispositivo:
+`boxSize = 104` no código vira ~127 px na tela e `.width(360)` do trilho vira ~430 px
+(`Scl ≈ 1,2`); os cards saíam ~20% maiores que o painel, a tabela de conteúdo ficava mais
+larga que a tela e o diálogo era cortado dos dois lados.
+
+**[DECISÃO]** Regra a seguir em qualquer mudança desse menu, **somente no Android**:
+
+1. **Converter antes de usar.** `cataloguePaneWidth()` devolve unidades de célula:
+   largura bruta do painel (ou estimativa) **dividida por `Scl.scl(1f)`**. `catalogueWidth()`
+   (estimativa antes do primeiro layout) subtrai da tela o trilho **já escalado**
+   (`Scl.scl(slotWidth() + railScrollWidth() + 48f)`). `textWidth()`, `cardMetrics()` e
+   `lockedLine()` consomem esse valor sem aplicar Scl de novo.
+2. **Texto longo sempre com largura explícita.** `Cell.wrap()` chama
+   `Label.setWrap(true, false)` (`wrapFit = false`); nesse modo `getPrefWidth()` devolve a
+   **largura da linha única** e um parágrafo sem `.width()` infla a tabela além do painel.
+   `Cell.width(w)` define `minWidth = maxWidth = scl(w)` e o layout limita coluna **e** ator.
+   Para centralizar o texto de um label com wrap, usar `labelAlign(Align.center)` — o
+   `.center()` da célula só posiciona o ator.
+3. **Medir depois do layout.** `show()` e o `Core.app.post()` reconstróem antes do primeiro
+   layout, quando `pane.getWidth()` ainda é 0. O `act()` (somente `mobile`, campo
+   `builtForPaneWidth`) reconstrói uma vez quando a largura real aparece, e de novo em rotação
+   ou tela dividida. Sem isso, a estimativa da tela inteira "gruda" e os cards nunca cabem.
+4. **Não escalar o que já é célula.** O trilho de encaixes (`slotWidth()`, `boxSize`,
+   `railScrollWidth()` nas larguras de célula) já é internamente consistente: **não mexer nele**
+   para corrigir o catálogo. Foi restrição explícita desta sessão.
+5. **Windows intacto.** No desktop `cardWidth = 168f` é fixo — por isso o defeito nunca
+   apareceu lá — e `columns()` foi mantido com a fórmula original. A única mudança visível no
+   Windows é a tradução. Não "aproveitar" para ajustar a geometria do desktop.
+
+**[IMPLEMENTADO]** Arquivos desta rodada: `core/src/orbital/ui/dialogs/TurretLoadoutDialog.java`
+(conversão de unidades, `act()`, larguras dos textos e cards) e
+`core/assets/bundles/bundle_pt_BR.properties` (`weapon.module.available`, `weapon.module.hint`,
+`weapon.module.noavailable`, que apareciam em inglês). O Android fica com **4 cards por linha**;
+o desktop segue com colunas dinâmicas.
+
+**[FATO]** Receita de verificação usada, a repetir em qualquer mudança desse menu:
+`./gradlew :android:assembleDebug` → conferir o **tamanho** do APK (~86,7 MB; um daemon que
+morre no `packageDebug` deixou um APK parcial de 7 MB com saída enganosa) →
+`apksigner verify` → `javap` na classe para confirmar a divisão por Scl → `unzip -p` no bundle
+para confirmar as traduções dentro do APK. Apagar o APK anterior antes de recompilar; se o
+`packageDebug` travar no `zip-cache`, `./gradlew --stop`, remover o intermediário e reconstruir
+com `--no-daemon`. O aceite final é **screenshot no dispositivo**: layout de UI não é coberto
+pela suíte de testes headless.
 
 ### 3.6 Mira automática x manual
 
