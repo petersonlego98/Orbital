@@ -112,9 +112,17 @@ public class TurretLoadoutDialog extends BaseDialog{
         //slot rail on the right, which fills the empty area beside the module grid
         Table columns = new Table();
         columns.left();
-        cont.add(columns).grow().row();
+        //the menu may never be taller than the screen: on a phone the rail alone - slots, anchors
+        //and the supply panel - runs past the display, and a centred menu taller than the stage
+        //is clipped at both ends, which hid the title at the top and the anchors at the bottom
+        cont.add(columns).grow()
+            .maxHeight(Core.scene.getHeight() - Core.scene.marginTop - Core.scene.marginBottom
+                - Scl.scl(140f)).row();
         pane = columns.pane(t -> list = t).grow().scrollX(false).get();
-        columns.add(slots = new Table()).growY().width(slotWidth()).top();
+        //the rail scrolls in its own column: it is a stack that grows with the loadout, and it
+        //must not push the menu off the top of the screen
+        columns.pane(t -> t.add(slots = new Table()).growX().top()).growY().width(slotWidth())
+            .scrollX(false);
 
         buttons.button("@back", Icon.left, this::hide).size(210f, 64f);
         addCloseListener();
@@ -129,6 +137,10 @@ public class TurretLoadoutDialog extends BaseDialog{
         this.unit = unit;
         this.changed = changed;
         armedSlot = -1;
+        //the menu opens at its beginning: the offset still in the pane belongs to the loadout
+        //the player left behind, and starting mid-catalogue hid the hull name, the budget line
+        //and the first heading under the top edge
+        if(pane != null) pane.setScrollYForce(0f);
         rebuild();
         show();
         //the pane width is only known once it is laid out, so the grid is rebuilt with the
@@ -1195,16 +1207,18 @@ public class TurretLoadoutDialog extends BaseDialog{
     private void cardMetrics(){
         if(mobile){
             //A module card is a reading surface, so on phones it keeps a fixed physical size
-            //instead of shrinking with the UI scale: at the 125% default it is 118 units wide,
-            //and at 100% it grows in units so the card on the screen stays just as large.
+            //instead of shrinking with the UI scale.
             float unit = 1f / Scl.scl(1f);
-            cardWidth = 295f * unit;
-            btnSize = 175f * unit;
-            imgSize = 128f * unit;
+            //Four cards to a row: the card is a quarter of the catalogue column, so four always
+            //fit, and the floor keeps the sprite and the two text lines readable on the smallest
+            //phone, where the cap keeps a tablet from stretching the card into a billboard
+            cardWidth = Mathf.clamp(catalogueWidth() / 4f - 8f, 84f * unit, 240f * unit);
+            btnSize = Math.max(36f, cardWidth * 0.62f);
+            imgSize = btnSize;
             //two text lines under the icon, so one- and two-line labels still line up
-            nameLineHeight = 30f * unit;
-            roleLineHeight = 26f * unit;
-            cardMinHeight = 144f * unit;
+            nameLineHeight = Math.max(16f, cardWidth * 0.24f);
+            roleLineHeight = Math.max(14f, cardWidth * 0.22f);
+            cardMinHeight = btnSize + nameLineHeight + roleLineHeight + 34f;
         }else{
             cardWidth = 168f;
             btnSize = 98f;
@@ -1215,18 +1229,24 @@ public class TurretLoadoutDialog extends BaseDialog{
         }
     }
 
+    /**
+     * @return the width the catalogue column really has: the screen minus the slot rail and the
+     * pane's own margins. Both the rail and the stage are measured in the same units, so no UI
+     * scale enters this number - scaling the rail here double-counted it and cost a column.
+     */
+    private float catalogueWidth(){
+        return Core.graphics.getWidth() - slotWidth() - Scl.scl(24f);
+    }
+
     /** columns that fit the catalogue pane, not the whole screen: the slot rail takes the rest */
     private int columns(){
-        float width;
         if(mobile){
-            //list.getWidth() under-reports the space the pane actually offers (margins and the
-            //scroll bar), which on phones cost a whole column. The available width is therefore
-            //computed from the screen minus the rail, so seven modules fit per row.
-            width = Core.graphics.getWidth() - slotWidth() * Scl.scl(1f) - Scl.scl(48f);
-            return Mathf.clamp((int)(width / Scl.scl(cardWidth + 4f)), 3, 7);
+            //four to a row on Android: the card is sized from that quarter of the catalogue, so
+            //the rail and the cards always agree on how many fit
+            return 4;
         }
         //the pane is laid out by the frame it is drawn, so its width is only known the second time
-        width = list.getWidth() > 1f
+        float width = list.getWidth() > 1f
             ? list.getWidth() - Scl.scl(24f)
             : Core.graphics.getWidth() - slotWidth() - Scl.scl(60f);
         return Mathf.clamp((int)(width / Scl.scl(cardWidth + 18f)), 3, 8);

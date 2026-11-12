@@ -372,6 +372,11 @@ public class MobileInput extends InputHandler implements GestureListener{
 
             t.spacerY(() -> showCancel() ? 50f : 0f).row();
 
+            //the dorsal module bar owns the bottom-left corner, so the command buttons are a
+            //column above it: the stack is pinned to the bottom, and this spacer sits between the
+            //buttons and the inset below, so it lifts them clear of the module cells
+            t.spacerY(() -> mobile && ui.hudfrag != null ? ui.hudfrag.moduleBarHeight() + 12f : 0f).row();
+
             //for better looking insets
             t.rect((x, y, w, h) -> {
                 if(Core.scene.marginBottom > 0){

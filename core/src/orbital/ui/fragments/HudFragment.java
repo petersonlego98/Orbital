@@ -64,6 +64,8 @@ public class HudFragment{
     private Unit turretBarUnit;
     /** identity signature of the turret mounts currently drawn in the loadout bar. */
     private long turretBarSignature = Long.MIN_VALUE;
+    /** the framed body of the bottom module bar, kept to measure its height every frame. */
+    private @Nullable Table turretBarBody;
     /** turret add/remove menu for the selected unit. */
     private @Nullable TurretLoadoutDialog turretDialog;
     /** block picker of the enemy-structure tool of the test mode. */
@@ -748,7 +750,11 @@ public class HudFragment{
                         rebuildTurretBar(content, unit);
                     }
                 });
-            }).padLeft(mobile ? 175f : 0f).padBottom(mobile ? 12f : 8f);
+                //kept to measure the bar: the touch command buttons sit above it
+                turretBarBody = bar;
+            //the corner belongs to the modules: the command buttons are a column above this
+            //bar, so nothing is squeezed beside the module cells
+            }).padBottom(mobile ? 12f : 8f);
         });
 
         //analog stick (touch controls only): the hull answers it directly, so dragging the
@@ -1045,6 +1051,17 @@ public class HudFragment{
     /** Forces a rebuild of the bottom bar on the next frame (a mount was added or removed). */
     private void refreshTurretBar(){
         turretBarSignature = Long.MIN_VALUE;
+    }
+
+    /**
+     * @return the height of the bottom module bar on screen right now, or 0 when the bar is not
+     * shown. The touch command buttons sit <b>above</b> the bar, so they are lifted by this
+     * measured height: the corner stays with the modules, and the buttons never cover a cell.
+     */
+    public float moduleBarHeight(){
+        if(turretBarBody == null || !shown() || state.isMenu() || state.isEditor()
+        || !selectedHasTurretBar()) return 0f;
+        return turretBarBody.getHeight();
     }
 
     private void openTurretDialog(Unit unit){

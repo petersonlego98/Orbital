@@ -273,6 +273,29 @@ for(SupportMount mount : unit.supportMounts) ... supportCell(unit, mount, index+
 - As células se repintam a cada frame (`cell.update`), então a estrela e o cinza acompanham a
   escolha feita pelo teclado sem reconstruir a faixa.
 
+**[DECISÃO]** O canto inferior esquerdo é da faixa de módulos no toque. O botão **Comando**
+(`MobileInput.buildUI`) ficava nesse canto e a faixa passava por cima dele (`padLeft` de 175
+unidades), o que espremia as duas coisas. Agora a faixa ocupa o canto e o botão de comando é
+uma coluna **acima** dela: `MobileInput` mede a altura da faixa com
+`HudFragment.moduleBarHeight()` e abre um `spacerY` desse tamanho acima do fundo preto do
+inset. Sem faixa na tela (casco sem encaixes), a altura medida é 0 e o botão volta ao canto.
+
+### 3.8 Menu de módulos: quatro cartões por linha e altura limitada
+
+**[DECISÃO]** Dois problemas de encaixe no Android, ambos corrigidos em
+`TurretLoadoutDialog`:
+
+1. **Cartões.** O card media 295/`Scl.scl(1)` unidades e a contagem de colunas escalava a
+   largura do trilho duas vezes (`slotWidth() * Scl.scl(1f)`), o que roubava uma coluna e
+   deixava só 3 por linha. Agora o card é `clamp(catalogueWidth()/4 - 8, 84/`Scl.scl(1)`,
+   240/`Scl.scl(1)`) e `columns()` devolve **4** no toque. `catalogueWidth()` subtrai o trilho
+   sem escalar — trilho e palco estão nas mesmas unidades.
+2. **Altura.** Um menu mais alto que a tela é cortado nas duas pontas: some o título em cima e
+   os encaixes em baixo. O conteúdo agora tem `maxHeight(altura da cena - margens -
+   Scl.scl(140))`, o trilho de encaixes rolha na própria coluna (`columns.pane`) em vez de
+   empurrar o menu, e o menu abre no começo (`pane.setScrollYForce(0)` em `show`) — o offset
+   guardado era do loadout anterior e escondia o nome do casco e o orçamento.
+
 ### 3.6 Mira automática x manual
 
 **[DECISÃO]** Dono da mira, por módulo:
@@ -359,12 +382,14 @@ O desenho do traço entre disparos (`draw`) passa a usar o ponto mirado no modo 
 | Mira manual | arrastar no mapa / mirar e tocar | mouse | analógico direito |
 | Disparar | toque longo no mapa | botão esquerdo | A / RT / RB |
 | Mira automática | alternar no diálogo de módulos ou no diálogo da arma | idem | — |
+| Comando de unidades | botão **Comando**, acima da faixa de módulos | idem | — |
 | Liga/desliga suporte | tocar a célula numerada | tecla numérica | — |
 
 A faixa de módulos fica no canto inferior esquerdo, acima dos botões de construção, e mostra
 para cada módulo: ícone, número, barra de recarga (arma) ou estado ativo/inativo (suporte). O
 módulo escolhido leva a estrela e a borda acesa; os demais módulos de arma ficam cinza enquanto
-existe uma escolha.
+existe uma escolha. O menu de módulos mostra o catálogo com **quatro cartões por linha** no
+toque e cabe inteiro na tela, com o trilho de encaixes rolando na própria coluna.
 
 ### 4.1 Onde ficam as opções no menu
 
