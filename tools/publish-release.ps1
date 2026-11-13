@@ -37,10 +37,13 @@
 param(
     [Parameter(Mandatory = $true)][string]$Version,
     [string]$Repo,
-    [string]$Commit = "HEAD",
+    [string]$Commit = "",
     [string[]]$Assets,
     [switch]$Latest
 )
+
+#"HEAD" is not a commitish the API accepts: resolve it to the real sha.
+if(-not $Commit){ $Commit = (git rev-parse HEAD) }
 
 $ErrorActionPreference = "Stop"
 
@@ -130,9 +133,18 @@ if($Assets){
         if($existingAsset){
             Send-GitHub Delete "https://api.github.com/repos/$Repo/releases/assets/$($existingAsset.id)" "{}" | Out-Null
         }
+        #PowerShell 5.1 sends -InFile as application/x-www-form-urlencoded, which the
+        #uploads endpoint rejects ("content_type can't be ..."): name the type explicitly.
+        $extension = [System.IO.Path]::GetExtension($asset).ToLower()
+        $contentType = switch($extension){
+            ".zip" { "application/zip" }
+            ".apk" { "application/vnd.android.package-archive" }
+            ".sha256" { "text/plain" }
+            default { "application/octet-stream" }
+        }
         $upload = "https://uploads.github.com/repos/$Repo/releases/$($release.id)/assets?name=$([Uri]::EscapeDataString($name))"
-        Invoke-WebRequest -Uri $upload -Headers $headers -Method Post -InFile $asset -UseBasicParsing | Out-Null
-        Write-Host "Asset:   $name"
+        Invoke-WebRequest -Uri $upload -Headers $headers -Method Post -InFile $asset -ContentType $contentType -UseBasicParsing | Out-Null
+        Write-Host "Asset:   $name ($contentType)"
     }
 }
 
