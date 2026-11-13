@@ -774,6 +774,8 @@ public class TurretLoadoutDialog extends BaseDialog{
                 //aim mode: automatic lets the module pick its own target inside its own range;
                 //manual fires where the pilot aims, which is the default. The button carries
                 //the mode in its icon and its checked state, so no extra text has to fit.
+                //The row is the group of identical mounts ("Duo x2"), so the toggle hands
+                //every copy of this module over at once - see WeaponsComp.sameModule().
                 boolean aims = unit.weaponAimsSelf(weapon);
                 cell.button(aims ? Icon.filter : Icon.move, Styles.clearNoneTogglei, () -> {
                     unit.setWeaponAimsSelf(weapon, !unit.weaponAimsSelf(weapon));

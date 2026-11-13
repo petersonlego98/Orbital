@@ -4,18 +4,18 @@ import arc.graphics.Color;
 import arc.util.Nullable;
 import orbital.ctype.UnlockableContent;
 import orbital.graphics.Pal;
+import orbital.world.consumers.ConsumeLiquidBase;
 
 /**
  * A hull's module supply, as three pools: <b>item ammo</b>, <b>liquid ammo</b> and
  * <b>energy</b>.
  *
  * <p>Each bar sums what every installed module of that kind brings: an item turret adds its
- * own ammo buffer to the item pool, a liquid turret or a liquid support module adds its
- * liquid capacity to the liquid pool, and every power consumer - turret or projector - adds
- * its drain to the energy pool. Each ammo pool is fed by one resource the player picks from
- * what the mounted modules accept, so no part of a supply is stranded behind a turret that
- * can never use it (the same rule {@code WeaponsComp.ammoCompatible()} enforces at mount
- * time).</p>
+ * own ammo buffer to the item pool, a liquid turret or a liquid support module adds its liquid
+ * capacity to the liquid pool, and every power consumer - turret or projector - adds its
+ * drain to the energy pool. The capacities are physical buffers, so they are the sum of every
+ * mounted module's own buffer regardless of which resource the pool is currently fed with;
+ * the chosen resource decides what the pool carries, not how much it holds.</p>
  *
  * <p>Runtime-only. Nothing here is consumed by the game yet: the pools are stored, derived
  * from the installed blocks and read by the loadout menu's bars. Drain on fire, resupply
@@ -119,6 +119,30 @@ public final class ModuleSupply{
     /** @return 0-1 fill of the energy bar. */
     public float energyFraction(){
         return energyCapacity <= 0f ? 0f : Math.min(1f, Math.max(0f, energy / energyCapacity));
+    }
+
+    /**
+     * Spends one tick of a liquid consumer out of this pool and reports how much of it was
+     * satisfied.
+     *
+     * <p>It is the module-side equivalent of the block's own consumer: the liquid must be one
+     * the block accepts, and the cost is the block's per-tick amount. A coolant booster uses
+     * the returned fraction to scale its bonus, exactly like the block scales its efficiency
+     * by the liquid it could draw this tick.</p>
+     *
+     * @return 0 when the pool has none of the liquid, 1 when the tick was fully paid, and a
+     * fraction when the pool ran dry partway through the tick.
+     */
+    public float useLiquid(@Nullable ConsumeLiquidBase consumer, float delta){
+        if(consumer == null || liquid == null || liquidAmount <= 0f || delta <= 0f) return 0f;
+        if(!consumer.consumes(liquid)) return 0f;
+
+        float needed = consumer.amount * delta;
+        if(needed <= 0.0001f) return 1f;
+
+        float used = Math.min(needed, liquidAmount);
+        liquidAmount -= used;
+        return used / needed;
     }
 
     /**

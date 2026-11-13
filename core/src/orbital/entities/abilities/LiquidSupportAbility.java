@@ -29,12 +29,12 @@ import static orbital.Vars.*;
  * carrier happens to be holding. While it sprays it also keeps the support role of the block:
  * it extinguishes burning allies and applies the liquid status to enemies inside the field.</p>
  *
- * <p>{@link #autoTarget} starts <b>true</b>, like every other support module and like the block
- * itself: the jet goes at the closest enemy the block would target, on its own cadence, whether
- * or not the pilot is holding fire. Switching the mode to manual from the loadout dialog makes
- * the jet follow the hull's aim point instead, and it only fires while the hull is firing - but
- * even then the support half below never waits for the fire control, since extinguishing an ally
- * that is burning has nothing to do with the pilot's aim.</p>
+ * <p>{@link #autoTarget} starts <b>false</b>, like every other module of the liquid category:
+ * the jets are piloted, not automatic. The jet only sprays while the hull is firing and follows
+ * the hull's aim point, on both desktop (mouse) and mobile (tap/stick aim). The pilot can hand
+ * the module back to its own targeting from the loadout dialog, and then it sprays at the
+ * closest enemy the block would target. Either way the support half below never waits for the
+ * fire control, since extinguishing an ally that is burning has nothing to do with the aim.</p>
  *
  * <p>Created by {@link orbital.entities.units.SupportMount}; never serialized and lives only
  * in the mount.</p>
@@ -53,10 +53,11 @@ public class LiquidSupportAbility extends Ability implements AimingModule{
     /**
      * When false the pilot drives the jet instead of the module picking its own target: it
      * sprays only while the hull is firing, toward the hull's aim point, and only within the
-     * module's own range. Starts true, so a mounted {@code wave} or {@code tsunami} behaves
-     * like its block; the support role is never gated by this flag.
+     * module's own range. Starts false, so a mounted {@code wave} or {@code tsunami} is a
+     * piloted weapon like every other liquid module; the support role is never gated by this
+     * flag.
      */
-    public boolean autoTarget = true;
+    public boolean autoTarget = false;
 
     /** How fast the turret turns toward its aim, in degrees per tick. */
     public float rotateSpeed = 10f;
@@ -68,12 +69,8 @@ public class LiquidSupportAbility extends Ability implements AimingModule{
     public float muzzleLength = 3f;
 
     protected float timer = 0f;
-    /** last aim, so the beam can be drawn between shots. */
+    /** last aim, so automatic mode knows what it was tracking between shots. */
     protected @Nullable Unit target;
-    /** where a manual shot was aimed, so the beam can be drawn between shots. */
-    protected float drawX, drawY;
-    /** whether a manual shot was fired recently enough to draw its beam. */
-    protected boolean drawing;
 
     public LiquidSupportAbility(float range, float reload){
         this.range = range;
@@ -158,25 +155,24 @@ public class LiquidSupportAbility extends Ability implements AimingModule{
 
         if(timer < reload){
             target = null;
-            drawing = false;
             return;
         }
         timer = 0f;
 
         if(bullet == null){
             target = null;
-            drawing = false;
             return;
         }
 
         //manual: the pilot's fire control is the trigger, and the jet follows the hull's aim
-        //point instead of the module choosing its own target. A hull that carries no weapon at
-        //all has no fire control to hold, so its manual module behaves as automatic instead
-        //of never spraying
+        //point instead of the module choosing its own target. isShooting reflects player.shooting
+        //for player-controlled hulls and mount.shoot for AI, so it is the right gate in both
+        //cases. The old hasWeapons() guard was wrong: a hull with no native weapons still has
+        //isShooting driven by the input layer, so the guard was making the module fire
+        //unconditionally whenever the hull carried no weapon of its own.
         boolean manual = !autoTarget;
-        if(manual && unit.hasWeapons() && !unit.isShooting()){
+        if(manual && !unit.isShooting()){
             target = null;
-            drawing = false;
             return;
         }
 
@@ -193,7 +189,6 @@ public class LiquidSupportAbility extends Ability implements AimingModule{
                 u -> u.checkTarget(targetAir, targetGround) && u.targetable(unit.team));
             if(enemy == null){
                 target = null;
-                drawing = false;
                 return;
             }
 
@@ -228,34 +223,14 @@ public class LiquidSupportAbility extends Ability implements AimingModule{
         bullet.create(unit, unit.team, mx, my, angle, 1f, life);
         shootEffect.at(mx, my, angle, color);
         if(shootSound != Sounds.none) shootSound.at(mx, my, 1f, soundVolume);
-
-        drawX = mx + Angles.trnsx(angle, dst);
-        drawY = my + Angles.trnsy(angle, dst);
-        drawing = true;
     }
 
+    /**
+     * No aim guide is drawn: the jet itself and its shoot effect already show where the module
+     * is pointing. The old line from the dock to the pilot's mouse point was the "rectangle"
+     * that appeared to grow out of the turret, and it also survived between shots.
+     */
     @Override
     public void draw(Unit unit){
-        float dockX = moduleX(unit), dockY = moduleY(unit);
-        float dx, dy;
-
-        if(target != null && target.isAdded() && target.health > 0f){
-            dx = target.x;
-            dy = target.y;
-        }else if(drawing){
-            dx = drawX;
-            dy = drawY;
-        }else{
-            return;
-        }
-
-        float z = unit.type != null && unit.type.lowAltitude ? Layer.flyingUnitLow + 0.1f : Layer.flyingUnit + 0.1f;
-        Draw.z(z);
-        Draw.color(color, 0.7f);
-        Lines.stroke(2.5f);
-        Lines.line(dockX, dockY, dx, dy, false);
-        Lines.stroke(1f);
-        Draw.color(Color.white);
-        Draw.reset();
     }
 }

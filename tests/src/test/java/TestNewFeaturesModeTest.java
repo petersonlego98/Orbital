@@ -1,5 +1,7 @@
+import arc.math.*;
 import orbital.content.*;
 import orbital.game.*;
+import orbital.ui.fragments.HudFragment;
 import orbital.world.*;
 import org.junit.jupiter.api.*;
 
@@ -191,6 +193,43 @@ public class TestNewFeaturesModeTest{
 
         //beginWaves must refuse to run outside the test environment
         assertFalse(TestNewFeaturesMode.beginWaves());
+    }
+
+    /**
+     * The friendly-ship grid has to use the whole width of the pane: the icons spread over the
+     * full row instead of leaving a gap, and they never hide under the vertical scrollbar.
+     */
+    @Test
+    void friendlyShipGridFillsThePaneWithoutHidingUnderTheScrollbar(){
+        float width = 496f, height = 184f, scroll = 24f, preferred = 48f;
+
+        //a grid that fits in the height uses the whole width: no scrollbar is drawn
+        float[] fits = HudFragment.unitGridLayout(width, height, 10, preferred, scroll);
+        assertEquals(width, (int)fits[0] * fits[1], 0.01f,
+            "a grid that fits in the height has to span the whole width of the pane");
+
+        //a grid that does not fit keeps room for the scrollbar, so no icon is hidden under it
+        float[] packed = HudFragment.unitGridLayout(width, height, 60, preferred, scroll);
+        int columns = (int)packed[0];
+        float cell = packed[1];
+        assertTrue(columns * cell <= width - scroll + 0.01f,
+            "the grid must stay clear of the vertical scrollbar");
+        assertTrue(columns * cell > width - scroll - preferred,
+            "the grid must still use the width the pane has");
+        assertTrue(Mathf.ceil(60 / (float)columns) * cell > height,
+            "that grid has to overflow the pane, so it really needs the scrollbar");
+
+        //the real catalog, on both platforms, may not run under the scrollbar either
+        int count = TestNewFeaturesMode.aerialTypes().size;
+        assertTrue(count > 0);
+        float[] desktop = HudFragment.unitGridLayout(width, height, count, preferred, scroll);
+        assertTrue((int)desktop[0] * desktop[1] <= width - scroll + 0.01f,
+            "the desktop grid must stay clear of the vertical scrollbar");
+        //on mobile the ui is scaled up, so the same 24 raw pixels take fewer ui units
+        float mobileScroll = 24f / 2.5f;
+        float[] mobile = HudFragment.unitGridLayout(376f, 138f, count, 40f, mobileScroll);
+        assertTrue((int)mobile[0] * mobile[1] <= 376f - mobileScroll + 0.01f,
+            "the mobile grid must stay clear of the vertical scrollbar");
     }
 
     private static void createFlatMap(int width, int height){

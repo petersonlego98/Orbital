@@ -641,6 +641,9 @@ public class SupportModuleEffectsTest{
             unit.set(384f, 384f);
             SupportMount mount = unit.mountSupport(Blocks.wave);
             assertNotNull(mount);
+            //the jets start piloted, so hand this module back to its own targeting: the tank
+            //check needs it to spray with the hull idle, then rest when the target is gone
+            unit.setModuleAuto(unit.moduleCount() - 1, true);
 
             var supply = unit.moduleSupply();
             supply.setResource(Liquids.water);
@@ -805,6 +808,83 @@ public class SupportModuleEffectsTest{
             assertTrue(unit.shield > 0f, "the force module must give the carrier a shield; block shield=" + force.shieldHealth);
         }finally{
             unit.remove();
+            Groups.unit.update();
+        }
+    }
+
+    @Test
+    void forceModuleFeedsOnCoolantAndRegeneratesFaster(){
+        Unit unit = carrier();
+
+        try{
+            SupportMount mount = unit.mountSupport(Blocks.forceProjector);
+            assertNotNull(mount);
+            assertTrue(mount.ability instanceof ForceFieldAbility);
+            ForceFieldAbility field = (ForceFieldAbility)mount.ability;
+
+            ModuleSupply supply = unit.moduleSupply();
+            assertNotNull(supply.liquid, "the force projector must feed the liquid pool with coolant");
+            assertEquals(ModuleSupplies.liquidCapacity(Blocks.forceProjector), supply.liquidCapacity, 0.001f,
+                "the projector's own liquid buffer must size the bar");
+            assertTrue(ModuleSupplies.acceptsSupportLiquid(Blocks.forceProjector, Liquids.water),
+                "water must be accepted as coolant");
+
+            supply.setResource(Liquids.water);
+            unit.refreshModuleSupply();
+            supply.liquidAmount = supply.liquidCapacity;
+
+            unit.shield = field.scaledMax(unit) * 0.5f;
+            float shieldBefore = unit.shield, liquidBefore = supply.liquidAmount;
+
+            tick(mount, unit, 1f);
+
+            assertTrue(supply.liquidAmount < liquidBefore,
+                "rebuilding the shield must spend coolant from the hull pool");
+            float expected = field.regen * field.coolantMultiplier
+                * (1f + (Liquids.water.heatCapacity - 0.4f) * 0.9f);
+            assertEquals(expected, unit.shield - shieldBefore, 0.02f,
+                "the block's coolant multiplier must speed the shield up");
+        }finally{
+            unit.remove();
+            Groups.unit.update();
+        }
+    }
+
+    @Test
+    void repairTurretModuleFeedsOnCoolantAndHealsFaster(){
+        Unit unit = carrier();
+        Unit ally = damagedAlly(unit);
+
+        try{
+            SupportMount mount = unit.mountSupport(Blocks.repairTurret);
+            assertNotNull(mount);
+            assertTrue(mount.ability instanceof RepairBeamAbility);
+            RepairBeamAbility beam = (RepairBeamAbility)mount.ability;
+
+            ModuleSupply supply = unit.moduleSupply();
+            assertNotNull(supply.liquid, "the repair turret must feed the liquid pool with coolant");
+            assertEquals(ModuleSupplies.liquidCapacity(Blocks.repairTurret), supply.liquidCapacity, 0.001f,
+                "the repair turret's own liquid buffer must size the bar");
+            assertTrue(ModuleSupplies.acceptsSupportLiquid(Blocks.repairTurret, Liquids.water),
+                "water must be accepted as coolant");
+
+            supply.setResource(Liquids.water);
+            unit.refreshModuleSupply();
+            supply.liquidAmount = supply.liquidCapacity;
+
+            float healthBefore = ally.health, liquidBefore = supply.liquidAmount;
+
+            tick(mount, unit, 1f);
+
+            assertTrue(supply.liquidAmount < liquidBefore,
+                "healing must spend coolant from the hull pool");
+            float expected = beam.repairSpeed * (1f + Liquids.water.heatCapacity * beam.coolantMultiplier);
+            assertEquals(expected, ally.health - healthBefore, 0.02f,
+                "the block's coolant multiplier must boost the repair speed");
+        }finally{
+            ally.remove();
+            unit.remove();
+            state.teams.updateTeamStats();
             Groups.unit.update();
         }
     }

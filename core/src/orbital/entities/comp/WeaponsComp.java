@@ -155,37 +155,44 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     }
 
     /**
-     * @return every liquid accepted as ammo by a mounted module, in content order and without
-     * repeats.
+     * @return every liquid a mounted module can draw from the hull's pool, in content order
+     * and without repeats.
      *
-     * <p>The liquids of the liquid modules the hull could still host come along, so the pool's
-     * resource can be chosen before one is installed - the menu offers the liquid picker from
-     * the first module added, not only after a wave or a tsunami is mounted. Liquid modules
-     * draw from no item supply, so listing them in advance strands nothing.</p>
+     * <p>For turret modules this is their ammo (a liquid turret's spray) plus their own coolant;
+     * for support modules it also includes required liquids, so the {@code force-projector} and
+     * the {@code repair-turret} receive the same liquid they would receive as blocks. The liquids
+     * of the liquid modules the hull could still host come along, so the pool's resource can be
+     * chosen before one is installed - the menu offers the liquid picker from the first module
+     * added, not only after a wave or a tsunami is mounted. Liquid modules draw from no item
+     * supply, so listing them in advance strands nothing.</p>
      */
     private Seq<Liquid> acceptedLiquids(){
         Seq<Liquid> options = new Seq<>(Liquid.class);
         for(WeaponMount mount : mounts){
             if(!(mount.weapon instanceof TurretWeapon turret)) continue;
-            for(Liquid liquid : ModuleSupplies.liquids(turret.turret)){
+            //a turret module's ammo liquid (a liquid turret) plus its own coolant: the coolant
+            //buffer the block carries is real hull storage, so its liquids are on offer too
+            for(Liquid liquid : ModuleSupplies.supportLiquids(turret.turret)){
                 if(!options.contains(liquid, true)) options.add(liquid);
             }
         }
         for(SupportMount mount : supports()){
             if(mount.block == null) continue;
-            for(Liquid liquid : ModuleSupplies.liquids(mount.block)){
+            for(Liquid liquid : ModuleSupplies.supportLiquids(mount.block)){
                 if(!options.contains(liquid, true)) options.add(liquid);
             }
         }
         for(Block block : content.blocks()){
-            if(!(block instanceof LiquidTurret) || !SupportModuleCategory.isSupport(block)) continue;
+            //any support block that takes liquid: liquid turrets (wave/tsunami) and blocks
+            //that use coolant, such as the force-projector and the repair-turret
+            if(!SupportModuleCategory.isSupport(block) || ModuleSupplies.liquidCapacity(block) <= 0f) continue;
             SupportModuleCategory category = SupportModuleCategory.of(block);
             if(category == null || type == null) continue;
             //a category already taken cannot gain a second module, so its liquids are not on
             //offer - picking one would leave a pool no installed module can draw from
             if(hasSupportCategory(category) || type.hasNativeSupport(category)) continue;
             if(!type.hasAnchorFor(category, block.size)) continue;
-            for(Liquid liquid : ModuleSupplies.liquids(block)){
+            for(Liquid liquid : ModuleSupplies.supportLiquids(block)){
                 if(!options.contains(liquid, true)) options.add(liquid);
             }
         }
@@ -220,10 +227,11 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     }
 
     /**
-     * Recomputes the three supply pools from the modules installed right now: each ammo pool
-     * sums the buffers of the modules that use it, and the energy pool sums every module's
-     * power drain. Called after every mount and removal, so the bars never disagree with the
-     * loadout.
+     * Recomputes the three supply pools from the modules installed right now: each bar sums the
+     * own buffers of every module of its kind, and the energy pool sums every module's power
+     * drain. The chosen resource only decides what the pool is fed with, never how much it
+     * holds, so the capacities do not depend on it. Called after every mount and removal, so
+     * the bars never disagree with the loadout.
      *
      * <p>A chosen resource survives while it is still on offer; a pool whose resource stopped
      * being carried (its turret was removed) falls back to the first remaining one.</p>
@@ -242,17 +250,21 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         }
 
         float ammo = 0f, liquid = 0f, energy = 0f;
-        //every module of a kind adds to its own bar: turret modules and support modules alike
+        //every module of a kind adds its own buffer to its bar, no matter which resource the
+        //pool is currently fed with: capacity is a physical property of the installed modules,
+        //so the bar must read the sum of all of them. A turret module's liquid buffer is the
+        //coolant tank the block carries (Duo 0.1/tick, Lancer 0.2/tick, ...), so it counts
+        //toward the liquid bar exactly like any other module's own storage.
         for(WeaponMount mount : mounts){
             if(!(mount.weapon instanceof TurretWeapon turret)) continue;
-            if(ModuleSupplies.accepts(turret.turret, supply.item)) ammo += ModuleSupplies.ammoCapacity(turret.turret);
-            if(ModuleSupplies.accepts(turret.turret, supply.liquid)) liquid += ModuleSupplies.liquidCapacity(turret.turret);
+            ammo += ModuleSupplies.ammoCapacity(turret.turret);
+            liquid += ModuleSupplies.liquidCapacity(turret.turret);
             energy += ModuleSupplies.energyCapacity(turret.turret);
         }
         for(SupportMount mount : supports()){
             if(mount.block == null) continue;
-            if(ModuleSupplies.accepts(mount.block, supply.item)) ammo += ModuleSupplies.ammoCapacity(mount.block);
-            if(ModuleSupplies.accepts(mount.block, supply.liquid)) liquid += ModuleSupplies.liquidCapacity(mount.block);
+            ammo += ModuleSupplies.ammoCapacity(mount.block);
+            liquid += ModuleSupplies.liquidCapacity(mount.block);
             energy += ModuleSupplies.energyCapacity(mount.block);
         }
 
@@ -841,10 +853,18 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         autoAimModules.remove(weapon);
         //the module the pilot picked no longer exists: the rest of the loadout keeps its
         //selection only while the chosen module is still mounted, otherwise the hull would
-        //silence itself for a module that is no longer there
-        if(selectedModule == weapon){
-            selectedModule = null;
-            disarmedModules.clear();
+        //silence itself for a module that is no longer there. A group keeps its selection
+        //while another copy of it is mounted - dropping one Duo of two does not un-pick Duo
+        if(selectedModule != null && sameModule(selectedModule, weapon)){
+            Weapon survivor = null;
+            for(WeaponMount other : mounts){
+                if(sameModule(other.weapon, selectedModule) && !disarmedModules.contains(other.weapon)){
+                    survivor = other.weapon;
+                    break;
+                }
+            }
+            selectedModule = survivor;
+            if(survivor == null) disarmedModules.clear();
         }
         refreshModuleSupply();
         return true;
@@ -854,34 +874,81 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
 
     /**
      * @return how many switchable modules this unit carries, in the order the bottom module
-     * bar draws them: every weapon mount that occupies a dorsal position, then every support
+     * bar draws them: <b>one per group of identical dorsal weapons</b>, then every support
      * module. Wall plates are not counted - a plate defends while it is mounted, so it has
      * nothing to switch.
+     *
+     * <p>A hull with three Duo modules counts three weapon mounts in {@code mounts} but reports
+     * <b>one</b> module here: the bar draws one cell for the group, and the number keys point
+     * at the group, so the pilot never has to press the same key three times.</p>
      */
     public int moduleCount(){
-        int count = 0;
-        for(WeaponMount mount : mounts){
-            if(mount.weapon.isTurretMount()) count++;
-        }
+        int count = moduleGroups().size;
         for(SupportMount mount : supports()){
             if(mount != null && mount.block != null) count++;
         }
         return count;
     }
 
-    /** @return the name of the module at this position, or null when there is none. */
-    public @Nullable String moduleName(int index){
-        int i = 0;
+    /**
+     * @return one representative weapon per group of identical dorsal weapons, in the order
+     * the bottom module bar draws them (first occurrence of each kind).
+     *
+     * <p>This is the model of the bar itself: one cell per group. Everything the pilot can
+     * address - the number keys, a touch on a cell, the loadout rows that map to it - walks
+     * this list, so two Duo mounted are one module with two copies.</p>
+     */
+    public Seq<Weapon> moduleGroups(){
+        Seq<Weapon> groups = new Seq<>(Weapon.class);
         for(WeaponMount mount : mounts){
             if(!mount.weapon.isTurretMount()) continue;
-            if(i++ == index) return mount.weapon.moduleDisplayName != null && !mount.weapon.moduleDisplayName.isEmpty()
-                ? mount.weapon.moduleDisplayName : mount.weapon.name;
+            boolean seen = false;
+            for(Weapon group : groups){
+                if(sameModule(group, mount.weapon)){ seen = true; break; }
+            }
+            if(!seen) groups.add(mount.weapon);
         }
+        return groups;
+    }
+
+    /** @return how many copies of this module kind are mounted on the hull. */
+    public int moduleCopies(Weapon weapon){
+        int copies = 0;
+        for(WeaponMount mount : mounts){
+            if(sameModule(mount.weapon, weapon)) copies++;
+        }
+        return copies;
+    }
+
+    /**
+     * @return the weapon module occupying this bar position, or null when the position is a
+     * support module (or past the end of the bar).
+     */
+    private @Nullable Weapon weaponModule(int index){
+        Seq<Weapon> groups = moduleGroups();
+        return index >= 0 && index < groups.size ? groups.get(index) : null;
+    }
+
+    /** @return the support module occupying this bar position, or null when none does. */
+    private @Nullable SupportMount supportModule(int index){
+        int i = index - moduleGroups().size;
+        if(i < 0) return null;
         for(SupportMount mount : supports()){
             if(mount == null || mount.block == null) continue;
-            if(i++ == index) return mount.block.localizedName;
+            if(i-- == 0) return mount;
         }
         return null;
+    }
+
+    /** @return the name of the module at this position, or null when there is none. */
+    public @Nullable String moduleName(int index){
+        Weapon weapon = weaponModule(index);
+        if(weapon != null){
+            return weapon.moduleDisplayName != null && !weapon.moduleDisplayName.isEmpty()
+                ? weapon.moduleDisplayName : weapon.name;
+        }
+        SupportMount mount = supportModule(index);
+        return mount == null ? null : mount.block.localizedName;
     }
 
     /**
@@ -890,16 +957,11 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * A support module reports whether its effect runs.
      */
     public boolean moduleActive(int index){
-        int i = 0;
-        for(WeaponMount mount : mounts){
-            if(!mount.weapon.isTurretMount()) continue;
-            if(i++ == index) return !disarmedModules.contains(mount.weapon);
-        }
-        for(SupportMount mount : supports()){
-            if(mount == null || mount.block == null) continue;
-            if(i++ == index) return mount.active;
-        }
-        return false;
+        Weapon weapon = weaponModule(index);
+        if(weapon != null) return !disarmedModules.contains(weapon);
+
+        SupportMount mount = supportModule(index);
+        return mount != null && mount.active;
     }
 
     /**
@@ -908,12 +970,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * index past the end of the bar.
      */
     public boolean moduleFires(int index){
-        int i = 0;
-        for(WeaponMount mount : mounts){
-            if(!mount.weapon.isTurretMount()) continue;
-            if(i++ == index) return true;
-        }
-        return false;
+        return weaponModule(index) != null;
     }
 
     /** @return the dorsal weapon module the pilot picked, or null when every module fires. */
@@ -924,20 +981,16 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     /** @return whether the module at this position is the one the pilot picked to fire. */
     public boolean moduleSelected(int index){
         if(selectedModule == null) return false;
-        int i = 0;
-        for(WeaponMount mount : mounts){
-            if(!mount.weapon.isTurretMount()) continue;
-            if(i++ == index) return mount.weapon == selectedModule;
-        }
-        return false;
+        Weapon weapon = weaponModule(index);
+        return weapon != null && sameModule(weapon, selectedModule);
     }
 
     /**
      * Picks the module at this position as the <b>only one to fire</b>: every other weapon
      * module of this hull is silenced - it stays mounted, keeps its slot, anchor, category and
-     * dorsal budget and keeps tracking the aim, it just never shoots - while the chosen one is
-     * armed and fires. Picking the same module again releases the selection, and every weapon
-     * module fires together again.
+     * dorsal budget and keeps tracking the aim, it just never shoots - while the chosen module
+     * and <b>every copy of it</b> are armed and fire. Picking the same module again releases the
+     * selection, and every weapon module fires together again.
      *
      * <p>The gesture is what the bottom bar cells and the module number keys both call, so the
      * two always agree on which module is shooting.</p>
@@ -948,30 +1001,26 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     public boolean selectModule(int index){
         if(!moduleFires(index)) return toggleModule(index);
 
-        int i = 0;
-        for(WeaponMount mount : mounts){
-            if(!mount.weapon.isTurretMount()) continue;
-            if(i++ != index) continue;
+        Weapon weapon = weaponModule(index);
+        if(weapon == null) return false;
 
-            //the same module again: the pilot lets every weapon module fire again
-            if(mount.weapon == selectedModule){
-                releaseSelection();
-                return false;
-            }
-
-            //a fresh pick silences the rest of the loadout and arms this one
-            for(WeaponMount other : mounts){
-                if(!other.weapon.isTurretMount()) continue;
-                if(other.weapon == mount.weapon){
-                    disarmedModules.remove(other.weapon);
-                }else{
-                    disarmedModules.add(other.weapon);
-                }
-            }
-            selectedModule = mount.weapon;
-            return true;
+        //the same module again: the pilot lets every weapon module fire again
+        if(selectedModule != null && sameModule(selectedModule, weapon)){
+            releaseSelection();
+            return false;
         }
-        return false;
+
+        //a fresh pick silences the rest of the loadout and arms every copy of this module
+        for(WeaponMount other : mounts){
+            if(!other.weapon.isTurretMount()) continue;
+            if(sameModule(other.weapon, weapon)){
+                disarmedModules.remove(other.weapon);
+            }else{
+                disarmedModules.add(other.weapon);
+            }
+        }
+        selectedModule = weapon;
+        return true;
     }
 
     /** Drops the pilot selection and lets every weapon module fire again. */
@@ -992,18 +1041,10 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     public boolean toggleModule(int index){
         if(moduleFires(index)) return selectModule(index);
 
-        int i = 0;
-        for(WeaponMount mount : mounts){
-            if(mount.weapon.isTurretMount()) i++;
-        }
-        for(SupportMount mount : supports()){
-            if(mount == null || mount.block == null) continue;
-            if(i++ == index){
-                mount.setActive(self(), !mount.active);
-                return mount.active;
-            }
-        }
-        return false;
+        SupportMount mount = supportModule(index);
+        if(mount == null) return false;
+        mount.setActive(self(), !mount.active);
+        return mount.active;
     }
 
     /**
@@ -1015,47 +1056,31 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * dialog.</p>
      */
     public boolean moduleAuto(int index){
-        int i = 0;
-        for(WeaponMount mount : mounts){
-            if(!mount.weapon.isTurretMount()) continue;
-            if(i++ == index) return autoAimModules.contains(mount.weapon);
-        }
-        for(SupportMount mount : supports()){
-            if(mount == null || mount.block == null) continue;
-            if(i++ == index) return mount.autoTarget;
-        }
-        return false;
+        Weapon weapon = weaponModule(index);
+        if(weapon != null) return autoAimModules.contains(weapon);
+
+        SupportMount mount = supportModule(index);
+        return mount != null && mount.autoTarget;
     }
 
     /**
      * Switches the module at this position between automatic targeting (it picks its own
      * target inside its own range and filters) and manual targeting (it fires where the pilot
-     * aims). Support modules only change their aim, never their on/off state.
+     * aims). Every mounted copy of the same module kind switches with it. Support modules only
+     * change their aim, never their on/off state.
      *
      * @return true when the mode actually changed.
      */
     public boolean setModuleAuto(int index, boolean auto){
-        int i = 0;
-        for(WeaponMount mount : mounts){
-            if(!mount.weapon.isTurretMount()) continue;
-            if(i++ == index){
-                if(auto){
-                    return autoAimModules.add(mount.weapon);
-                }else{
-                    return autoAimModules.remove(mount.weapon);
-                }
-            }
-        }
-        for(SupportMount mount : supports()){
-            if(mount == null || mount.block == null) continue;
-            if(i++ == index){
-                if(mount.autoTarget == auto) return false;
-                //the effect follows the flag: the liquid jet reads its own copy
-                mount.setAutoTarget(auto);
-                return true;
-            }
-        }
-        return false;
+        Weapon weapon = weaponModule(index);
+        if(weapon != null) return setWeaponAimsSelf(weapon, auto);
+
+        SupportMount mount = supportModule(index);
+        if(mount == null) return false;
+        if(mount.autoTarget == auto) return false;
+        //the effect follows the flag: the liquid jet reads its own copy
+        mount.setAutoTarget(auto);
+        return true;
     }
 
     /**
@@ -1066,15 +1091,71 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         return autoAimModules.contains(mount.weapon);
     }
 
+    /**
+     * @return whether two mounted weapons are the same module kind: two copies of the same
+     * turret block, or two copies of the same hull weapon taken from the same unit type.
+     *
+     * <p>The loadout menu lists identical modules as a single row ("Duo ×2"), so a choice made
+     * on that row means the same thing for every copy of it. This is what makes the aim mode
+     * one decision for the whole group instead of a different state per physical mount; native
+     * hull weapons are never grouped, because each one is its own hardpoint.</p>
+     */
+    public static boolean sameModule(Weapon a, Weapon b){
+        if(a == b) return true;
+        if(a == null || b == null || !a.removable || !b.removable) return false;
+        if(a instanceof TurretWeapon ta && b instanceof TurretWeapon tb) return ta.turret == tb.turret;
+        return a.dorsalSourceWeapon != null && a.dorsalSourceWeapon == b.dorsalSourceWeapon
+            && a.dorsalSource == b.dorsalSource;
+    }
+
+    /** @return the first weapon mount carrying this weapon, or null when it is not mounted. */
+    public @Nullable WeaponMount mountOf(Weapon weapon){
+        if(weapon == null) return null;
+        for(WeaponMount mount : mounts){
+            if(mount.weapon == weapon) return mount;
+        }
+        return null;
+    }
+
+    /** @return the first weapon mount carrying a weapon of this module kind, or null. */
+    public @Nullable WeaponMount representativeMountOf(Weapon weapon){
+        if(weapon == null) return null;
+        for(WeaponMount mount : mounts){
+            if(sameModule(mount.weapon, weapon)) return mount;
+        }
+        return null;
+    }
+
+    /** @return every mounted weapon of the same kind as this one, including itself. */
+    public Seq<Weapon> sameModules(Weapon weapon){
+        Seq<Weapon> matches = new Seq<>(Weapon.class);
+        if(weapon == null) return matches;
+        for(WeaponMount mount : mounts){
+            if(sameModule(mount.weapon, weapon)) matches.add(mount.weapon);
+        }
+        return matches;
+    }
+
     /** @return whether this weapon aims by itself (automatic targeting). */
     public boolean weaponAimsSelf(Weapon weapon){
         return autoAimModules.contains(weapon);
     }
 
-    /** Switches one weapon between automatic targeting and manual targeting. */
+    /**
+     * Switches a module between automatic targeting and manual targeting, for <b>every</b>
+     * mounted copy of it: identical weapons are one module as far as the pilot is concerned,
+     * so the row in the loadout menu that says "Duo ×2" hands both over at once. Without this,
+     * only the copy the menu happened to pick changed, and the rest kept aiming at the hand.
+     *
+     * @return whether any mounted weapon changed its aim mode.
+     */
     public boolean setWeaponAimsSelf(Weapon weapon, boolean auto){
         if(weapon == null) return false;
-        return auto ? autoAimModules.add(weapon) : autoAimModules.remove(weapon);
+        boolean any = false;
+        for(Weapon same : sameModules(weapon)){
+            any |= auto ? autoAimModules.add(same) : autoAimModules.remove(same);
+        }
+        return any;
     }
 
     /** @return whether this weapon is switched off: mounted, tracking, but never firing. */

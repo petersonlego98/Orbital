@@ -50,6 +50,11 @@ public class HudFragment{
 
     private String hudText = "";
     private boolean showHudText;
+    //keeps the friendly-ships panel expanded across frames; collapsed when the player taps its header
+    private boolean testFeaturesUnitsExpanded = true;
+    //signature of the test-features panel content: the content is rebuilt when it changes, because
+    //the panel's table is built once and keeps its children afterwards
+    private long testFeaturesContentSignature = Long.MIN_VALUE;
 
     private Table lastUnlockTable;
     private Table lastUnlockLayout;
@@ -779,45 +784,163 @@ public class HudFragment{
             t.visible(() -> shown() && state.isGame() && TestNewFeaturesMode.active());
             t.table(Styles.black6, panel -> {
                 panel.margin(8f).top().left();
-                panel.add("@mode.testfeatures.units").style(Styles.outlineLabel).left().padBottom(5f).row();
-                panel.pane(scroll -> {
-                    scroll.left().top();
-                    //columns follow the pane width, so phones show more than four units per row
-                    float width = Core.graphics.getWidth() * (mobile ? 0.22f : 0.28f);
-                    int columns = Mathf.clamp((int)(width / Scl.scl(46f)), 4, 7);
-                    int index = 0;
-                    float btnSize = mobile ? 36f : 44f;
-                    float imgSize = mobile ? 26f : 32f;
-                    for(UnitType type : TestNewFeaturesMode.aerialTypes()){
-                        var btn = scroll.button(new TextureRegionDrawable(type.uiIcon), Styles.selecti, () -> {
-                            if(!TestNewFeaturesMode.spawn(type)){
-                                ui.showInfoToast(Core.bundle.get("mode.testfeatures.limit", "Unit cap reached or no valid spawn location."), 3f);
-                            }
-                        }).size(btnSize).tooltip(type.localizedName).pad(2f).get();
-                        btn.resizeImage(imgSize);
-                        if(++index % columns == 0) scroll.row();
+                float width = mobile ? 188f : 248f;
+
+                //header: title + collapse/expand toggle (always visible)
+                Table header = new Table();
+                header.left();
+                header.add("@mode.testfeatures.units").style(Styles.outlineLabel).padBottom(5f);
+                header.add().growX();
+                header.button(testFeaturesUnitsExpanded ? Icon.upOpen : Icon.downOpen, Styles.squareTogglei, () -> {
+                    testFeaturesUnitsExpanded = !testFeaturesUnitsExpanded;
+                    //the content lives in its own table that is rebuilt when this flag changes
+                    testFeaturesContentSignature = Long.MIN_VALUE;
+                }).update(i -> i.getStyle().imageUp = testFeaturesUnitsExpanded ? Icon.upOpen : Icon.downOpen)
+                    .size(mobile ? 48f : 40f).padLeft(6f).padTop(2f);
+                panel.add(header).growX().left().padBottom(5f).row();
+
+                //the collapsible content: rebuilt only when the expanded flag flips, so the panel
+                //does not flicker every frame
+                Table content = new Table();
+                content.left();
+                panel.add(content).growX().left().row();
+                content.update(() -> {
+                    if(testFeaturesContentSignature != (testFeaturesUnitsExpanded ? 1L : 0L)){
+                        testFeaturesContentSignature = testFeaturesUnitsExpanded ? 1L : 0L;
+                        rebuildTestFeaturesContent(content, width);
                     }
-                }).size(mobile ? 188f : 248f, mobile ? 138f : 184f).top().left().row();
-                panel.button("@mode.testfeatures.setup.button", Icon.settings, TestNewFeaturesMode::openSetup)
-                    .width(mobile ? 188f : 248f).height(34f).padTop(4f).left()
-                    .visible(() -> !TestNewFeaturesMode.wavesStarted).row();
-                panel.add("@mode.testfeatures.modules").color(Pal.accent).left().padTop(6f).row();
-                panel.label(() -> {
-                    Unit unit = selectedUnit();
-                    return unit == null ? Core.bundle.get("mode.testfeatures.modules.none")
-                        : Core.bundle.format("mode.testfeatures.modules.target", unit.type.localizedName);
-                }).color(Color.lightGray).width(mobile ? 188f : 248f).wrap().left().row();
-                panel.button("@mode.testfeatures.modules.open", () -> openTurretDialog(selectedUnit()))
-                    .width(mobile ? 188f : 248f).height(34f).padTop(4f).left()
-                    .disabled(b -> {
-                        Unit unit = selectedUnit();
-                        return unit == null || unit.type.turretSlots.isEmpty();
-                    });
-                buildEnemyBuildings(panel);
+                });
             }).pad(4f);
         });
 
         buildEnemyBuildPlacer(parent);
+    }
+
+    /**
+     * Fills the collapsible part of the test-features panel: the friendly-ship grid, the setup
+     * button, the module section and the enemy-structure section.
+     *
+     * <p>When the panel is collapsed the content is empty, so only the header stays on screen.
+     * The method is called again whenever the player folds or unfolds the panel.</p>
+     *
+     * <p>The grid sits on its own row, above the lower part, and is as wide as both columns of
+     * that lower part (modules on the left, enemy buildings on the right). It therefore takes
+     * the whole width of the panel without ever reaching the enemy-buildings section.</p>
+     */
+    private void rebuildTestFeaturesContent(Table content, float width){
+        content.clearChildren();
+        content.left();
+
+        if(!testFeaturesUnitsExpanded) return;
+
+        //the lower part has two columns of the same width, so the grid above them is twice as wide
+        float gridWidth = width * 2f;
+        float gridHeight = mobile ? 138f : 184f;
+
+        content.pane(scroll -> {
+            scroll.left().top();
+            buildUnitGrid(scroll, gridWidth, gridHeight);
+        }).size(gridWidth, gridHeight).top().left().row();
+
+        //lower part: the module column on the left, the enemy buildings on the right
+        Table lower = new Table();
+        lower.left();
+        content.add(lower).growX().left().row();
+
+        Table modules = new Table();
+        modules.left();
+        lower.add(modules).width(width).left().top();
+        modules.button("@mode.testfeatures.setup.button", Icon.settings, TestNewFeaturesMode::openSetup)
+            .width(width).height(34f).padTop(4f).left()
+            .visible(() -> !TestNewFeaturesMode.wavesStarted).row();
+        modules.add("@mode.testfeatures.modules").color(Pal.accent).left().padTop(6f).row();
+        modules.label(() -> {
+            Unit unit = selectedUnit();
+            return unit == null ? Core.bundle.get("mode.testfeatures.modules.none")
+                : Core.bundle.format("mode.testfeatures.modules.target", unit.type.localizedName);
+        }).color(Color.lightGray).width(width).wrap().left().row();
+        modules.button("@mode.testfeatures.modules.open", () -> openTurretDialog(selectedUnit()))
+            .width(width).height(34f).padTop(4f).left()
+            .disabled(b -> {
+                Unit unit = selectedUnit();
+                return unit == null || unit.type.turretSlots.isEmpty();
+            });
+
+        buildEnemyBuildings(lower);
+    }
+
+    /**
+     * Fills the friendly-ship grid so it uses the whole width of the pane.
+     *
+     * <p>The cell size is derived from the space the pane really has: the vertical scrollbar
+     * takes a slice of it, and the scrollbar is drawn in raw pixels while the cells are sized in
+     * ui units, so both sides are converted before they are compared. The icons then spread over
+     * the full width instead of leaving a gap on the right.</p>
+     */
+    private void buildUnitGrid(Table grid, float width, float height){
+        Seq<UnitType> types = TestNewFeaturesMode.aerialTypes();
+        int count = types.size;
+        if(count == 0) return;
+
+        //the space the scrollbar steals, in ui units
+        float scroll = scrollBarWidth() / Math.max(1f, Scl.scl(1f));
+        float[] layout = unitGridLayout(width, height, count, mobile ? 40f : 48f, scroll);
+        int columns = (int)layout[0];
+        float cell = layout[1];
+
+        float button = cell - 4f;
+        int index = 0;
+        for(UnitType type : types){
+            var btn = grid.button(new TextureRegionDrawable(type.uiIcon), Styles.selecti, () -> {
+                if(!TestNewFeaturesMode.spawn(type)){
+                    ui.showInfoToast(Core.bundle.get("mode.testfeatures.limit", "Unit cap reached or no valid spawn location."), 3f);
+                }
+            }).size(button).tooltip(type.localizedName).pad(2f).get();
+            btn.resizeImage(button * 0.72f);
+            if(++index % columns == 0) grid.row();
+        }
+    }
+
+    /**
+     * Works out how the friendly-ship grid is laid out inside a pane.
+     *
+     * <p>The vertical scrollbar takes a slice of the pane's width, and it is drawn in raw pixels
+     * while the cells are sized in ui units, so both sides are converted before they are
+     * compared. The first pass keeps room for the scrollbar, so no icon hides under it; when the
+     * grid fits the height, no scrollbar is drawn at all and the second pass lets the grid use
+     * the full width.</p>
+     *
+     * @param width width of the pane, in ui units
+     * @param height height of the pane, in ui units
+     * @param count how many units have to be shown
+     * @param preferred preferred size of one cell, in ui units
+     * @param scroll width of the vertical scrollbar, in ui units
+     * @return the number of columns and the size of one cell, in ui units
+     */
+    public static float[] unitGridLayout(float width, float height, int count, float preferred, float scroll){
+        //first pass: assume the vertical scrollbar is there, so no icon hides under it
+        int columns = Mathf.clamp((int)((width - scroll) / preferred), 2, 12);
+        float cell = (width - scroll) / columns;
+        //second pass: when everything fits, no scrollbar is drawn and the grid uses the full width
+        if(Mathf.ceil(count / (float)columns) * cell <= height){
+            int full = Mathf.clamp((int)(width / preferred), 2, 12);
+            float fullCell = width / full;
+            if(Mathf.ceil(count / (float)full) * fullCell <= height){
+                columns = full;
+                cell = fullCell;
+            }
+        }
+        return new float[]{columns, cell};
+    }
+
+    /** @return the width the vertical scrollbar of a pane takes, in raw pixels. */
+    private static float scrollBarWidth(){
+        try{
+            ScrollPane.ScrollPaneStyle style = Core.scene.getStyle(ScrollPane.ScrollPaneStyle.class);
+            if(style != null && style.vScroll != null) return Math.max(style.vScroll.getMinWidth(), 4f);
+        }catch(Throwable ignored){
+        }
+        return 24f;
     }
 
     /**
@@ -831,7 +954,9 @@ public class HudFragment{
 
         Table section = new Table();
         section.left();
-        panel.add(section).width(width).left().row();
+        //top aligned: the section starts on the same line as the module column, so it never
+        //drifts down over the units grid above it
+        panel.add(section).width(width).left().top().row();
         section.update(() -> {
             long signature = enemyToolSignature();
             if(signature != enemySignature){
@@ -1130,14 +1255,19 @@ public class HudFragment{
         //the extra bottom padding is the air between the bars and the modules below
         bars.add(supplyCell(unit)).width(supplyWidth).left().padBottom(cellPad + 8f).row();
 
-        //module numbering: the same order the number keys use, so key 1 is the first cell
+        //module numbering: the same order the number keys use, so key 1 is the first cell.
+        //One cell per group of identical modules: two Duo mounted are one module with two
+        //copies, drawn once and addressed once - the selection and the aim of that cell apply
+        //to every copy of it (see WeaponsComp.moduleGroups).
         int index = 0;
 
-        for(WeaponMount mount : unit.mounts){
-            if(mount.weapon.isTurretMount()){
-                int moduleIndex = index++;
-                modules.add(turretCell(unit, mount, moduleIndex)).size(cellSize).pad(cellPad).tooltip(turretTooltip(unit, moduleIndex, mount.weapon));
-            }
+        for(Weapon group : unit.moduleGroups()){
+            int moduleIndex = index++;
+            WeaponMount mount = unit.representativeMountOf(group);
+            if(mount == null) continue;
+            int copies = unit.moduleCopies(group);
+            modules.add(turretCell(unit, mount, moduleIndex, copies)).size(cellSize).pad(cellPad)
+                .tooltip(turretTooltip(unit, moduleIndex, group, copies));
         }
 
         //support modules sit immediately beside the turrets. The badge on top of each icon
@@ -1272,13 +1402,17 @@ public class HudFragment{
     }
 
     /** Tooltip of a weapon cell: name, module kind, firing state and the number key. */
-    private String turretTooltip(Unit unit, int index, Weapon weapon){
+    private String turretTooltip(Unit unit, int index, Weapon weapon, int copies){
         boolean removable = weapon.removable;
         String state = removable ? Core.bundle.get("turret.hud.removable") : Core.bundle.get("turret.hud.native");
         //the pilot's pick is the state worth reading: every other module stays silent
         String power = Core.bundle.get(moduleSelected(unit, index) ? "module.hud.selected"
             : (moduleActive(unit, index) ? "support.hud.active" : "module.hud.silent"));
-        return turretName(weapon)
+        String name = turretName(weapon);
+        //a group is one module with several copies: the pilot needs to see how many are behind
+        //this cell, because every action on it (select, aim) applies to all of them
+        if(copies > 1) name += "  [lightgray]" + Core.bundle.format("weapon.module.count", copies);
+        return name
             + "\n[lightgray]" + state + " · " + power
             + "\n" + Core.bundle.format("module.hint.select", moduleKeyName(index));
     }
@@ -1316,8 +1450,12 @@ public class HudFragment{
      * the pilot's selection. Clicking picks the module: from then on it is the only one that
      * fires, every other module of the hull stays mounted and silent. Clicking the same cell
      * again lets every module fire together.
+     *
+     * <p>One cell is a whole <b>group</b> of identical modules ({@link WeaponsComp#moduleGroups}),
+     * not one mount: the bars shown are the representative's, and {@code copies} says how many
+     * sit behind the cell - picking it arms every copy, and the aim mode of one goes to all.</p>
      */
-    private Table turretCell(Unit unit, WeaponMount mount, int index){
+    private Table turretCell(Unit unit, WeaponMount mount, int index, int copies){
         Weapon weapon = mount.weapon;
         boolean removable = weapon.removable;
         float baseThickness = removable ? 3f : 2f;
@@ -1345,6 +1483,19 @@ public class HudFragment{
         mark.visible(() -> moduleSelected(unit, index));
         mark.image(Icon.star).size(13f).pad(1f).get().setColor(Pal.accent);
         stack.add(mark);
+
+        //the count of identical copies behind this cell: the number key occupies the top-left,
+        //so this sits at the bottom-left, small and quiet
+        if(copies > 1){
+            Table copiesBadge = new Table();
+            copiesBadge.bottom().left();
+            copiesBadge.touchable = Touchable.disabled;
+            Label label = copiesBadge.label(() -> Core.bundle.format("weapon.module.count", copies))
+                .style(Styles.outlineLabel).fontScale(mobile ? 0.6f : 0.7f).get();
+            label.setColor(Pal.lightTrailer);
+            copiesBadge.pack();
+            stack.add(copiesBadge);
+        }
 
         if(!removable){
             Table lock = new Table();

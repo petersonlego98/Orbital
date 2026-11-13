@@ -57,7 +57,6 @@ public class ModuleSupplyTest{
         ModuleSupply supply = unit.moduleSupply();
         //Duo: copper 35, its ammo is item ammo and it has no power consumer
         assertEquals(((Turret)Blocks.duo).maxAmmo, supply.ammoCapacity, "the bar sums the block's own buffer");
-        assertEquals(0f, supply.liquidCapacity);
         assertEquals(0f, supply.energyCapacity);
         assertNotNull(supply.item, "the item pool is fed by one of Duo's ammo items");
         assertTrue(ModuleSupplies.accepts((Turret)Blocks.duo, supply.item));
@@ -74,24 +73,58 @@ public class ModuleSupplyTest{
         assertNotNull(unit.mountTurret((Turret)Blocks.duo));
 
         ModuleSupply supply = unit.moduleSupply();
-        float expected = 2 * ModuleSupplies.ammoCapacity(Blocks.duo);
-        assertEquals(expected, supply.ammoCapacity, "each installed turret adds its buffer");
+        assertEquals(2 * ModuleSupplies.ammoCapacity(Blocks.duo), supply.ammoCapacity,
+            "each installed turret adds its buffer");
         assertEquals(supply.ammoCapacity, supply.ammo, "the summed pool reads full");
     }
 
     @Test
-    void powerTurretFeedsOnlyTheEnergyPool(){
+    void turretModuleFeedsTheLiquidBarWithItsOwnCoolantTank(){
+        //a weapon turret carries a coolant tank as a block (Duo: 0.1/tick, sized by the block
+        //itself), so mounting it as a module must add that storage to the hull's liquid bar,
+        //exactly like its ammo buffer adds to the item bar
+        Unit unit = carrier().create(Team.sharded);
+        unit.mountTurret((Turret)Blocks.duo);
+
+        ModuleSupply supply = unit.moduleSupply();
+        assertEquals(ModuleSupplies.liquidCapacity(Blocks.duo), supply.liquidCapacity, 0.001f,
+            "the turret's own coolant buffer must size the liquid bar");
+        assertTrue(supply.liquidCapacity > 0f);
+        assertEquals(supply.liquidCapacity, supply.liquidAmount, "the pool starts full");
+        assertNotNull(supply.liquid, "the pool must be fed by one of the turret's coolants");
+        assertTrue(ModuleSupplies.acceptsSupportLiquid(Blocks.duo, supply.liquid),
+            "water or cryofluid is the Duo's coolant, and the pool must carry one of them");
+
+        //the picker offers those coolants, so the player can choose what fills the tank
+        Seq<Liquid> options = unit.ammoLiquidOptions();
+        assertTrue(options.contains(Liquids.water, true), "water must be offered as coolant");
+        assertTrue(options.contains(Liquids.cryofluid, true), "cryofluid must be offered as coolant");
+    }
+
+    @Test
+    void everyTurretOfAKindSumsItsCoolantTankToo(){
+        Unit unit = carrier().create(Team.sharded);
+        assertNotNull(unit.mountTurret((Turret)Blocks.duo));
+        assertNotNull(unit.mountTurret((Turret)Blocks.duo));
+
+        ModuleSupply supply = unit.moduleSupply();
+        float expected = 2 * ModuleSupplies.liquidCapacity(Blocks.duo);
+        assertEquals(expected, supply.liquidCapacity, 0.001f, "each installed turret adds its coolant tank");
+    }
+
+    @Test
+    void powerTurretFeedsTheEnergyBarAndItsCoolantTank(){
         Unit unit = carrier().create(Team.sharded);
         unit.mountTurret((Turret)Blocks.lancer);
 
         ModuleSupply supply = unit.moduleSupply();
         assertEquals(0f, supply.ammoCapacity, "Lancer runs on energy, not on ammo");
-        assertEquals(0f, supply.liquidCapacity);
+        assertEquals(ModuleSupplies.liquidCapacity(Blocks.lancer), supply.liquidCapacity, 0.001f,
+            "but its own coolant tank still feeds the liquid bar");
         assertNull(supply.item);
         assertTrue(supply.energyCapacity > 0f, "its power drain becomes an energy buffer");
         assertEquals(1f, supply.energyFraction());
         assertEquals(0f, supply.ammoFraction());
-        assertEquals(0f, supply.liquidFraction());
     }
 
     @Test
@@ -120,6 +153,53 @@ public class ModuleSupplyTest{
         assertEquals(supply.liquidCapacity, supply.liquidAmount);
         assertEquals(1f, supply.liquidFraction());
         assertEquals(0f, supply.ammoFraction());
+    }
+
+    @Test
+    void coolantSupportModuleFeedsTheLiquidBarWithItsOwnBuffer(){
+        //force-projector and repair-turret have the block's optional coolant input; their
+        //own liquid buffer must size the hull's liquid bar and the picker must offer coolant
+        Unit unit = supportCarrier().create(Team.sharded);
+
+        Seq<Liquid> options = unit.ammoLiquidOptions();
+        assertTrue(options.contains(Liquids.water, true), "water must be offered as coolant");
+        assertTrue(options.contains(Liquids.cryofluid, true), "cryofluid must be offered as coolant");
+
+        assertNotNull(unit.mountSupport(Blocks.forceProjector));
+        ModuleSupply supply = unit.moduleSupply();
+        assertNotNull(supply.liquid, "a mounted coolant module must feed the liquid pool");
+        assertEquals(ModuleSupplies.liquidCapacity(Blocks.forceProjector), supply.liquidCapacity, 0.001f);
+        assertTrue(supply.liquidCapacity > 0f);
+        assertEquals(supply.liquidCapacity, supply.liquidAmount, "the pool starts full");
+    }
+
+    @Test
+    void everyMountedSupportAddsItsLiquidCapacityToTheBar(){
+        //a liquid module and a required-liquid module have different liquids (water and
+        //ozone). The bar is one pool fed by one resource, but its capacity is the physical
+        //buffer of every installed module, so both must be summed.
+        Unit unit = supportCarrier().create(Team.sharded);
+        assertNotNull(unit.mountSupport(Blocks.wave));
+        assertNotNull(unit.mountSupport(Blocks.unitRepairTower));
+
+        ModuleSupply supply = unit.moduleSupply();
+        float expected = ModuleSupplies.liquidCapacity(Blocks.wave)
+            + ModuleSupplies.liquidCapacity(Blocks.unitRepairTower);
+        assertEquals(expected, supply.liquidCapacity, 0.001f,
+            "each installed support module adds its own liquid buffer");
+        assertEquals(supply.liquidCapacity, supply.liquidAmount, "the summed pool reads full");
+    }
+
+    @Test
+    void everyMountedModuleAddsItsEnergyToTheBar(){
+        Unit unit = supportCarrier().create(Team.sharded);
+        assertNotNull(unit.mountTurret((Turret)Blocks.lancer));
+        assertNotNull(unit.mountSupport(Blocks.overdriveProjector));
+
+        float expected = ModuleSupplies.energyCapacity(Blocks.lancer)
+            + ModuleSupplies.energyCapacity(Blocks.overdriveProjector);
+        assertEquals(expected, unit.moduleSupply().energyCapacity, 0.001f,
+            "a turret and a support module both add their power drain to the energy buffer");
     }
 
     @Test
@@ -179,11 +259,14 @@ public class ModuleSupplyTest{
             "the liquid picker must be offered with only a turret mounted; quad can host wave/tsunami");
         assertNotNull(unit.moduleSupply().liquid, "the liquid pool has a resource to be fed by");
 
-        //a hull that cannot host any liquid module offers nothing, even with a module mounted
+        //a hull with no liquid anchor still offers liquid when it carries a turret module: the
+        //Duo ships with a coolant tank of its own, so water and cryofluid feed that buffer
         Unit light = UnitTypes.mono.create(Team.sharded);
         assertTrue(light.mountedTurrets() > 0, "mono ships the Duo out of the box");
-        assertTrue(light.ammoLiquidOptions().isEmpty(),
-            "mono has no liquid anchor, so no liquid picker is offered");
+        assertFalse(light.ammoLiquidOptions().isEmpty(),
+            "mono's Duo module has a coolant tank, so the liquid picker is offered");
+        assertEquals(ModuleSupplies.liquidCapacity(Blocks.duo), light.moduleSupply().liquidCapacity, 0.001f,
+            "the shipped Duo sizes the liquid bar with its own buffer");
     }
 
     @Test

@@ -53,10 +53,11 @@ public class HintsFragment{
                 }
             }else if(hints.size > 0){
                 //check one hint each frame to see if it should be shown.
-                Hint hint = hints.find(Hint::show);
+                Hint hint = findHint();
                 if(hint != null && hint.complete()){
                     hints.remove(hint);
-                }else if(hint != null && !renderer.isCutscene() && state.isGame() && control.saves.getTotalPlaytime() > 8000){
+                }else if(hint != null && !renderer.isCutscene() && state.isGame()
+                    && (hint.immediate() || control.saves.getTotalPlaytime() > 8000)){
                     display(hint);
                 }else{
                     //moused over a derelict structure
@@ -108,11 +109,30 @@ public class HintsFragment{
         hints.removeAll(h -> !h.valid() || h.finished() || (h.show() && h.complete()));
         hints.sort(Hint::order);
 
-        Hint first = hints.find(Hint::show);
+        Hint first = findHint();
         if(first != null && !renderer.isCutscene() && state.isGame()){
             hints.remove(first);
             display(first);
         }
+    }
+
+    /**
+     * @return the hint to consider next. Inside the part-test mode only its own tutorial is
+     * eligible: the generic hints (move, zoom, respawn...) would otherwise take the single hint
+     * slot and a player could finish a whole practice round without seeing the new parts
+     * explained. The tutorial hints are also exempt from the playtime threshold elsewhere.
+     */
+    private Hint findHint(){
+        if(TestNewFeaturesMode.active()) return hints.find(h -> h.immediate() && h.show());
+        return hints.find(Hint::show);
+    }
+
+    /** Re-registers the part-test tutorial for a fresh round from the menu. */
+    public void resetModuleHints(){
+        hints.removeAll(h -> h instanceof ModuleHint);
+        ModuleHint.reset();
+        for(ModuleHint hint : ModuleHint.values()) hints.add(hint);
+        if(current instanceof ModuleHint) hide();
     }
 
     void display(Hint hint){
@@ -375,6 +395,75 @@ public class HintsFragment{
         }
     }
 
+    /**
+     * The part-test mode's own tutorial: one short, plain-language hint at the moment it is
+     * useful. Unlike the generic hints, these are session-scoped - a fresh round from the menu
+     * shows them again, because the mode exists precisely for trying things out. The hints are
+     * never persisted, never shown outside the mode, and wait until no dialog covers the screen.
+     */
+    public enum ModuleHint implements Hint{
+        //names must match the shipped bundle keys: text() looks up "hint." + name()
+        moduleParts(
+            () -> active() && !wavesStarted() && !dialogOpen() && chosenShip() && mountedCount() == 0,
+            () -> mountedCount() > 0
+        ),
+        moduleSupplies(
+            () -> active() && !wavesStarted() && !dialogOpen() && mountedCount() > 0,
+            () -> wavesStarted()
+        ),
+        moduleControls(
+            () -> active() && wavesStarted() && !dialogOpen() && wave() < 2,
+            () -> wave() >= 2
+        ),
+        moduleWaves(
+            () -> active() && wavesStarted() && !dialogOpen() && wave() >= 2 && wave() < 4,
+            () -> wave() >= 4
+        );
+
+        private static final boolean[] done = new boolean[values().length];
+
+        static void reset(){
+            for(int i = 0; i < done.length; i++) done[i] = false;
+        }
+
+        private static boolean active(){ return TestNewFeaturesMode.active(); }
+        private static boolean wavesStarted(){ return TestNewFeaturesMode.wavesStarted; }
+        private static boolean dialogOpen(){ return Core.scene != null && Core.scene.hasDialog(); }
+        private static int mountedCount(){ return TestNewFeaturesMode.mountedCount(); }
+        private static int wave(){ return state == null ? 0 : state.wave; }
+        private static boolean chosenShip(){
+            Unit unit = TestNewFeaturesMode.playerUnit();
+            return unit != null && unit.type.flying;
+        }
+
+        private final Boolp shown, complete;
+        private @Nullable String text;
+
+        ModuleHint(Boolp shown, Boolp complete){
+            this.shown = shown;
+            this.complete = complete;
+        }
+
+        /** hints stay in the pool across rounds; {@link #show()} hides them once finished */
+        @Override public boolean finished(){ return false; }
+        @Override public void finish(){ done[ordinal()] = true; }
+        @Override public boolean complete(){ return complete.get(); }
+        @Override public boolean show(){ return !done[ordinal()] && shown.get(); }
+        /** runs before the generic hints while the part-test mode is active */
+        @Override public int order(){ return -1000 + ordinal(); }
+        @Override public boolean valid(){ return true; }
+        @Override public boolean immediate(){ return true; }
+
+        @Override public String text(){
+            if(text == null){
+                text = Vars.mobile && Core.bundle.has("hint." + name() + ".mobile")
+                    ? Core.bundle.get("hint." + name() + ".mobile")
+                    : Core.bundle.get("hint." + name());
+            }
+            return UI.formatIcons(text);
+        }
+    }
+
     /** Hint interface for defining any sort of message appearing at the left. */
     public interface Hint{
         int visibleDesktop = 1, visibleMobile = 2, visibleAll = visibleDesktop | visibleMobile;
@@ -391,6 +480,15 @@ public class HintsFragment{
         int order();
         /** @return whether this hint should be processed, used for platform splits */
         boolean valid();
+
+        /**
+         * @return whether this hint may appear before the normal playtime threshold. Generic
+         * hints wait until the player has some hours of play; a tutorial for a practice mode
+         * must be there from the very first visit.
+         */
+        default boolean immediate(){
+            return false;
+        }
 
         /** finishes the hint - it should not be shown again */
         default void finish(){

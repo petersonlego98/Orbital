@@ -55,6 +55,18 @@ public class AutoAimAimingTest{
     }
 
     /**
+     * @return a quad carrying two <b>different</b> dorsal modules, a Duo and a Lancer: the
+     * contrast a manual module needs now that identical modules share their aim mode.
+     */
+    private Unit twoDifferentTurrets(){
+        Unit unit = UnitTypes.quad.spawn(Team.sharded, 48 * 8f, 48 * 8f);
+        enemy();
+        assertNotNull(unit.mountTurret((Turret)Blocks.duo), "quad must accept the duo");
+        assertNotNull(unit.mountTurret((Turret)Blocks.lancer), "quad must accept the lancer");
+        return unit;
+    }
+
+    /**
      * The frame order of the real game, so the driver cannot lie: weapons first, then the pilot's
      * aim. The mouse moves every frame and points away from the enemy.
      */
@@ -105,8 +117,46 @@ public class AutoAimAimingTest{
     }
 
     @Test
-    void aManualModuleStillFollowsThePilot(){
+    void everyIdenticalModuleFollowsTheAimModeTogether(){
+        //the loadout row is one row ("Duo x2"), so the pilot's choice on it applies to every
+        //copy: switching one to automatic hands all of them over, not only the one the menu
+        //happened to pick
         Unit unit = twoDorsalDuos();
+        int auto = unit.moduleCount() - 1;
+        assertTrue(unit.setModuleAuto(auto, true), "the pilot may hand the module over");
+
+        for(WeaponMount mount : unit.mounts){
+            if(!mount.weapon.isTurretMount()) continue;
+            assertTrue(unit.weaponAimsSelf(mount.weapon),
+                "every copy of the same module kind must aim on its own");
+        }
+
+        //and with that, every copy aims at the enemy instead of waiting at the hand
+        float mouseX = 48 * 8f - 400f, mouseY = 48 * 8f - 300f;
+        runFrames(unit, mouseX, mouseY, 200);
+
+        for(WeaponMount mount : unit.mounts){
+            if(!mount.weapon.isTurretMount()) continue;
+            assertTrue(mount.totalShots > 0, "each identical module must find the enemy and fire");
+            assertTrue(distTo(unit, mount, 54 * 8f, 48 * 8f) < 20f,
+                "each identical module must aim at the enemy it found");
+            assertFalse(mount.aimX == mouseX && mount.aimY == mouseY,
+                "no identical module may fall back to the pilot's hand");
+        }
+
+        //switching back takes the whole group out of automatic targeting with it
+        assertTrue(unit.setModuleAuto(auto, false), "the pilot may take the module back");
+        for(WeaponMount mount : unit.mounts){
+            if(!mount.weapon.isTurretMount()) continue;
+            assertFalse(unit.weaponAimsSelf(mount.weapon),
+                "every copy of the same module kind must return to manual together");
+        }
+    }
+
+    @Test
+    void aManualModuleStillFollowsThePilot(){
+        //two different modules: only the one the pilot hands over aims on its own
+        Unit unit = twoDifferentTurrets();
         int auto = unit.moduleCount() - 1;
         unit.setModuleAuto(auto, true);
 

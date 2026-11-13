@@ -2,9 +2,11 @@ package orbital.type;
 
 import arc.struct.*;
 import arc.util.Nullable;
+import orbital.Vars;
 import orbital.ctype.UnlockableContent;
 import orbital.world.Block;
 import orbital.world.blocks.defense.turrets.*;
+import orbital.world.consumers.*;
 
 /**
  * Reads the supply a dorsal module demands straight from the block it came from.
@@ -18,6 +20,10 @@ import orbital.world.blocks.defense.turrets.*;
  *       buffer the block on the ground carries.</li>
  *   <li><b>Liquid ammo:</b> the block's own {@link Block#liquidCapacity}, the buffer a liquid
  *       turret drains its spray from.</li>
+ *   <li><b>Coolant:</b> the same buffer, for a support block that takes a liquid input - the
+ *       {@code force-projector} and the {@code repair-turret} coolant, or the
+ *       {@code unit-repair-tower}'s required ozone; the block sizes it from its own per-tick
+ *       use.</li>
  *   <li><b>Energy:</b> the block's power usage (per tick) times
  *       {@link ModuleSupply#energyTicks}, which is the only number in this system that is not
  *       a block parameter - the engine's power consumer is a rate, not a buffer.</li>
@@ -81,6 +87,53 @@ public final class ModuleSupplies{
     }
 
     /**
+     * @return every liquid a module takes from the hull's liquid pool: its ammo liquids when
+     * it is a liquid turret, plus any coolant or required liquid of the block behind it.
+     *
+     * <p>This is the pool-side counterpart of {@link #liquids(Block)}, which stays ammo-only.
+     * It is the same rule for a turret module and a support module: whatever liquid the block
+     * itself can hold in its buffer (coolant tank, required reagent) belongs to the hull pool,
+     * so its liquids are offered in the picker.</p>
+     */
+    public static Seq<Liquid> supportLiquids(Block block){
+        Seq<Liquid> result = liquids(block);
+        ConsumeLiquidBase consumer = liquidConsumer(block);
+        if(consumer == null || Vars.content == null) return result;
+
+        for(Liquid liquid : Vars.content.liquids()){
+            if(consumer.consumes(liquid) && !result.contains(liquid, true)) result.add(liquid);
+        }
+        return result;
+    }
+
+    /**
+     * @return the liquid consumer of a support block, or null when it takes no liquid. The
+     * first consumer is enough: a block has at most one liquid input or coolant in this
+     * system, and a liquid turret's ammo filter is its only one.
+     */
+    public static @Nullable ConsumeLiquidBase liquidConsumer(Block block){
+        return block == null ? null : block.findConsumer(c -> c instanceof ConsumeLiquidBase);
+    }
+
+    /** @return the coolant consumer of a block, or null when the block takes no coolant. */
+    public static @Nullable ConsumeCoolant coolant(Block block){
+        return block == null ? null : block.findConsumer(c -> c instanceof ConsumeCoolant);
+    }
+
+    /**
+     * @return true when this support block draws this liquid from the hull's pool: as ammo for
+     * a liquid turret, or as coolant/a required input for a support block such as the
+     * {@code force-projector} and the {@code repair-turret}.
+     */
+    public static boolean acceptsSupportLiquid(Block block, @Nullable Liquid liquid){
+        if(liquid == null) return false;
+        if(accepts(block, liquid)) return true;
+
+        ConsumeLiquidBase consumer = liquidConsumer(block);
+        return consumer != null && consumer.consumes(liquid);
+    }
+
+    /**
      * @return how much of the item-ammo pool this block represents, in the block's own ammo
      * units ({@link Turret#maxAmmo}). Blocks without item ammo add nothing.
      */
@@ -95,14 +148,18 @@ public final class ModuleSupplies{
     }
 
     /**
-     * @return how much of the liquid pool this block represents, in liquid units: the block's
-     * own {@link Block#liquidCapacity}, which is what a liquid turret drains its spray from.
-     * Blocks that are not liquid turrets add nothing.
+     * @return how much of the liquid pool this block represents, in liquid units: a liquid
+     * turret's own {@link Block#liquidCapacity}, or the buffer of a support block that takes
+     * coolant (the block sizes it from its coolant use). Blocks that take no liquid add
+     * nothing.
      */
     public static float liquidCapacity(Block block){
         if(block instanceof LiquidTurret liquid){
             return liquid.liquidCapacity > 0f ? liquid.liquidCapacity : Math.max(1, liquid.maxAmmo);
         }
+
+        ConsumeLiquidBase consumer = liquidConsumer(block);
+        if(consumer != null) return block.liquidCapacity > 0f ? block.liquidCapacity : 1f;
         return 0f;
     }
 
@@ -131,12 +188,14 @@ public final class ModuleSupplies{
     /**
      * @return liquid this block drains per tick, derived from its own liquid ammo: a liquid
      * turret sprays one liquid unit per shot, and {@code ReloadTurret.reload} ticks pass
-     * between shots, so the rate is {@code 1 / reload}. Blocks that are not liquid turrets
-     * drain nothing.
+     * between shots, so the rate is {@code 1 / reload}. A coolant block drains its own
+     * coolant amount; blocks that take no liquid drain nothing.
      */
     public static float liquidUsage(Block block){
         if(block instanceof LiquidTurret liquid) return 1f / Math.max(1f, liquid.reload);
-        return 0f;
+
+        ConsumeLiquidBase consumer = liquidConsumer(block);
+        return consumer != null ? consumer.amount : 0f;
     }
 
     /** @return liquid this turret drains per tick. */

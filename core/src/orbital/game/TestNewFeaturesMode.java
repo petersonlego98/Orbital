@@ -6,6 +6,7 @@ import arc.struct.*;
 import arc.util.Nullable;
 import orbital.content.*;
 import orbital.entities.*;
+import orbital.entities.units.*;
 import orbital.game.EventType.*;
 import orbital.gen.*;
 import orbital.maps.*;
@@ -101,6 +102,10 @@ public final class TestNewFeaturesMode{
         setupOpen = true;
         wavesStarted = false;
 
+        //the tutorial belongs to this round, not to the save: replay the four hints on every
+        //fresh visit so a player testing a different combination sees the explanations again
+        if(ui != null && ui.hints != null) ui.hints.resetModuleHints();
+
         initializeMono = true;
         //createSave = false: this is a disposable test session, it must never touch the save list
         control.playMap(testMap, rules, false, false);
@@ -154,6 +159,23 @@ public final class TestNewFeaturesMode{
     /** @return the player unit, or null when it is missing or dead. */
     public static @Nullable Unit playerUnit(){
         return player == null || player.dead() || player.unit() == null ? null : player.unit();
+    }
+
+    /**
+     * @return how many parts are fitted on the player's ship, counting mounted turrets, armour
+     * plates and support parts. Used by the tutorial hints to notice the player's first part.
+     */
+    public static int mountedCount(){
+        Unit unit = playerUnit();
+        if(unit == null) return 0;
+
+        int count = unit.mountedTurrets() + (unit.wallMounts == null ? 0 : unit.wallMounts.length);
+        if(unit.supportMounts != null){
+            for(SupportMount mount : unit.supportMounts){
+                if(mount != null && mount.block != null) count++;
+            }
+        }
+        return count;
     }
 
     /**

@@ -38,18 +38,14 @@ public class SupportMount{
 
     /**
      * Whether the effect picks its own target. True for every support module except the
-     * liquid jets ({@code wave} and {@code tsunami}): those spray at the closest enemy on
-     * their own in the block version, and here the pilot drives them - the jet fires only
-     * while the hull is firing, toward the hull's aim point.
+     * liquid jets ({@code wave} and {@code tsunami}): those are piloted weapons, so the jet
+     * fires only while the hull is firing and toward the hull's aim point (mouse on desktop,
+     * tap/stick aim on mobile), exactly like the rest of the pilot's fire control.
      *
-     * <p><b>Manual aiming is opt-in, not the default.</b> Every category - the liquid modules
-     * included - starts on auto-targeting, because a dorsal module reproduces the block it
-     * comes from and the block acts on its own. Leaving {@code wave} and {@code tsunami}
-     * manual by default meant they never did anything unless the pilot held fire: the jet
-     * stayed silent and, worse, the support half (which extinguishes allies and slows enemies)
-     * was gated behind the same trigger, so the modules were inert while the hull idled.
-     * The pilot can still switch the aim mode to manual from the loadout dialog, and the
-     * effect stays able to follow the hull's aim point when that happens.</p>
+     * <p>The liquid category therefore starts on manual targeting; every other category starts
+     * on auto-targeting, because a dorsal module reproduces the block it comes from and the
+     * block acts on its own. The pilot can still switch the aim mode to automatic from the
+     * loadout dialog, and then the effect picks its own target inside its range and filters.</p>
      *
      * <p>Toggleable from the loadout dialog while the module stays installed; it never
      * changes {@link #active}, the anchor or the footprint.</p>
@@ -195,10 +191,13 @@ public class SupportMount{
 
         if(block instanceof RepairTurret repair){
             //block: repairs the closest unit at repairSpeed hp per tick inside repairRadius,
-            //with a beam of beamWidth; no power or coolant on units
+            //with a beam of beamWidth; a repair-turret also accepts coolant and heals faster,
+            //so the module draws that coolant from the hull pool the same way
             RepairBeamAbility beam = new RepairBeamAbility(repair.repairRadius, repair.repairSpeed, repair.beamWidth);
             beam.airOnly = true;
             beam.buildings = true;
+            beam.coolant = ModuleSupplies.coolant(repair);
+            beam.coolantMultiplier = repair.acceptCoolant ? repair.coolantMultiplier : 0f;
             //the block's beam is aimed, not a turning turret, so the module's turret tracks
             //about as fast as the beam can be re-pointed
             beam.rotateSpeed = 45f;
@@ -261,8 +260,13 @@ public class SupportMount{
             //block: polygonal shield with shieldHealth, cooldownNormal regen/tick, radius and sides
             //unit analogue: ForceFieldAbility; cooldown is derived as the time to regen the full pool
             float regen = Math.max(force.cooldownNormal, 0.01f);
-            return new ForceFieldAbility(force.radius, regen, force.shieldHealth,
+            ForceFieldAbility field = new ForceFieldAbility(force.radius, regen, force.shieldHealth,
                 force.shieldHealth / regen, force.sides, force.shieldRotation);
+            //the block's optional coolant shortens shield buildup: copy the same consumer and
+            //the liquid-regeneration multiplier so the module can draw it from the hull pool
+            field.coolant = ModuleSupplies.coolant(force);
+            field.coolantMultiplier = force.cooldownLiquid;
+            return field;
         }
 
         return null;

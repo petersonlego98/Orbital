@@ -94,29 +94,51 @@ public class ModuleControlTest{
         return shots;
     }
 
-    /** @return the index in the mount array of the weapon module at this bar position. */
+    /** @return true when two turret weapons are the same module kind (same turret block). */
+    private static boolean sameKind(Weapon a, Weapon b){
+        if(!(a instanceof TurretWeapon ta) || !(b instanceof TurretWeapon tb)) return false;
+        return ta.turret == tb.turret;
+    }
+
+    /** @return the index in the mount array of the first weapon mount of the group at this bar position. */
     private static int moduleMount(Unit unit, int index){
-        int i = 0;
+        int group = 0;
         for(int k = 0; k < unit.mounts.length; k++){
             if(!unit.mounts[k].weapon.isTurretMount()) continue;
-            if(i++ == index) return k;
+            //first mount of a group: no earlier mount shares its kind
+            boolean first = true;
+            for(int j = 0; j < k; j++){
+                if(unit.mounts[j].weapon.isTurretMount() && sameKind(unit.mounts[j].weapon, unit.mounts[k].weapon)){
+                    first = false;
+                    break;
+                }
+            }
+            if(first && group++ == index) return k;
         }
         return -1;
     }
 
     /**
-     * @return how many weapon modules the bar numbers, in bar order: the hull's own fixed
-     * weapons first, then the dorsal modules. The numbering the number keys use is the same.
+     * @return how many weapon groups the bar numbers: one per kind of dorsal weapon, then fixed
+     * hull weapons. The numbering the number keys use is the same.
      */
     private static int weaponModuleCount(Unit unit){
         int count = 0;
-        for(WeaponMount mount : unit.mounts){
-            if(mount.weapon.isTurretMount()) count++;
+        for(int k = 0; k < unit.mounts.length; k++){
+            if(!unit.mounts[k].weapon.isTurretMount()) continue;
+            boolean first = true;
+            for(int j = 0; j < k; j++){
+                if(unit.mounts[j].weapon.isTurretMount() && sameKind(unit.mounts[j].weapon, unit.mounts[k].weapon)){
+                    first = false;
+                    break;
+                }
+            }
+            if(first) count++;
         }
         return count;
     }
 
-    /** @return the bar position of the first of the last {@code count} weapon modules. */
+    /** @return the bar position of the first of the last {@code count} weapon groups. */
     private static int lastModules(Unit unit, int count){
         return weaponModuleCount(unit) - count;
     }
@@ -136,12 +158,12 @@ public class ModuleControlTest{
         return unit;
     }
 
-    /** @return a quad with two dorsal Duos and an enemy in range: two modules that both shoot. */
+    /** @return a quad with a dorsal Duo and a dorsal Lancer: two separately-addressable groups. */
     private Unit hullWithTwoModules(){
         Unit unit = UnitTypes.quad.spawn(Team.sharded, 48 * 8f, 48 * 8f);
         enemyBuilding(52, 48);
-        assertNotNull(unit.mountTurret((Turret)Blocks.duo), "quad must accept the first module");
-        assertNotNull(unit.mountTurret((Turret)Blocks.duo), "quad must accept the second module");
+        assertNotNull(unit.mountTurret((Turret)Blocks.duo), "quad must accept the dorsal duo");
+        assertNotNull(unit.mountTurret((Turret)Blocks.lancer), "quad must accept the dorsal lancer");
         return unit;
     }
 
@@ -150,18 +172,15 @@ public class ModuleControlTest{
         //quad carries anchors of several categories, so the bar has both kinds of module
         Unit unit = UnitTypes.quad.spawn(Team.sharded, 48 * 8f, 48 * 8f);
 
-        int weapons = 0;
-        for(WeaponMount mount : unit.mounts){
-            if(mount.weapon.isTurretMount()) weapons++;
-        }
+        int groups = weaponModuleCount(unit);
 
         assertNotNull(unit.mountSupport(Blocks.mendProjector), "quad must accept the repair projector");
         assertNotNull(unit.mountTurret((Turret)Blocks.duo), "quad must accept the dorsal duo");
 
-        //weapons first, in bar order, then the support modules
-        assertEquals(weapons + 2, unit.moduleCount());
-        assertEquals(Blocks.duo.localizedName, unit.moduleName(weapons));
-        assertEquals(Blocks.mendProjector.localizedName, unit.moduleName(weapons + 1));
+        //weapon groups first (quad's own + the new duo), then the support module
+        assertEquals(groups + 2, unit.moduleCount());
+        assertEquals(Blocks.duo.localizedName, unit.moduleName(groups));
+        assertEquals(Blocks.mendProjector.localizedName, unit.moduleName(groups + 1));
     }
 
     private static @Nullable String weaponName(Unit unit, int index){

@@ -7,6 +7,8 @@ import arc.util.*;
 import orbital.entities.Units;
 import orbital.gen.*;
 import orbital.graphics.*;
+import orbital.type.ModuleSupply;
+import orbital.world.consumers.ConsumeLiquidBase;
 
 import static orbital.Vars.*;
 
@@ -17,8 +19,10 @@ import static orbital.Vars.*;
  * <p>Continuously repairs the closest damaged allied unit with the block's real
  * {@code repairRadius}, {@code repairSpeed} and {@code beamWidth}. The block heals
  * {@code repairSpeed} hit points per tick with a beam; the module reproduces exactly
- * that, without power or coolant. Created by {@link orbital.entities.units.SupportMount};
- * never serialized and lives only in the mount.</p>
+ * that. When the block accepts coolant (the {@code repair-turret}), the module draws that
+ * coolant from the hull's liquid pool and heals faster by the same heat-capacity bonus.
+ * Created by {@link orbital.entities.units.SupportMount}; never serialized and lives only
+ * in the mount.</p>
  *
  * <p>When {@link #buildings} is set, damaged allied constructions are valid targets too,
  * so a dorsal repair module also patches the base it is defending.</p>
@@ -36,6 +40,14 @@ public class RepairBeamAbility extends Ability implements AimingModule{
     public float anchorX, anchorY;
     /** current aim, relative to the hull, in degrees. */
     public float rotation = 90f;
+    /**
+     * Optional coolant consumer copied from the block. The block's own {@code repair-turret}
+     * accepts coolant and heals faster; the module reads the same consumer, so it pays the
+     * same liquid per tick out of the hull's pool.
+     */
+    public @Nullable ConsumeLiquidBase coolant;
+    /** Extra healing per unit of the coolant's heat capacity, from the block. */
+    public float coolantMultiplier = 0f;
 
     protected @Nullable Unit target;
     protected @Nullable Building buildingTarget;
@@ -115,11 +127,21 @@ public class RepairBeamAbility extends Ability implements AimingModule{
                 rotateSpeed, Time.delta);
         }
 
+        //the block pays its coolant only while it has a target, and the heat capacity of the
+        //liquid it drew boosts the repair speed. The module does the same out of the hull pool.
+        ModuleSupply supply = unit.moduleSupply();
+        float coolantEfficiency = 0f;
+        if((unitValid || buildingValid) && coolant != null && supply != null){
+            coolantEfficiency = supply.useLiquid(coolant, Time.delta);
+        }
+        float coolantHeat = supply != null && supply.liquid != null ? supply.liquid.heatCapacity : 0f;
+        float repairMultiplier = 1f + coolantHeat * coolantMultiplier * coolantEfficiency;
+
         if(unitValid){
-            target.heal(repairSpeed * Time.delta);
+            target.heal(repairSpeed * repairMultiplier * Time.delta);
             strength = Mathf.lerpDelta(strength, 1f, 0.1f);
         }else if(buildingValid){
-            buildingTarget.heal(repairSpeed * Time.delta);
+            buildingTarget.heal(repairSpeed * repairMultiplier * Time.delta);
             strength = Mathf.lerpDelta(strength, 1f, 0.1f);
         }else{
             target = null;

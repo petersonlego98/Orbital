@@ -1932,10 +1932,14 @@ public class UnitType extends UnlockableContent implements Senseable{
             float wy = unit.y + Angles.trnsy(hull, mount.x, mount.y);
 
             //the hull's rotation for area modules, the hull plus the module's own aim for
-            //turret-like ones: both stay relative to the hull, so they follow it as it rolls
+            //turret-like ones: both stay relative to the hull, so they follow it as it rolls.
+            //AimingModule.rotation() is hull-local and uses the same 0=right convention as
+            //Draw.rect. DrawTurret compensates with drawrot() = rotation - 90, so turret
+            //sprites that have their barrel pointing up at 0 deg need the same -90 adjustment
+            //here; without it the barrel points 90 deg off the actual aim direction.
             float headRotation = hull;
             if(mount.ability instanceof orbital.entities.abilities.AimingModule aim){
-                headRotation += aim.rotation();
+                headRotation += aim.rotation() - 90f;
             }
 
             //reproduce Draw.rect(region, x, y, rotation)'s native sizing, then shrink it.
@@ -1944,10 +1948,15 @@ public class UnitType extends UnlockableContent implements Senseable{
 
             if(block instanceof Turret){
                 //a turret block is two sprites: a base that never turns and a head that turns
-                //with the barrel (DrawTurret.draw). Rotating the single tile instead makes the
-                //square block texture spin around its anchor - the blue rectangle on wave and
-                //tsunami was exactly that, with the liquid tanks as the head and no base under.
-                var base = Core.atlas.find(block.name + "-base", block.region);
+                //with the barrel (DrawTurret.draw). block.region is the HEAD - the barrel and the
+                //tanks - never the base; using it as the base as well drew a second, unrotated
+                //copy of the turret over the turning one. That was the "rectangle" that seemed
+                //to grow from wave/tsunami toward the aim point whenever the head turned.
+                //The base is the block's own -base sprite, or the generic block-<size> plate
+                //the block itself falls back to.
+                var base = Core.atlas.find(block.name + "-base");
+                if(!base.found()) base = Core.atlas.find("block-" + block.size);
+
                 if(base.found() && base != block.region){
                     float bw = base.width * base.scl() * Draw.xscl * mount.visualScale;
                     float bh = base.height * base.scl() * Draw.yscl * mount.visualScale;
@@ -1957,9 +1966,12 @@ public class UnitType extends UnlockableContent implements Senseable{
             }
 
             if(block.region.found()){
+                //the head turns around the module's dock: 0 deg in the region points up, while
+                //the aim is in Draw.rect's 0 = right convention, hence the -90 (DrawTurret's
+                //drawrot()). Without it the barrel tip points 90 deg away from the jet.
                 float w = block.region.width * block.region.scl() * Draw.xscl * mount.visualScale;
                 float h = block.region.height * block.region.scl() * Draw.yscl * mount.visualScale;
-                Draw.rect(block.region, wx, wy, w, h, headRotation);
+                Draw.rect(block.region, wx, wy, w, h, block instanceof Turret ? headRotation : hull);
             }
 
             //the liquid overlay, drawn on top of the head exactly like the block's tank
@@ -1982,6 +1994,15 @@ public class UnitType extends UnlockableContent implements Senseable{
                             Draw.color();
                         }
                     }
+                }
+
+                //the block's -top overlay (muzzle glow/sparkle) turns with the barrel
+                var top = Core.atlas.find(block.name + "-top");
+                if(top.found() && top != block.region){
+                    float tw = top.width * top.scl() * Draw.xscl * mount.visualScale;
+                    float th = top.height * top.scl() * Draw.yscl * mount.visualScale;
+                    Draw.color();
+                    Draw.rect(top, wx, wy, tw, th, headRotation);
                 }
             }
         }

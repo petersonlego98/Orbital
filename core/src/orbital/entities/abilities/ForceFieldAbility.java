@@ -13,7 +13,9 @@ import orbital.*;
 import orbital.content.*;
 import orbital.gen.*;
 import orbital.graphics.*;
+import orbital.type.ModuleSupply;
 import orbital.ui.*;
+import orbital.world.consumers.ConsumeLiquidBase;
 
 import static orbital.Vars.*;
 
@@ -30,6 +32,16 @@ public class ForceFieldAbility extends Ability{
     public int sides = 6;
     /** Rotation of shield. */
     public float rotation = 0f;
+    /**
+     * Optional coolant consumer copied from a force-projector block. While the shield is
+     * rebuilding, the module draws this coolant from the hull's liquid pool.
+     */
+    public @Nullable ConsumeLiquidBase coolant;
+    /**
+     * The block's {@code cooldownLiquid}: how much faster shield buildup gets when the liquid
+     * is a good coolant. The actual factor also includes the liquid's heat capacity.
+     */
+    public float coolantMultiplier = 1f;
 
     public Sound breakSound = Sounds.shieldBreakSmall;
     public Sound hitSound = Sounds.shieldHit;
@@ -96,7 +108,19 @@ public class ForceFieldAbility extends Ability{
         }
 
         if(unit.shield < scaledMax(unit)){
-            unit.shield += Time.delta * regen;
+            //the block shortens shield buildup when it can draw coolant; the module pays the
+            //same coolant out of the hull pool and applies the same heat-capacity multiplier
+            float regenMultiplier = 1f;
+            ModuleSupply supply = unit.moduleSupply();
+            if(coolant != null && supply != null){
+                float efficiency = supply.useLiquid(coolant, Time.delta);
+                if(efficiency > 0f && supply.liquid != null){
+                    float boosted = coolantMultiplier * (1f + (supply.liquid.heatCapacity - 0.4f) * 0.9f);
+                    regenMultiplier = 1f + (boosted - 1f) * efficiency;
+                }
+            }
+
+            unit.shield += Time.delta * regen * regenMultiplier;
         }
 
         wasBroken = unit.shield <= 0f;

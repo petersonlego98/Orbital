@@ -98,6 +98,7 @@ public class Pal{
     unitBack = Color.valueOf("d06b53"),
 
     lightTrail = Color.valueOf("ffe2a9"),
+    lightTrailer = Color.valueOf("ffe2a9"),
 
     surge = Color.valueOf("f3e979"),
 

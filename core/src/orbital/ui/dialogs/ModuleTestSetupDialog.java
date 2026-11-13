@@ -80,6 +80,7 @@ public class ModuleTestSetupDialog extends BaseDialog{
         body.add("@mode.testfeatures.setup.unit").style(Styles.outlineLabel).left().padBottom(4f).row();
         body.add("@mode.testfeatures.setup.unit.hint").color(Color.lightGray).left().wrap()
             .width(contentWidth() - 24f).padBottom(8f).row();
+        note("@mode.testfeatures.setup.unit.try");
 
         int columns = Mathf.clamp((int)(contentWidth() / Scl.scl(76f)), 4, 9);
         int[] index = {0};
@@ -119,6 +120,8 @@ public class ModuleTestSetupDialog extends BaseDialog{
             .color(Color.lightGray).left().wrap().width(contentWidth() - 24f).padBottom(4f).row();
         body.add("@mode.testfeatures.setup.modules.hint").color(Color.lightGray).left().wrap()
             .width(contentWidth() - 24f).padBottom(12f).row();
+        note("@mode.testfeatures.setup.modules.kinds");
+        note("@mode.testfeatures.setup.modules.try");
 
         body.button("@mode.testfeatures.modules.open", Icon.settings, this::openLoadout)
             .size(contentWidth() - 24f, 52f).left().padBottom(10f).row();
@@ -149,6 +152,8 @@ public class ModuleTestSetupDialog extends BaseDialog{
         body.add(String.format(Core.bundle.get("mode.testfeatures.setup.waves.timer"),
             (int)(TestNewFeaturesMode.initialWaveSpacing / 60f), (int)(TestNewFeaturesMode.waveSpacing / 60f)))
             .color(Color.lightGray).left().wrap().width(contentWidth() - 24f).padBottom(12f).row();
+        note("@mode.testfeatures.setup.waves.tools");
+        note("@mode.testfeatures.setup.waves.after");
 
         if(unit != null){
             body.add(Core.bundle.format("mode.testfeatures.setup.summary", unit.type.localizedName,
@@ -168,6 +173,15 @@ public class ModuleTestSetupDialog extends BaseDialog{
                 ui.showInfoToast(Core.bundle.get("mode.testfeatures.setup.waves.invalid"), 3f);
             }
         }).disabled(button -> unit == null);
+    }
+
+    /**
+     * A short "how to try it" note in plain language. The explicit width is what makes it wrap
+     * inside the dialog column on phones instead of running off the right edge.
+     */
+    private void note(String key){
+        body.add(key).color(Color.lightGray).left().wrap().width(contentWidth() - 30f)
+            .padLeft(6f).padBottom(8f).row();
     }
 
     private void openLoadout(){
