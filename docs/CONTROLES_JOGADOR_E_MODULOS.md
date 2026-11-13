@@ -3,6 +3,8 @@
 **Tipo:** relatório de implementação
 **Data:** 11 de novembro de 2026 · **revisão 12 de novembro de 2026:** §3.11 registra o
 dimensionamento atual do menu de módulos/encaixes no Android e revoga três medidas do §3.8.
+**Revisão 13 de novembro de 2026:** células, numeração e mira passam a valer **por grupo de
+módulos idênticos**, com o selo "×N" nas células com mais de uma cópia (§3.5 e §3.6).
 **Escopo:** controles de toque para Android, controle físico (gamepad), teclas numéricas dos
 módulos, escolha de arma para atirar e regra de mira automática/manual.
 **Rótulos:** **[FATO]** = verificado no código, com arquivo/linha; **[IMPLEMENTADO]** = entregue
@@ -248,17 +250,25 @@ seleção no início de cada rodada.
 
 ### 3.5 Faixa do HUD: números e escolha por toque
 
-`rebuildTurretBar` numera as células na mesma ordem das teclas:
+`rebuildTurretBar` numera as células na mesma ordem das teclas. A numeração é **por grupo de
+módulos idênticos** (13/11): dois Duo montados são um grupo, ocupam uma célula e um número só.
 
 ```java
 int index = 0;
-for(WeaponMount mount : unit.mounts) if(mount.weapon.isTurretMount()){
-    modules.add(turretCell(unit, mount, index++)).size(cellSize)...;
+for(Weapon group : unit.moduleGroups()){
+    int moduleIndex = index++;
+    WeaponMount mount = unit.representativeMountOf(group);
+    if(mount == null) continue;
+    int copies = unit.moduleCopies(group);
+    modules.add(turretCell(unit, mount, moduleIndex, copies)).size(cellSize).pad(cellPad)
+        .tooltip(turretTooltip(unit, moduleIndex, group, copies));
 }
 for(SupportMount mount : unit.supportMounts) ... supportCell(unit, mount, index++) ...
 ```
 
 - `moduleBadge` desenha o número no canto da célula (1..9, depois 0).
+- `turretCell` ganhou um selo "×N" no canto quando o grupo tem mais de uma cópia: cada cópia
+  alimenta o pool do casco, então o número diz quantas instâncias a célula representa.
 - `turretCell` ganhou `cell.clicked(() -> selectModule(unit, index))` — tocar **escolhe** o
   módulo: a partir daí ele é o único a atirar e os outros ficam cinza (borda e ícone
   acinzentados, fundo escuro). A escolha leva uma estrela no canto do ícone e borda da cor de
@@ -439,7 +449,22 @@ acabou de achar e ele re-buscaria a cada frame.
 
 **[FATO]** O único lugar onde o estado do piloto é aplicado é `InputHandler.update()` (teclas)
 e a faixa do HUD (toque); o próprio dialog `TurretLoadoutDialog.rebuildInstalled` tem um botão
-por arma instalada (`Icon.filter` = automático, `Icon.move` = manual, estado `checked`).
+por arma instalada (`Icon.filter` = automático, `Icon.move` = manual, estado `checked`).  
+
+**A identidade de módulo** é `WeaponsComp.sameModule()`:
+
+| Caso | Identidade |
+|---|---|
+| Módulo de torre (`TurretWeapon`) | o próprio bloco (`turret`) — dois Duo montados são o mesmo módulo |
+| Módulo de arma de casco (`WeaponModules`) | a arma de origem (`dorsalSourceWeapon`) no mesmo casco de origem |
+| Arma nativa do casco | nunca entra em grupo: cada montagem é seu próprio suporte |
+
+`setWeaponAimsSelf(weapon, auto)` e `setModuleAuto(index, auto)` aplicam o modo a **todas** as
+cópias iguais montadas (`WeaponsComp.sameModules`); `weaponAimsSelf`/`mountSelfTargets` continuam
+por montagem, e `Weapon.update` lê o conjunto já populado — assim todas as cópias giram para o
+próprio alvo. Armas **diferentes** seguem independentes — mudar uma não muda a outra.
+
+**Tudo isso agora é coberto por `AutoAimAimingTest.everyIdenticalModuleFollowsTheAimModeTogether`.**
 
 ### 3.7 `wave` e `tsunami` manuais
 

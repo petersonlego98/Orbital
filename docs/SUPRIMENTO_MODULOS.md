@@ -1,7 +1,7 @@
 ﻿# Suprimento dos módulos: munição, líquido e energia
 
-**Data:** 2026-11-10 · revisões em 2026-11-11 (três pools separados, reparo aéreo, jato das torres líquidas, energia como leitura)
-**Estado:** implementado em código, coberto por `tests/src/test/java/ModuleSupplyTest.java` (17 casos), `tests/src/test/java/SupportModuleEffectsTest.java` (15 casos) e pelas suítes de loadout existentes.
+**Data:** 2026-11-10 · revisões em 2026-11-11 (três pools separados, reparo aéreo, jato das torres líquidas, energia como leitura) e 2026-11-13 (células agrupadas com contador ×N, mira por grupo)
+**Estado:** implementado em código, coberto por `tests/src/test/java/ModuleSupplyTest.java` (22 casos), `tests/src/test/java/SupportModuleEffectsTest.java` (26 casos) e pelas suítes de loadout existentes.
 **Escopo:** armazenar, por casco, os recursos que os módulos dorsais usam — munição (item), líquido e energia, em pools separados — mostrar os três em barras coloridas no menu e no HUD, e fazer os módulos gastarem o que carregam.
 
 ---
@@ -20,6 +20,9 @@
 | Reparo | Os módulos de reparo curam **unidades aéreas** (2.6) |
 | Torres de líquido | Atiram de verdade: o jato é a munição líquida do bloco (2.7) |
 | Carga da unidade | A logística gasta o pool do casco, nunca o item que a unidade carrega (2.4) |
+| Células do HUD | **Um** módulo por grupo de cópias idênticas, com selo "×N" (2.8) |
+| Mira por grupo | O modo (automático/manual) vale para **todas** as cópias iguais (2.8) |
+| Teclas numéricas | Apontam para **grupos**, não para montagens individuais (2.8) |
 
 ## 2. O que o código faz
 
@@ -76,6 +79,18 @@ Os módulos de reparo montados no casco curam **unidades voadoras**: `RepairFiel
 
 `LiquidSupportAbility` (wave, tsunami) deixou de ser só um campo de status: a cada `reload` ticks ela mira o inimigo mais próximo que o bloco miraria (`targetAir`/`targetGround` do bloco) e **dispara a munição líquida do bloco** — mesmo projétil, mesmo dano, mesmo status, mesmos efeitos. O líquido vem do pool do casco (o líquido escolhido na barra) e cada jato o cobra, como o bloco cobra o dele. Enquanto jorra, ela mantém o papel de suporte do bloco: apaga fogo em aliados e aplica o status do líquido nos inimigos dentro do campo.
 
+### 2.8 Células agrupadas e o contador ×N
+
+Dois Duo montados no mesmo casco são **um módulo com duas cópias**, e a interface trata os dois como um só objeto:
+
+- `WeaponsComp.moduleGroups()` devolve os módulos montados **um por grupo de identidade** (`sameModule()`), `moduleCopies(group)` diz quantas cópias cada grupo tem e `representativeMountOf(group)` devolve a montagem que a célula desenha.
+- A faixa do HUD (`HudFragment.rebuildTurretBar`) e o menu (`TurretLoadoutDialog.rebuildInstalled`) desenham **uma célula por grupo**, com o selo "×N" no canto quando há mais de uma cópia — cada cópia contribui para o pool da mesma forma, então o número indica exatamente quantas instâncias alimentam a barra.
+- A numeração das células e as **teclas numéricas** seguem os grupos: apertar "1" escolhe todas as torres do grupo "Duo", não apenas uma montagem.
+- O modo de mira (automático/manual) é **do grupo**: `WeaponsComp.setModuleAuto(index, auto)` e `setWeaponAimsSelf(weapon, auto)` aplicam o modo a todas as cópias iguais (`sameModules`), enquanto `weaponAimsSelf`/`mountSelfTargets` continuam por montagem. Armas diferentes seguem independentes — mudar uma não muda a outra.
+- O menu de loadout continua listando cada cópia na coluna de encaixes; é a **mira** que passa a valer para o grupo inteiro.
+
+Detalhado em `CONTROLES_JOGADOR_E_MODULOS.md` §3.5 e §3.6.
+
 ## 3. O que **não** foi feito
 
 1. **Sem custo de instalação.** Montar/remover módulo continua gratuito (a receita do bloco segue documentada em `CATALOGO_VALORES_CONSTRUCAO_MODULOS.md`).
@@ -87,15 +102,19 @@ Os módulos de reparo montados no casco curam **unidades voadoras**: `RepairFiel
 
 | Suíte | Testes | Resultado |
 |---|---:|---|
-| `ModuleSupplyTest` | 17 | 0 falhas |
-| `SupportModuleEffectsTest` (novo) | 15 | 0 falhas |
+| `ModuleSupplyTest` | 22 | 0 falhas |
+| `SupportModuleEffectsTest` (novo) | 26 | 0 falhas |
 | `SupportLoadoutTest` | 43 | 0 falhas |
+| `ModuleControlTest` (grupos e escolha) | 15 | 0 falhas |
+| `AutoAimAimingTest` (mira por grupo) | 4 | 0 falhas |
+| `ModuleTutorialTest` | 4 | 0 falhas |
 | `TurretAmmoCompatibilityTest` | 6 | 0 falhas |
 | `TurretLoadoutDialogTest` | 7 | 0 falhas |
 | `TurretLoadoutSmokeTest` | 7 | 0 falhas |
 | `TurretModuleShootingTest` | 3 | 0 falhas |
 | `WallLoadoutTest` | 22 | 0 falhas |
 | `WeaponModuleTest` | 8 | 0 falhas |
+| `TestNewFeaturesModeTest` (grade e modo de teste) | 12 | 0 falhas |
 
 `SupportModuleEffectsTest` exercita **cada** categoria de suporte pelo laço real (`Groups.unit.update()`): campo de reparo, projetor de reparo, trator, ponto de defesa, feixe de reparo, torre de reparo, módulo líquido (jato + gasto de líquido + status + jato contínuo após 800 pulsos), logística, sobrecarga e campo de força — e prova que os reparos curam voadores e ignoram terrestres.
 
