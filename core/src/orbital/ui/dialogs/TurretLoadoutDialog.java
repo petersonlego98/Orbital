@@ -66,6 +66,15 @@ public class TurretLoadoutDialog extends BaseDialog{
     private int hoverSlot = -1;
     /** colour selector group (swatch + button); visible only while a wall plate is installed */
     private @Nullable Table colorPick;
+    /** which half of the module catalogue is being shown; {@link CatalogFilter#all} shows both */
+    private CatalogFilter filter = CatalogFilter.all;
+
+    /** Catalogue filter selected in the module menu. */
+    private enum CatalogFilter{
+        all,
+        weapons,
+        support
+    }
 
     public TurretLoadoutDialog(){
         super("@turret.loadout.title");
@@ -185,6 +194,9 @@ public class TurretLoadoutDialog extends BaseDialog{
         this.unit = unit;
         this.changed = changed;
         armedSlot = -1;
+        //the equipment screen always opens on the full catalogue; a filter left from the last
+        //unit would hide half the modules the player came to see
+        filter = CatalogFilter.all;
         //the menu opens at its beginning: the offset still in the pane belongs to the loadout
         //the player left behind, and starting mid-catalogue hid the hull name, the budget line
         //and the first heading under the top edge
@@ -252,72 +264,115 @@ public class TurretLoadoutDialog extends BaseDialog{
             .color(Color.lightGray).left().padBottom(6f).row();
         list.image().color(Pal.accent).height(3f).growX().padBottom(8f).row();
 
-        list.add("@turret.loadout.installed").style(Styles.outlineLabel).left().padBottom(4f).row();
-        rebuildInstalled();
+        //The filter bar sits above the catalogue: "show everything" is the big way back from
+        //either category, and the two category buttons keep weapons and support one tap apart.
+        list.add("@turret.loadout.categories").style(Styles.outlineLabel).left().padBottom(4f).row();
+        rebuildFilters();
 
-        list.image().color(Pal.accent).height(3f).growX().padBottom(8f).row();
-        //what the unit already carries, and the rule that follows from it - the catalogue below
-        //only offers turrets that run on that ammo. Both lines carry an explicit width: arc's
-        //wrap() keeps the single-line preferred width, so on a narrow pane (phones) the text
-        //would run past the edge and inflate the whole content table instead of wrapping
-        list.label(() -> Core.bundle.format("turret.loadout.ammo", ammoText(unit))).color(Color.lightGray)
-            .left().width(textWidth()).wrap().padBottom(2f).row();
-        list.add("@turret.loadout.ammo.rule").color(Color.lightGray).left().width(textWidth())
-            .wrap().padBottom(6f).row();
-        heading("@turret.loadout.available", turretKeys());
-        rebuildTurretGrid();
+        if(filter != CatalogFilter.support){
+            list.image().color(Pal.accent).height(3f).growX().padTop(10f).padBottom(8f).row();
 
-        list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
-        heading("@weapon.module.available", weaponKeys());
-        list.add("@weapon.module.hint").color(Color.lightGray).left().width(textWidth())
-            .wrap().padBottom(6f).row();
-        rebuildWeaponGrid();
+            list.add("@turret.loadout.installed").style(Styles.outlineLabel).left().padBottom(4f).row();
+            rebuildInstalled();
 
-        //wall plates come after the turret catalogue because they take turret space: the player
-        //reads the two grids as one budget decision
-        list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
-        heading("@support.loadout.available", wallKeys());
-        list.add("@support.category.armor.info").color(Color.lightGray).left().width(textWidth())
-            .wrap().padBottom(6f).row();
-        rebuildWallGrid();
+            list.image().color(Pal.accent).height(3f).growX().padTop(10f).padBottom(8f).row();
+            //what the unit already carries, and the rule that follows from it - the catalogue below
+            //only offers turrets that run on that ammo. Both lines carry an explicit width: arc's
+            //wrap() keeps the single-line preferred width, so on a narrow pane (phones) the text
+            //would run past the edge and inflate the whole content table instead of wrapping
+            list.label(() -> Core.bundle.format("turret.loadout.ammo", ammoText(unit))).color(Color.lightGray)
+                .left().width(textWidth()).wrap().padBottom(2f).row();
+            list.add("@turret.loadout.ammo.rule").color(Color.lightGray).left().width(textWidth())
+                .wrap().padBottom(6f).row();
+            heading("@turret.loadout.available", turretKeys());
+            rebuildTurretGrid();
 
-        list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
-        list.add("@support.loadout.installed").style(Styles.outlineLabel).left().padBottom(4f).row();
-        //the HUD can switch modules off without reopening this dialog, so read the live state
-        list.label(() -> Core.bundle.get(supportStateKey())).color(Color.lightGray)
-            .left().width(textWidth()).wrap().padBottom(6f).row();
-        rebuildSupportInstalled();
-
-        //A hull that already has an equivalent ability owns that effect permanently. Show it as
-        //a fixed module instead of letting the player install a second, conflicting copy.
-        if(hasNativeSupport(unit.type)){
-            list.add("@support.loadout.native").style(Styles.outlineLabel).left().padTop(10f).padBottom(4f).row();
-
-            for(SupportModuleCategory category : SupportModuleCategory.values()){
-                if(!unit.type.hasNativeSupport(category)) continue;
-
-                list.table(Styles.grayPanel, row -> {
-                    row.left().margin(6f);
-                    row.image(nativeIcon(category).uiIcon).size(40f).padRight(10f).scaling(Scaling.fit);
-                    row.add(Core.bundle.get("support.category." + category.name())).left().growX().ellipsis(false).wrap();
-                    row.add("@support.loadout.fixed").color(Color.lightGray).padLeft(8f).padRight(8f);
-                    row.image(Icon.lockSmall).size(24f).padLeft(8f).padRight(12f).get().setColor(Pal.gray);
-                }).growX().pad(3f).row();
-            }
-
-            list.add("@support.loadout.native.locked").color(Color.lightGray).left().width(textWidth())
-                .wrap().padBottom(4f).row();
+            list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
+            heading("@weapon.module.available", weaponKeys());
+            list.add("@weapon.module.hint").color(Color.lightGray).left().width(textWidth())
+                .wrap().padBottom(6f).row();
+            rebuildWeaponGrid();
         }
 
-        //the catalogue comes last, under its own heading and rule text
-        list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
-        heading("@support.loadout.available", supportKeys());
-        list.add("@support.loadout.limit").color(Color.lightGray).left().width(textWidth())
-            .wrap().padBottom(6f).row();
-        rebuildSupportGrid();
+        if(filter != CatalogFilter.weapons){
+            //wall plates come after the turret catalogue because they take turret space: the player
+            //reads the two grids as one budget decision
+            list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
+            heading("@support.loadout.available", wallKeys());
+            list.add("@support.category.armor.info").color(Color.lightGray).left().width(textWidth())
+                .wrap().padBottom(6f).row();
+            rebuildWallGrid();
+
+            list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
+            list.add("@support.loadout.installed").style(Styles.outlineLabel).left().padBottom(4f).row();
+            //the HUD can switch modules off without reopening this dialog, so read the live state
+            list.label(() -> Core.bundle.get(supportStateKey())).color(Color.lightGray)
+                .left().width(textWidth()).wrap().padBottom(6f).row();
+            rebuildSupportInstalled();
+
+            //A hull that already has an equivalent ability owns that effect permanently. Show it as
+            //a fixed module instead of letting the player install a second, conflicting copy.
+            if(hasNativeSupport(unit.type)){
+                list.add("@support.loadout.native").style(Styles.outlineLabel).left().padTop(10f).padBottom(4f).row();
+
+                for(SupportModuleCategory category : SupportModuleCategory.values()){
+                    if(!unit.type.hasNativeSupport(category)) continue;
+
+                    list.table(Styles.grayPanel, row -> {
+                        row.left().margin(6f);
+                        row.image(nativeIcon(category).uiIcon).size(40f).padRight(10f).scaling(Scaling.fit);
+                        row.add(Core.bundle.get("support.category." + category.name())).left().growX().ellipsis(false).wrap();
+                        row.add("@support.loadout.fixed").color(Color.lightGray).padLeft(8f).padRight(8f);
+                        row.image(Icon.lockSmall).size(24f).padLeft(8f).padRight(12f).get().setColor(Pal.gray);
+                    }).growX().pad(3f).row();
+                }
+
+                list.add("@support.loadout.native.locked").color(Color.lightGray).left().width(textWidth())
+                    .wrap().padBottom(4f).row();
+            }
+
+            //the catalogue comes last, under its own heading and rule text
+            list.image().color(Pal.accent).height(3f).growX().padTop(12f).padBottom(8f).row();
+            heading("@support.loadout.available", supportKeys());
+            list.add("@support.loadout.limit").color(Color.lightGray).left().width(textWidth())
+                .wrap().padBottom(6f).row();
+            rebuildSupportGrid();
+        }
 
         //restoring the offset keeps a mount or a section toggle from moving the page
         restoreScroll(keep);
+    }
+
+    /**
+     * The category bar: a big "show everything" button, then one button per module family.
+     * Both category buttons narrow the same catalogue, so the large button is the way back.
+     */
+    private void rebuildFilters(){
+        float allHeight = mobile ? 56f : 62f;
+
+        list.button("@turret.loadout.filter.all", Icon.list, Styles.flatTogglet,
+                () -> setFilter(CatalogFilter.all))
+            .growX().height(allHeight).padBottom(4f)
+            .update(button -> button.setChecked(filter == CatalogFilter.all)).row();
+
+        list.table(row -> {
+            row.defaults().growX().height(mobile ? 48f : 54f).pad(2f);
+            row.button("@turret.loadout.filter.weapons", Icon.turret, Styles.flatTogglet,
+                    () -> setFilter(CatalogFilter.weapons))
+                .update(button -> button.setChecked(filter == CatalogFilter.weapons));
+            row.button("@turret.loadout.filter.support", Icon.defense, Styles.flatTogglet,
+                    () -> setFilter(CatalogFilter.support))
+                .update(button -> button.setChecked(filter == CatalogFilter.support));
+        }).growX().padBottom(4f).row();
+    }
+
+    /** Switches the catalogue filter; mounting a module keeps the chosen category. */
+    private void setFilter(CatalogFilter value){
+        if(filter == value) return;
+        filter = value;
+        //the filtered catalogue is shorter, so the old offset would open it mid-way
+        if(pane != null) pane.setScrollYForce(0f);
+        rebuild();
     }
 
     /**
