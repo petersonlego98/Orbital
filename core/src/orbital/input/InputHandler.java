@@ -969,6 +969,9 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
     }
 
     public void update(){
+        //auto-build: per-frame cleanup of the plans forwarded to the builder units
+        AutoBuildSync.update(player.team());
+
         if(spectating != null && (!spectating.isValid() || spectating.team != player.team())){
             spectating = null;
         }

@@ -31,13 +31,16 @@ import static orbital.gen.Tex.*;
  * with a second finger keeps working exactly as before.</p>
  */
 public class AnalogStick extends Table{
-    /** Maximum knob travel, in UI units, before the vector saturates. */
+    /** Maximum knob travel, in raw scene pixels, before the vector saturates. */
     public final float radius;
-    /** Drawn knob radius, in UI units. */
+    /** Drawn knob radius, in raw scene pixels. */
     public final float knobRadius;
 
+    /** Total widget side, in raw scene pixels. */
+    private final float widgetSize;
+
     private final Vec2 sink;
-    /** Live knob offset from the ring centre, in UI units. */
+    /** Live knob offset from the ring centre, in raw scene pixels. */
     private final Vec2 knob = new Vec2();
     private final Runnable active;
 
@@ -51,14 +54,22 @@ public class AnalogStick extends Table{
      *               live stick from an idle one.
      */
     public AnalogStick(Vec2 sink, Runnable active){
-        this(sink, active, Scl.scl(120f), Scl.scl(44f), Scl.scl(46f));
+        this(sink, active, 120f, 44f, 46f);
     }
 
+    /**
+     * @param size widget side, in ui units
+     * @param radius maximum knob travel, in ui units
+     * @param knobRadius drawn knob radius, in ui units
+     */
     public AnalogStick(Vec2 sink, Runnable active, float size, float radius, float knobRadius){
         this.sink = sink;
         this.active = active;
-        this.radius = radius;
-        this.knobRadius = knobRadius;
+        //input coordinates and drawing happen in raw scene pixels. Cell sizes, in contrast, are
+        //scaled by Arc when they are laid out, so the two kinds of values are converted here.
+        this.widgetSize = Scl.scl(size);
+        this.radius = Scl.scl(radius);
+        this.knobRadius = Scl.scl(knobRadius);
 
         background(orbital.gen.Tex.pane);
         touchable = Touchable.enabled;
@@ -102,9 +113,9 @@ public class AnalogStick extends Table{
         });
     }
 
-    /** Total widget side, in UI units. */
+    /** Total widget side, in raw scene pixels. */
     public float size(){
-        return radius * 2f;
+        return widgetSize;
     }
 
     /** @return the current steering vector, normalized; never null. */

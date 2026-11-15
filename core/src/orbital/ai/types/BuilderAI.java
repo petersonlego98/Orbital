@@ -43,6 +43,11 @@ public class BuilderAI extends AIController{
         }
     }
 
+    /** Forces the next team plan pickup on the following update instead of waiting for the rebuild timer (auto-build). */
+    public void pingForTeamPlans(){
+        timer.reset(timerTarget3, rebuildPeriod);
+    }
+
     @Override
     public void updateMovement(){
 

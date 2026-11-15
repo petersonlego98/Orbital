@@ -1,15 +1,9 @@
 package orbital.desktop.vulkan;
 
-import java.io.*;
-
-import arc.*;
 import arc.files.*;
 import arc.util.*;
 import orbital.core.*;
-import orbital.core.RendererPreference;
-import orbital.io.*;
-
-import static orbital.Vars.appName;
+import orbital.desktop.*;
 
 /**
  * Reads {@link RendererPreference} before {@code Core.settings} exists.
@@ -60,32 +54,17 @@ public final class VulkanPreferences{
      * missing, unreadable or holds something unexpected
      */
     public static String read(Fi directory){
-        Settings settings = new Settings();
-        settings.setJson(JsonIO.json);
-        settings.setAppName(appName);
-        settings.setDataDirectory(directory);
-
-        Fi file = directory.child("settings.bin");
-        if(!file.exists()) return RendererPreference.opengl;
-
         try{
-            //loadValues(Fi) instead of load(): it is read-only, while load() refreshes the backup copy.
-            settings.loadValues(file);
+            return RendererPreference.normalize(DesktopSettings.load(directory)
+                .getString(RendererPreference.key, RendererPreference.opengl));
         }catch(Throwable error){
             Log.debug("[Vulkan] Could not read the stored renderer preference: @", error.toString());
             return RendererPreference.opengl;
         }
-
-        return RendererPreference.normalize(settings.getString(RendererPreference.key, RendererPreference.opengl));
     }
 
     /** The data directory {@link orbital.Vars#loadSettings()} uses, resolved without {@code Core.files}. */
     private static Fi dataDirectory(){
-        String override = System.getProperty("orbital.data.dir", OS.env("ORBITAL_DATA_DIR"));
-        if(override != null) return new Fi(override);
-
-        //Steam keeps settings next to the executable; SdlFi maps a relative path onto the working
-        //directory, which is what Core.files.local("saves/") resolves to as well.
-        return Version.isSteam ? new Fi("saves") : new Fi(OS.getAppDataDirectoryString(appName));
+        return DesktopSettings.dataDirectory();
     }
 }

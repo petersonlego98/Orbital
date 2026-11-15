@@ -51,6 +51,8 @@ public class PlacementFragment{
     @Nullable Team lastTeam;
     boolean wasHovered;
     Table blockTable, toggler, topTable, blockCatTable, commandTable;
+    /** main block-selection frame, used by the command tablet to sit above it. */
+    @Nullable Table blockFrame;
     Stack mainStack;
     ScrollPane blockPane;
     Runnable rebuildCommand;
@@ -184,6 +186,9 @@ public class PlacementFragment{
         if(ui.chatfrag.shown() || ui.consolefrag.shown() || Core.scene.hasKeyboard()) return false;
 
         for(int i = 0; i < blockSelect.length; i++){
+            //in the test mode the number keys belong to the module hotkeys (see InputHandler.update);
+            //blocks are still selected by click/touch, and the arrow keys keep navigating the grid
+            if(i < 10 && TestNewFeaturesMode.active()) continue;
             if(Core.input.keyTap(blockSelect[i])){
                 if(i > 9){ //select block directionally
                     Seq<Block> blocks = getUnlockedByCategory(currentCategory);
@@ -274,12 +279,20 @@ public class PlacementFragment{
         return false;
     }
 
+    /** @return current height of the block-selection frame in ui units, or 0 when it is hidden. */
+    public float menuHeight(){
+        if(!BuildMenuPreference.oldMenuEnabled() || blockFrame == null) return 0f;
+        return blockFrame.getHeight() / Math.max(0.01f, Scl.scl(1f));
+    }
+
     public void build(Group parent){
         parent.fill(full -> {
             toggler = full;
-            full.bottom().right().visible(() -> ui.hudfrag.shown() && !TestNewFeaturesMode.active());
+            //the test mode also builds now: it queues plans for the builder units
+            full.bottom().right().visible(() -> ui.hudfrag.shown() && BuildMenuPreference.oldMenuEnabled());
 
             full.table(frame -> {
+                blockFrame = frame;
 
                 //rebuilds the category table with the correct recipes
                 Runnable rebuildCategory = () -> {
@@ -754,7 +767,8 @@ public class PlacementFragment{
         if(block == null) return null;
         if(!player.isBuilder()) return "@unit.nobuild";
         if(state.isEditor()) return null; //always placeable in editor as long as there's a builder
-        if(!block.supportsEnv(state.rules.env)) return "@unsupported.environment";
+        //test mode is a sandbox: the planet environment filter does not apply there
+        if(!TestNewFeaturesMode.active() && !block.supportsEnv(state.rules.env)) return "@unsupported.environment";
         if(block.isBanned()) return "@banned";
         if(block.isOverPlacementLimit(player.team())) return Core.bundle.format("block.limit", state.rules.blockLimits.get(block));
         return null;
@@ -765,7 +779,8 @@ public class PlacementFragment{
     }
 
     Seq<Block> getByCategory(Category cat){
-        return returnArray.selectFrom(content.blocks(), block -> block.category == cat && block.isVisible() && block.environmentBuildable());
+        return returnArray.selectFrom(content.blocks(), block -> block.category == cat && block.isVisible()
+            && (block.environmentBuildable() || TestNewFeaturesMode.active()));
     }
 
     Seq<Block> getUnlockedByCategory(Category cat){
@@ -777,6 +792,9 @@ public class PlacementFragment{
     }
 
     boolean unlocked(Block block){
+        //test mode is a sandbox for content: show every placeable block of both planets,
+        //ignoring research unlocks and the planet environment filter
+        if(TestNewFeaturesMode.active()) return TestNewFeaturesMode.blockAvailable(block);
         return block.unlockedNowHost() && block.placeablePlayer && block.environmentBuildable() &&
             block.supportsEnv(state.rules.env);
     }

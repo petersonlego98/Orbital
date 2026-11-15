@@ -273,6 +273,10 @@ project(":desktop"){
 
         implementation arcModule("backends:backend-sdl")
 
+        // Win32 DPI awareness on Windows. The native classifier is kept as a runtime dependency
+        // below; the core artifact provides the Java bindings used by WindowsDpiSupport.
+        implementation "org.lwjgl:lwjgl:3.4.3"
+
         // GLSL 450 -> SPIR-V for the desktop Vulkan backend. Native binaries are loaded lazily,
         // so this dependency is only exercised when shader compilation is requested.
         implementation "org.lwjgl:lwjgl-shaderc:3.4.3"

@@ -523,8 +523,24 @@ public class Vars implements Loadable{
         //larger there than on desktop. Scl already raises the base scale by density; this
         //adds the extra that makes labels and buttons comfortable without the user having
         //to hunt for the Graphics > UI Scaling slider.
-        int defaultUiScale = Vars.android ? 125 : 100;
+        //
+        //Windows can additionally report the scale of the monitor that owns the window. When
+        //automatic DPI scaling is enabled, that value keeps controls at the same physical size
+        //on high-resolution/high-DPI displays. An explicit UI-scale choice disables the
+        //automatic mode in the settings menu.
+        boolean automaticDpi = !Vars.android && DpiPreference.available()
+            && settings.getBool(DpiPreference.key, true);
+        int defaultUiScale = automaticDpi ? DpiPreference.recommendedScale(100)
+            : (Vars.android ? 125 : 100);
         int uiscale = settings.getInt("uiscale", defaultUiScale);
+        if(automaticDpi){
+            // Keep the scale the user had before automatic DPI was introduced, so turning the
+            // option off later restores it instead of falling back to 100%.
+            if(settings.getInt(DpiPreference.manualScaleKey, 0) <= 0){
+                DpiPreference.setManualScale(uiscale);
+            }
+            uiscale = DpiPreference.recommendedScale(uiscale);
+        }
         //persist it so the slider and the next launch see the same value
         settings.put("uiscale", uiscale);
 

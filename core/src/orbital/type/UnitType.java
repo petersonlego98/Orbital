@@ -1071,6 +1071,11 @@ public class UnitType extends UnlockableContent implements Senseable{
 
         if(flying){
             envEnabled |= Env.space;
+
+            //every aerial unit can build; types that already declare a build speed keep their own value
+            if(buildSpeed <= 0f){
+                buildSpeed = 0.5f;
+            }
         }
 
         if(deathSound == Sounds.unset){

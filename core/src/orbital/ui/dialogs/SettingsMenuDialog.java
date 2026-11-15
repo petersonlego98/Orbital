@@ -37,6 +37,8 @@ public class SettingsMenuDialog extends BaseDialog{
     /** Desktop-only renderer settings; see {@link RendererPreference}. */
     public SettingsTable advancedgraphics;
     public SettingsTable game;
+    /** construction automation: who builds the blocks the player queues. */
+    public SettingsTable constructions;
     public SettingsTable sound;
     public SettingsTable dev;
     public SettingsTable main;
@@ -67,6 +69,7 @@ public class SettingsMenuDialog extends BaseDialog{
                 advancedgraphics.rebuild();
                 sound.rebuild();
                 game.rebuild();
+                constructions.rebuild();
                 dev.rebuild();
                 updateScrollFocus();
                 lastRebuildSize[0] = Core.graphics.getWidth();
@@ -81,6 +84,7 @@ public class SettingsMenuDialog extends BaseDialog{
         menu = new Table(Tex.button);
 
         game = new SettingsTable();
+        constructions = new SettingsTable();
         graphics = new SettingsTable();
         advancedgraphics = new SettingsTable();
         sound = new SettingsTable();
@@ -347,11 +351,12 @@ public class SettingsMenuDialog extends BaseDialog{
 
         menu.defaults().size(300f, 60f);
         menu.button("@settings.game", Icon.settings, style, isize, () -> visible(0)).marginLeft(marg).row();
-        menu.button("@settings.graphics", Icon.image, style, isize, () -> visible(1)).marginLeft(marg).row();
+        menu.button("@settings.constructions", Icon.hammer, style, isize, () -> visible(1)).marginLeft(marg).row();
+        menu.button("@settings.graphics", Icon.image, style, isize, () -> visible(2)).marginLeft(marg).row();
         if(!mobile){
-            menu.button("@settings.advancedgraphics", Icon.terminal, style, isize, () -> visible(2)).marginLeft(marg).row();
+            menu.button("@settings.advancedgraphics", Icon.terminal, style, isize, () -> visible(3)).marginLeft(marg).row();
         }
-        menu.button("@settings.sound", Icon.volumeUp, style, isize, () -> visible(3)).marginLeft(marg).row();
+        menu.button("@settings.sound", Icon.volumeUp, style, isize, () -> visible(4)).marginLeft(marg).row();
         menu.button("@settings.language", Icon.chat, style, isize, ui.language::show).marginLeft(marg).row();
         //the controls menu is now relevant on the phone too: the analog stick, the module
         //number keys and the gamepad switches live there, and a Bluetooth keyboard or a
@@ -359,11 +364,11 @@ public class SettingsMenuDialog extends BaseDialog{
         menu.button("@settings.controls", Icon.move, style, isize, ui.controls::show).marginLeft(marg).row();
 
         menu.button("@settings.data", Icon.save, style, isize, () -> dataDialog.show()).marginLeft(marg).row();
-        menu.button("@settings.dev", Icon.fileCode, style, isize, () -> visible(4)).marginLeft(marg).row();
+        menu.button("@settings.dev", Icon.fileCode, style, isize, () -> visible(5)).marginLeft(marg).row();
         //ui.about is created after this dialog, so the reference must be resolved lazily.
         menu.button("@about.button", Icon.info, style, isize, () -> ui.about.show()).marginLeft(marg).row();
 
-        int i = 5;
+        int i = 6;
         for(var cat : categories){
             int index = i;
             if(cat.icon == null){
@@ -376,6 +381,11 @@ public class SettingsMenuDialog extends BaseDialog{
     }
 
     void addSettings(){
+        //construction automation: default is the builder units doing the work
+        constructions.checkPref("autobuild", true);
+        //the classic fixed build menu is opt-in; the command tablet is the default interface
+        constructions.checkPref(BuildMenuPreference.oldMenuKey, false);
+
         sound.checkPref("alwaysmusic", false);
         sound.sliderPref("musicvol", 100, 0, 100, 1, i -> i + "%");
         sound.sliderPref("sfxvol", 100, 0, 100, 1, i -> i + "%");
@@ -444,7 +454,13 @@ public class SettingsMenuDialog extends BaseDialog{
 
         graphics.sliderPref("uiscale", android ? 125 : 100, 25, 300, 5, s -> {
             //if the user changed their UI scale, but then put it back, don't consider it 'changed'
-            Core.settings.put("uiscalechanged", s != lastUiScale[0]);
+            boolean modified = s != lastUiScale[0];
+            Core.settings.put("uiscalechanged", modified);
+            // A manual UI scale takes precedence over the automatically detected Windows DPI.
+            if(modified && DpiPreference.available()){
+                DpiPreference.setAutomatic(false);
+                DpiPreference.setManualScale(s);
+            }
             return s + "%";
         });
 
@@ -574,6 +590,59 @@ public class SettingsMenuDialog extends BaseDialog{
             Core.settings.put("swapdiagonal", false);
         }
 
+        //Desktop-only display options. The resolution provider enumerates only modes supported by
+        //the user's computer, while the DPI option keeps the interface at a consistent physical
+        //size on high-resolution Windows displays.
+        if(!mobile && WindowPreference.provider != null){
+            Seq<WindowResolution> resolutions = WindowPreference.available();
+            WindowResolution selected = WindowPreference.selected();
+            if(selected != null && !resolutions.contains(selected)){
+                //The selected mode is no longer supported (for example, the user changed monitors).
+                //Fall back to automatic sizing instead of keeping a stale value.
+                Core.settings.put(WindowPreference.key, WindowPreference.automatic);
+            }
+
+            Seq<String> resolutionValues = Seq.with(WindowPreference.automatic);
+            Seq<String> resolutionLabels = Seq.with(bundle.get("setting.windowresolution.auto"));
+            // Window resolutions are logical coordinates, so compare against the logical size
+            // rather than the (possibly larger) physical drawable of a high-DPI display.
+            int currentWidth = Core.graphics.getWidth();
+            int currentHeight = Core.graphics.getHeight();
+            for(WindowResolution resolution : resolutions){
+                resolutionValues.add(resolution.id());
+                String label = resolution.refreshRate > 0
+                    ? bundle.format("setting.windowresolution.refresh", resolution.width, resolution.height, resolution.refreshRate)
+                    : bundle.format("setting.windowresolution.option", resolution.width, resolution.height);
+                if(resolution.width == currentWidth && resolution.height == currentHeight){
+                    label += " " + bundle.get("setting.windowresolution.current");
+                }
+                resolutionLabels.add(label);
+            }
+
+            advancedgraphics.pref(new SettingsTable.DropdownSetting(WindowPreference.key,
+                WindowPreference.automatic, resolutionValues.toArray(String.class),
+                resolutionLabels.toArray(String.class), value -> {
+                    if(!WindowPreference.apply(WindowResolution.parse(value))){
+                        ui.showInfo(bundle.get("settings.windowresolution.failed"));
+                    }
+                }));
+        }
+
+        if(!mobile && DpiPreference.available()){
+            advancedgraphics.checkPref(DpiPreference.key, true, automatic -> {
+                if(automatic){
+                    // The current value is the manual scale that the user had before enabling
+                    // automatic mode; keep it for when the option is turned off again.
+                    DpiPreference.setManualScale(settings.getInt("uiscale", 100));
+                }else{
+                    // The persisted uiscale currently holds the detected DPI value. Restore the
+                    // manual choice so turning this option off has a visible effect after restart.
+                    settings.put("uiscale", DpiPreference.manualScale(100));
+                }
+                ui.showInfo(bundle.get("settings.autodpi.restart"));
+            });
+        }
+
         //renderer choice is desktop-only: Vulkan has no mobile backend and the preference has to be
         //read by the launcher before the window exists, so the row registers nothing elsewhere.
         if(!mobile){
@@ -675,7 +744,7 @@ public class SettingsMenuDialog extends BaseDialog{
         prefs.clearChildren();
 
         Seq<Table> tables = new Seq<>();
-        tables.addAll(game, graphics, advancedgraphics, sound, dev);
+        tables.addAll(game, constructions, graphics, advancedgraphics, sound, dev);
         for(var custom : categories){
             tables.add(custom.table);
         }
@@ -852,6 +921,72 @@ public class SettingsMenuDialog extends BaseDialog{
                     table.add(current).left().growX().padTop(6f).update(label -> label.setText(status.get()));
                     table.row();
                 }
+            }
+        }
+
+        /**
+         * Preference backed by a dropdown-style button. The stored value and its visible label
+         * are separate, so dynamic values such as display resolutions do not need one bundle key
+         * per option.
+         */
+        public static class DropdownSetting extends Setting{
+            String def;
+            Seq<String> values;
+            Seq<String> labels;
+            @Nullable Cons<String> changed;
+
+            public DropdownSetting(String name, String def, String[] values, String[] labels, @Nullable Cons<String> changed){
+                super(name);
+                this.def = def;
+                this.values = Seq.with(values);
+                this.labels = Seq.with(labels);
+                this.changed = changed;
+                settings.defaults(name, def);
+            }
+
+            @Override
+            public void add(SettingsTable table){
+                Table content = table.table().left().growX().get();
+                content.add(title, Styles.outlineLabel).left();
+                addDesc(content);
+                table.row();
+
+                TextButton button = new TextButton(label(currentValue()), Styles.flatt);
+                button.clicked(() -> showOptions(button));
+                addDesc(table.add(button).left().width(300f).height(45f).padTop(3f).get());
+                table.row();
+            }
+
+            private void showOptions(TextButton button){
+                BaseDialog dialog = new BaseDialog(title);
+                dialog.cont.pane(p -> {
+                    p.defaults().size(300f, 45f).left();
+                    for(int i = 0; i < values.size; i++){
+                        String value = values.get(i);
+                        p.button(labels.get(i), Styles.flatTogglet, () -> {
+                            select(value);
+                            button.setText(label(value));
+                            dialog.hide();
+                        }).checked(value.equals(currentValue())).row();
+                    }
+                });
+                dialog.addCloseButton();
+                dialog.show();
+            }
+
+            private void select(String value){
+                boolean modified = !value.equals(currentValue());
+                settings.put(name, value);
+                if(changed != null && modified) changed.get(value);
+            }
+
+            private String currentValue(){
+                return settings.getString(name, def);
+            }
+
+            private String label(String value){
+                int index = values.indexOf(value);
+                return index < 0 ? values.isEmpty() ? value : labels.first() : labels.get(index);
             }
         }
 

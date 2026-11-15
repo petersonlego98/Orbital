@@ -1,7 +1,6 @@
-import arc.math.*;
 import orbital.content.*;
 import orbital.game.*;
-import orbital.ui.fragments.HudFragment;
+import orbital.ui.dialogs.TestFeaturesCatalogDialog;
 import orbital.world.*;
 import org.junit.jupiter.api.*;
 
@@ -59,6 +58,22 @@ public class TestNewFeaturesModeTest{
     }
 
     @Test
+    void aerialCatalogIncludesZenith(){
+        assertTrue(UnitTypes.zenith.flying, "Zenith must be an aerial unit");
+        assertFalse(UnitTypes.zenith.isHidden(), "Zenith must not be hidden");
+        assertTrue(TestNewFeaturesMode.aerialTypes().contains(UnitTypes.zenith),
+            "Zenith is missing from the tablet unit catalogue");
+    }
+
+    @Test
+    void everyAerialUnitCanBuild(){
+        for(var type : content.units()){
+            if(!type.flying) continue;
+            assertTrue(type.buildSpeed > 0f, type.name + " is an aerial unit and must be able to build");
+        }
+    }
+
+    @Test
     void enemyStructureCatalogOnlyHasStructures(){
         var blocks = TestNewFeaturesMode.enemyBlocks();
         assertFalse(blocks.isEmpty());
@@ -67,6 +82,19 @@ public class TestNewFeaturesModeTest{
             assertFalse(block.isAir(), block.name + " is air");
             assertNotEquals(Blocks.cliff, block);
             assertFalse(block.localizedName.isEmpty());
+        }
+    }
+
+    @Test
+    void enemyStructureCatalogCoversEveryBuildableStructure(){
+        var blocks = TestNewFeaturesMode.enemyBlocks();
+        for(var block : content.blocks()){
+            boolean eligible = block.canBeBuilt()
+                && block.placeablePlayer
+                && !block.moduleOnly
+                && !block.isAir() && !block.isFloor() && block != Blocks.cliff;
+            assertEquals(eligible, blocks.contains(block),
+                "buildable structure " + block.name + " does not match the catalogue filter");
         }
     }
 
@@ -187,49 +215,58 @@ public class TestNewFeaturesModeTest{
 
     @Test
     void setupIntervalsArePositiveAndWavesStayDisabledUntilStarted(){
-        assertTrue(TestNewFeaturesMode.initialWaveSpacing > 0f);
-        assertTrue(TestNewFeaturesMode.waveSpacing > TestNewFeaturesMode.initialWaveSpacing);
+        assertTrue(TestNewFeaturesMode.waveSpacing > 0f);
         assertEquals(0.55f, TestNewFeaturesMode.waveDifficulty, 0.0001f);
 
         //beginWaves must refuse to run outside the test environment
         assertFalse(TestNewFeaturesMode.beginWaves());
     }
 
+    @Test
+    void wavesNeverStartOnTheirOwn(){
+        Rules rules = new Rules();
+        TestNewFeaturesMode.configureWaveRules(rules);
+
+        assertTrue(rules.waves, "the wave groups must be ready");
+        assertTrue(rules.waveSending, "the player still needs the manual wave button");
+        assertFalse(rules.waveTimer, "the timer would send enemy groups without the player asking");
+        assertEquals(TestNewFeaturesMode.waveSpacing, rules.waveSpacing, 0.0001f);
+    }
+
     /**
-     * The friendly-ship grid has to use the whole width of the pane: the icons spread over the
-     * full row instead of leaving a gap, and they never hide under the vertical scrollbar.
+     * The shared catalogue grid has to stay clear of the vertical scrollbar at every Android
+     * scale. Raw pixels are converted to ui units before the columns are calculated, otherwise
+     * the tablet grid is counted in the wrong unit and the last icons slide under the scrollbar.
      */
     @Test
-    void friendlyShipGridFillsThePaneWithoutHidingUnderTheScrollbar(){
-        float width = 496f, height = 184f, scroll = 24f, preferred = 48f;
-
-        //a grid that fits in the height uses the whole width: no scrollbar is drawn
-        float[] fits = HudFragment.unitGridLayout(width, height, 10, preferred, scroll);
-        assertEquals(width, (int)fits[0] * fits[1], 0.01f,
-            "a grid that fits in the height has to span the whole width of the pane");
-
-        //a grid that does not fit keeps room for the scrollbar, so no icon is hidden under it
-        float[] packed = HudFragment.unitGridLayout(width, height, 60, preferred, scroll);
-        int columns = (int)packed[0];
-        float cell = packed[1];
-        assertTrue(columns * cell <= width - scroll + 0.01f,
-            "the grid must stay clear of the vertical scrollbar");
-        assertTrue(columns * cell > width - scroll - preferred,
-            "the grid must still use the width the pane has");
-        assertTrue(Mathf.ceil(60 / (float)columns) * cell > height,
-            "that grid has to overflow the pane, so it really needs the scrollbar");
-
-        //the real catalog, on both platforms, may not run under the scrollbar either
-        int count = TestNewFeaturesMode.aerialTypes().size;
-        assertTrue(count > 0);
-        float[] desktop = HudFragment.unitGridLayout(width, height, count, preferred, scroll);
-        assertTrue((int)desktop[0] * desktop[1] <= width - scroll + 0.01f,
+    void catalogGridStaysClearOfTheScrollbarAtEveryScale(){
+        float[] desktop = TestFeaturesCatalogDialog.catalogGridLayout(800f, 52f, 24f);
+        assertTrue((int)desktop[0] >= 1);
+        assertTrue((int)desktop[0] * desktop[1] <= 800f - 24f + 0.01f,
             "the desktop grid must stay clear of the vertical scrollbar");
+
         //on mobile the ui is scaled up, so the same 24 raw pixels take fewer ui units
         float mobileScroll = 24f / 2.5f;
-        float[] mobile = HudFragment.unitGridLayout(376f, 138f, count, 40f, mobileScroll);
-        assertTrue((int)mobile[0] * mobile[1] <= 376f - mobileScroll + 0.01f,
+        float mobileWidth = 1200f / 2.5f;
+        float[] mobile = TestFeaturesCatalogDialog.catalogGridLayout(mobileWidth, 56f, mobileScroll);
+        assertTrue((int)mobile[0] * mobile[1] <= mobileWidth - mobileScroll + 0.01f,
             "the mobile grid must stay clear of the vertical scrollbar");
+
+        //a narrow screen still gets one usable cell instead of an overflowing grid
+        float[] narrow = TestFeaturesCatalogDialog.catalogGridLayout(80f, 56f, 12f);
+        assertEquals(1, (int)narrow[0]);
+        assertTrue(narrow[1] <= 80f - 12f + 0.01f);
+    }
+
+    @Test
+    void catalogGrowsTheIconsOnWideScreens(){
+        float[] wide = TestFeaturesCatalogDialog.catalogGridLayout(1900f, 84f, 24f);
+
+        assertEquals(10, (int)wide[0], "wide panes keep at most ten columns");
+        assertTrue(wide[1] > 84f, "the cells must grow past the preferred size instead of leaving empty space");
+        assertTrue(wide[1] <= TestFeaturesCatalogDialog.maxCell + 0.01f, "cells must not grow beyond the readable maximum");
+        assertTrue((int)wide[0] * wide[1] <= 1900f - 24f + 0.01f,
+            "grown cells must still stay clear of the vertical scrollbar");
     }
 
     private static void createFlatMap(int width, int height){

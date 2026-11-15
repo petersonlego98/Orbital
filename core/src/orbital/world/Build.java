@@ -182,7 +182,12 @@ public class Build{
     /** @return whether a tile can be placed at this location by this team. Ignores units at this location. */
     public static boolean validPlaceIgnoreUnits(Block type, Team team, int x, int y, int rotation, boolean checkVisible, boolean checkCoreRadius){
         //the wave team can build whatever they want as long as it's visible - banned blocks are not applicable
-        if(type == null || (!state.rules.editor && (checkVisible && (!type.environmentBuildable() || (!type.isPlaceable() && !(state.rules.waves && team == state.rules.waveTeam && type.isVisible())))))){
+        //the test-features map is on Qatia, but its catalog mixes Serpulo and Erekir blocks;
+        //their shownPlanets do not include Qatia, so the planet check is skipped there
+        if(type == null || (!state.rules.editor && (checkVisible && (
+            !(type.environmentBuildable() || TestNewFeaturesMode.active()) ||
+            (!type.isPlaceable() && !(state.rules.waves && team == state.rules.waveTeam && type.isVisible()))
+        )))){
             return false;
         }
 

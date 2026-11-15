@@ -149,8 +149,7 @@ public class ModuleTestSetupDialog extends BaseDialog{
         body.add("@mode.testfeatures.setup.waves").style(Styles.outlineLabel).left().padBottom(4f).row();
         body.add("@mode.testfeatures.setup.waves.hint").color(Color.lightGray).left().wrap()
             .width(contentWidth() - 24f).padBottom(8f).row();
-        body.add(String.format(Core.bundle.get("mode.testfeatures.setup.waves.timer"),
-            (int)(TestNewFeaturesMode.initialWaveSpacing / 60f), (int)(TestNewFeaturesMode.waveSpacing / 60f)))
+        body.add("@mode.testfeatures.setup.waves.manual")
             .color(Color.lightGray).left().wrap().width(contentWidth() - 24f).padBottom(12f).row();
         note("@mode.testfeatures.setup.waves.tools");
         note("@mode.testfeatures.setup.waves.after");

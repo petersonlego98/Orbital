@@ -5,7 +5,9 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.regex.*;
 
+import orbital.core.DpiPreference;
 import orbital.core.RendererPreference;
+import orbital.core.WindowPreference;
 
 import org.junit.jupiter.api.*;
 
@@ -64,6 +66,47 @@ class AdvancedGraphicsSettingsTest{
         }
     }
 
+    @Test
+    void everyDisplayPreferenceEntryExistsInEveryBundle(){
+        List<String> required = List.of(
+        "setting." + WindowPreference.key + ".name",
+        "setting." + WindowPreference.key + ".description",
+        "setting." + WindowPreference.key + ".auto",
+        "setting." + WindowPreference.key + ".option",
+        "setting." + WindowPreference.key + ".refresh",
+        "setting." + WindowPreference.key + ".current",
+        "settings." + WindowPreference.key + ".failed",
+        "setting." + DpiPreference.key + ".name",
+        "setting." + DpiPreference.key + ".description",
+        "settings." + DpiPreference.key + ".restart"
+        );
+
+        for(String locale : new String[]{"", "_pt_BR", "_pt_PT"}){
+            Set<String> localeKeys = keysFor(locale);
+            for(String key : required){
+                assertTrue(localeKeys.contains(key), "missing bundle entry in bundle" + locale + ": " + key);
+            }
+        }
+    }
+
+    @Test
+    void theDialogRegistersTheDisplayPreferences(){
+        String source = read(dialog);
+
+        assertTrue(source.contains("Seq<WindowResolution> resolutions = WindowPreference.available()"),
+            "the resolution row must list only modes reported by the desktop provider");
+        assertTrue(source.contains("new SettingsTable.DropdownSetting(WindowPreference.key"),
+            "the resolution row must use the shared preference key");
+        assertTrue(source.contains("WindowPreference.apply(WindowResolution.parse(value))"),
+            "choosing a resolution must apply it through the desktop provider");
+        assertTrue(source.contains("advancedgraphics.checkPref(DpiPreference.key"),
+            "the automatic DPI option must register in Advanced Graphics");
+        assertTrue(Pattern.compile("if\\(!mobile && WindowPreference\\.provider != null\\)", Pattern.DOTALL)
+            .matcher(source).find(), "the resolution row must be desktop-only and require a provider");
+        assertTrue(Pattern.compile("if\\(!mobile && DpiPreference\\.available\\(\\)\\)", Pattern.DOTALL)
+            .matcher(source).find(), "the DPI row must only appear where a scale provider exists");
+    }
+
     //the label of each button is "setting.<key>.<value>", so the stored values must match the
     //bundle suffixes exactly or the row shows raw keys
     @Test
@@ -114,6 +157,22 @@ class AdvancedGraphicsSettingsTest{
         //Vulkan is desktop-only, so the row sits behind a platform guard with no other block in it
         assertTrue(Pattern.compile("if\\(!mobile\\)\\{[^{}]*?advancedgraphics\\.pref", Pattern.DOTALL)
         .matcher(source).find(), "the renderer row must be registered for desktop only");
+    }
+
+    private static Set<String> keysFor(String locale){
+        Set<String> localeKeys = new HashSet<>();
+        Path file = bundles.resolve("bundle" + locale + ".properties");
+        assertTrue(Files.isRegularFile(file), "missing bundle " + file);
+
+        try{
+            for(String line : Files.readAllLines(file, StandardCharsets.UTF_8)){
+                int split = line.indexOf('=');
+                if(split > 0) localeKeys.add(line.substring(0, split).trim());
+            }
+        }catch(Exception e){
+            throw new AssertionError("cannot read " + file, e);
+        }
+        return localeKeys;
     }
 
     private static String value(String key){

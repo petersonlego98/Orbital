@@ -50,8 +50,8 @@ public class HudFragment{
 
     private String hudText = "";
     private boolean showHudText;
-    //keeps the friendly-ships panel expanded across frames; collapsed when the player taps its header
-    private boolean testFeaturesUnitsExpanded = true;
+    //keeps the compact test-tools panel expanded across frames; collapsed when the player taps its header
+    private boolean testFeaturesPanelExpanded = true;
     //signature of the test-features panel content: the content is rebuilt when it changes, because
     //the panel's table is built once and keeps its children afterwards
     private long testFeaturesContentSignature = Long.MIN_VALUE;
@@ -73,8 +73,12 @@ public class HudFragment{
     private @Nullable Table turretBarBody;
     /** turret add/remove menu for the selected unit. */
     private @Nullable TurretLoadoutDialog turretDialog;
-    /** block picker of the enemy-structure tool of the test mode. */
-    private @Nullable EnemyBuildingDialog enemyDialog;
+    /** shared units/structures catalogue of the test mode. */
+    private @Nullable TestFeaturesCatalogDialog catalogDialog;
+    /** test-tools panel below the command tablet, kept to reserve its vertical space. */
+    private @Nullable Table testFeaturesPanel;
+    /** largest classic build-menu height seen this session, in ui units. */
+    private float buildMenuReservation;
     /** last armed block/team/mode of the enemy-structure tool, used to rebuild its panel only on change. */
     private long enemySignature = Long.MIN_VALUE;
     /** reused plan for the ghost preview of the armed enemy structure. */
@@ -771,85 +775,152 @@ public class HudFragment{
             t.visible(() -> mobile && shown() && !state.isMenu() && !state.isEditor() && !player.dead()
                 && Core.settings.getBool(KeybindDialog.analogKey, true));
             t.touchable = Touchable.childrenOnly;
-            t.add(buildAnalogStick()).size(Scl.scl(120f)).pad(Scl.scl(18f));
+            //Cell sizes are scaled by Arc once. Passing Scl.scl(...) here scaled the stick a
+            //second time on Android, making it reach into the test-tools panel above it.
+            t.add(buildAnalogStick()).size(120f).pad(18f);
         });
 
         buildTestFeaturesPanel(parent);
         blockfrag.build(parent);
     }
 
+    /** Collapsible tablet-style command deck, always available in-game. */
+    private final UnitCommandTablet unitCommandTablet = new UnitCommandTablet();
+
     private void buildTestFeaturesPanel(Group parent){
         parent.fill(t -> {
             t.bottom().right();
-            t.visible(() -> shown() && state.isGame() && TestNewFeaturesMode.active());
-            t.table(Styles.black6, panel -> {
-                panel.margin(8f).top().left();
-                float width = mobile ? 188f : 248f;
+            t.visible(() -> shown() && state.isGame());
+            t.touchable = Touchable.childrenOnly;
 
-                //header: title + collapse/expand toggle (always visible)
-                Table header = new Table();
-                header.left();
-                header.add("@mode.testfeatures.units").style(Styles.outlineLabel).padBottom(5f);
-                header.add().growX();
-                header.button(testFeaturesUnitsExpanded ? Icon.upOpen : Icon.downOpen, Styles.squareTogglei, () -> {
-                    testFeaturesUnitsExpanded = !testFeaturesUnitsExpanded;
-                    //the content lives in its own table that is rebuilt when this flag changes
-                    testFeaturesContentSignature = Long.MIN_VALUE;
-                }).update(i -> i.getStyle().imageUp = testFeaturesUnitsExpanded ? Icon.upOpen : Icon.downOpen)
-                    .size(mobile ? 48f : 40f).padLeft(6f).padTop(2f);
-                panel.add(header).growX().left().padBottom(5f).row();
+            boolean[] wasTest = {!TestNewFeaturesMode.active()};
+            float[] lastPad = {Float.NaN};
 
-                //the collapsible content: rebuilt only when the expanded flag flips, so the panel
-                //does not flicker every frame
-                Table content = new Table();
-                content.left();
-                panel.add(content).growX().left().row();
-                content.update(() -> {
-                    if(testFeaturesContentSignature != (testFeaturesUnitsExpanded ? 1L : 0L)){
-                        testFeaturesContentSignature = testFeaturesUnitsExpanded ? 1L : 0L;
-                        rebuildTestFeaturesContent(content, width);
-                    }
-                });
-            }).pad(4f);
+            t.update(() -> {
+                boolean test = TestNewFeaturesMode.active();
+                boolean firstLayout = Float.isNaN(lastPad[0]);
+                boolean modeChanged = test != wasTest[0];
+
+                //the block menu owns the bottom-right corner in every mode: the whole stack
+                //(tablet + test panel) sits above it, even with the square expanded. Leaving
+                //the stack at the bottom was what made the three panels overlap.
+                float currentMenuHeight = blockfrag.menuHeight();
+                if(BuildMenuPreference.oldMenuEnabled()){
+                    //the information box grows and shrinks while the player scrolls. Reserving
+                    //the largest height keeps the stack from repeatedly jumping up and down.
+                    buildMenuReservation = Math.max(buildMenuReservation, currentMenuHeight);
+                }else{
+                    buildMenuReservation = 0f;
+                }
+                float pad = 4f + buildMenuReservation + 8f;
+
+                //only rebuild when the set of panels changes. The classic build menu can grow
+                //when its information box appears; clearing the stack at that point made the
+                //command tablet disappear and flash again while the player was scrolling.
+                if(firstLayout || modeChanged){
+                    wasTest[0] = test;
+                    t.clearChildren();
+                    rebuildHudStack(t);
+                }
+
+                //the expanded tablet is sized from the real space occupied by the panels below
+                //it. This keeps the menus separate on both desktop and scaled Android ui.
+                float scale = Math.max(0.01f, Scl.scl(1f));
+                float toolsHeight = 0f;
+                if(testFeaturesPanel != null){
+                    toolsHeight = Math.max(testFeaturesPanel.getHeight(), testFeaturesPanel.getPrefHeight()) / scale;
+                    //include the panel's own 8-unit margin on both sides
+                    toolsHeight += 16f;
+                }
+                float sceneHeight = Core.scene.getHeight() / scale;
+                //12 units above the build menu, 6 between the panels and 8 at the screen top
+                float availableHeight = sceneHeight - buildMenuReservation - toolsHeight - 26f;
+                unitCommandTablet.setAvailableHeight(availableHeight);
+
+                if(firstLayout || Math.abs(pad - lastPad[0]) > 0.5f){
+                    lastPad[0] = pad;
+                    t.marginBottom(pad);
+                    //the margin changed, so the parent hierarchy needs a new layout. Keeping
+                    //the children intact makes the adjustment smooth instead of a rebuild.
+                    t.invalidateHierarchy();
+                }
+            });
         });
 
         buildEnemyBuildPlacer(parent);
     }
 
+    /** Rebuilds the right-hand hud stack: the command tablet on top, the unit panel below it. */
+    private void rebuildHudStack(Table stack){
+        Table list = new Table();
+        list.bottom().right();
+
+        list.add(unitCommandTablet).right().row();
+
+        if(TestNewFeaturesMode.active()){
+            testFeaturesContentSignature = Long.MIN_VALUE;
+            Table panel = new Table(Styles.black6);
+            panel.margin(8f).top().left();
+            testFeaturesPanel = panel;
+
+            float width = mobile ? 200f : 248f;
+
+            //header: title + collapse/expand toggle (always visible)
+            Table header = new Table();
+            header.left();
+            header.add("@mode.testfeatures.panel").style(Styles.outlineLabel).padBottom(5f);
+            header.add().growX();
+            header.button(testFeaturesPanelExpanded ? Icon.upOpen : Icon.downOpen, Styles.squareTogglei, () -> {
+                testFeaturesPanelExpanded = !testFeaturesPanelExpanded;
+                //the content lives in its own table that is rebuilt when this flag changes
+                testFeaturesContentSignature = Long.MIN_VALUE;
+            }).update(i -> i.getStyle().imageUp = testFeaturesPanelExpanded ? Icon.upOpen : Icon.downOpen)
+                .size(mobile ? 48f : 40f).padLeft(6f).padTop(2f);
+            panel.add(header).growX().left().padBottom(5f).row();
+
+            //the collapsible content: rebuilt only when the expanded flag flips, so the panel
+            //does not flicker every frame
+            Table content = new Table();
+            content.left();
+            panel.add(content).growX().left().row();
+            content.update(() -> {
+                if(testFeaturesContentSignature != (testFeaturesPanelExpanded ? 1L : 0L)){
+                    testFeaturesContentSignature = testFeaturesPanelExpanded ? 1L : 0L;
+                    rebuildTestFeaturesContent(content, width);
+                }
+            });
+
+            list.add(panel).right().padTop(6f);
+        }else{
+            testFeaturesPanel = null;
+        }
+
+        stack.add(list).bottom().right();
+    }
+
     /**
-     * Fills the collapsible part of the test-features panel: the friendly-ship grid, the setup
-     * button, the module section and the enemy-structure section.
+     * Fills the collapsible part of the test-tools panel.
      *
-     * <p>When the panel is collapsed the content is empty, so only the header stays on screen.
-     * The method is called again whenever the player folds or unfolds the panel.</p>
-     *
-     * <p>The grid sits on its own row, above the lower part, and is as wide as both columns of
-     * that lower part (modules on the left, enemy buildings on the right). It therefore takes
-     * the whole width of the panel without ever reaching the enemy-buildings section.</p>
+     * <p>The large unit and structure grids are not embedded in the HUD any more. Both open the
+     * same modal catalogue, so the touch controls never have to compete with a scrolling grid.
+     * What remains here are actions: open a catalogue tab, configure modules and control the
+     * enemy-structure tool.</p>
      */
     private void rebuildTestFeaturesContent(Table content, float width){
         content.clearChildren();
         content.left();
 
-        if(!testFeaturesUnitsExpanded) return;
+        if(!testFeaturesPanelExpanded) return;
 
-        //the lower part has two columns of the same width, so the grid above them is twice as wide
-        float gridWidth = width * 2f;
-        float gridHeight = mobile ? 138f : 184f;
-
-        content.pane(scroll -> {
-            scroll.left().top();
-            buildUnitGrid(scroll, gridWidth, gridHeight);
-        }).size(gridWidth, gridHeight).top().left().row();
-
-        //lower part: the module column on the left, the enemy buildings on the right
-        Table lower = new Table();
-        lower.left();
-        content.add(lower).growX().left().row();
+        content.button("@mode.testfeatures.catalog.units", Icon.units, () -> openCatalog(true))
+            .width(width).height(40f).left().row();
+        content.button("@mode.testfeatures.catalog.buildings", Icon.distribution, () -> openCatalog(false, true))
+            .width(width).height(40f).left()
+            .update(b -> b.setChecked(TestNewFeaturesMode.playerBlock != null)).row();
 
         Table modules = new Table();
         modules.left();
-        lower.add(modules).width(width).left().top();
+        content.add(modules).width(width).left().row();
         modules.button("@mode.testfeatures.setup.button", Icon.settings, TestNewFeaturesMode::openSetup)
             .width(width).height(34f).padTop(4f).left()
             .visible(() -> !TestNewFeaturesMode.wavesStarted).row();
@@ -866,82 +937,9 @@ public class HudFragment{
                 return unit == null || unit.type.turretSlots.isEmpty();
             });
 
-        buildEnemyBuildings(lower);
+        buildEnemyBuildings(content);
     }
 
-    /**
-     * Fills the friendly-ship grid so it uses the whole width of the pane.
-     *
-     * <p>The cell size is derived from the space the pane really has: the vertical scrollbar
-     * takes a slice of it, and the scrollbar is drawn in raw pixels while the cells are sized in
-     * ui units, so both sides are converted before they are compared. The icons then spread over
-     * the full width instead of leaving a gap on the right.</p>
-     */
-    private void buildUnitGrid(Table grid, float width, float height){
-        Seq<UnitType> types = TestNewFeaturesMode.aerialTypes();
-        int count = types.size;
-        if(count == 0) return;
-
-        //the space the scrollbar steals, in ui units
-        float scroll = scrollBarWidth() / Math.max(1f, Scl.scl(1f));
-        float[] layout = unitGridLayout(width, height, count, mobile ? 40f : 48f, scroll);
-        int columns = (int)layout[0];
-        float cell = layout[1];
-
-        float button = cell - 4f;
-        int index = 0;
-        for(UnitType type : types){
-            var btn = grid.button(new TextureRegionDrawable(type.uiIcon), Styles.selecti, () -> {
-                if(!TestNewFeaturesMode.spawn(type)){
-                    ui.showInfoToast(Core.bundle.get("mode.testfeatures.limit", "Unit cap reached or no valid spawn location."), 3f);
-                }
-            }).size(button).tooltip(type.localizedName).pad(2f).get();
-            btn.resizeImage(button * 0.72f);
-            if(++index % columns == 0) grid.row();
-        }
-    }
-
-    /**
-     * Works out how the friendly-ship grid is laid out inside a pane.
-     *
-     * <p>The vertical scrollbar takes a slice of the pane's width, and it is drawn in raw pixels
-     * while the cells are sized in ui units, so both sides are converted before they are
-     * compared. The first pass keeps room for the scrollbar, so no icon hides under it; when the
-     * grid fits the height, no scrollbar is drawn at all and the second pass lets the grid use
-     * the full width.</p>
-     *
-     * @param width width of the pane, in ui units
-     * @param height height of the pane, in ui units
-     * @param count how many units have to be shown
-     * @param preferred preferred size of one cell, in ui units
-     * @param scroll width of the vertical scrollbar, in ui units
-     * @return the number of columns and the size of one cell, in ui units
-     */
-    public static float[] unitGridLayout(float width, float height, int count, float preferred, float scroll){
-        //first pass: assume the vertical scrollbar is there, so no icon hides under it
-        int columns = Mathf.clamp((int)((width - scroll) / preferred), 2, 12);
-        float cell = (width - scroll) / columns;
-        //second pass: when everything fits, no scrollbar is drawn and the grid uses the full width
-        if(Mathf.ceil(count / (float)columns) * cell <= height){
-            int full = Mathf.clamp((int)(width / preferred), 2, 12);
-            float fullCell = width / full;
-            if(Mathf.ceil(count / (float)full) * fullCell <= height){
-                columns = full;
-                cell = fullCell;
-            }
-        }
-        return new float[]{columns, cell};
-    }
-
-    /** @return the width the vertical scrollbar of a pane takes, in raw pixels. */
-    private static float scrollBarWidth(){
-        try{
-            ScrollPane.ScrollPaneStyle style = Core.scene.getStyle(ScrollPane.ScrollPaneStyle.class);
-            if(style != null && style.vScroll != null) return Math.max(style.vScroll.getMinWidth(), 4f);
-        }catch(Throwable ignored){
-        }
-        return 24f;
-    }
 
     /**
      * Arm / disarm section of the test-mode panel: enemy team, block to drop, remove mode.
@@ -950,13 +948,17 @@ public class HudFragment{
      * bar), so the labels and toggles stay in sync without flickering every frame.</p>
      */
     private void buildEnemyBuildings(Table panel){
-        float width = mobile ? 188f : 248f;
+        float width = mobile ? 200f : 248f;
 
         Table section = new Table();
         section.left();
-        //top aligned: the section starts on the same line as the module column, so it never
-        //drifts down over the units grid above it
-        panel.add(section).width(width).left().top().row();
+        //own framed box: the enemy section reads as a separate "quadrado" instead of more
+        //buttons glued to the module actions above it
+        section.background(Tex.pane);
+        section.margin(8f);
+        //the section is stacked below the module actions; the large catalogues are in the
+        //shared modal dialog, so no grid can drift over another panel here
+        panel.add(section).width(width).left().top().padTop(8f).row();
         section.update(() -> {
             long signature = enemyToolSignature();
             if(signature != enemySignature){
@@ -964,6 +966,10 @@ public class HudFragment{
                 rebuildEnemyBuildings(section, width);
             }
         });
+        //fill right away: the update above only catches later changes, and the stored
+        //signature already matches the current tool state - without this, a section rebuilt
+        //while the panel reopens stayed empty until the mouse wheel changed the signature
+        rebuildEnemyBuildings(section, width);
     }
 
     private long enemyToolSignature(){
@@ -1000,28 +1006,35 @@ public class HudFragment{
             return text.toString();
         }).color(Color.lightGray).width(width).wrap().left().padBottom(4f).row();
 
-        //block button: arms a block, and disarms it (same as cancel) when clicked again
-        section.button(b -> {
-            b.left();
-            b.image().size(mobile ? 24f : 28f).padRight(6f).update(i -> {
-                Block block = TestNewFeaturesMode.enemyBlock;
-                i.setDrawable(block == null ? Icon.add : new TextureRegionDrawable(block.uiIcon));
-                i.setScaling(Scaling.fit);
-            });
-            b.label(() -> TestNewFeaturesMode.enemyBlock == null
-                ? Core.bundle.get("mode.testfeatures.buildings.select")
-                : TestNewFeaturesMode.enemyBlock.localizedName).growX().wrap();
-        }, Styles.defaultt, () -> {
-            if(TestNewFeaturesMode.enemyBlock == null){
-                openEnemyBuildingDialog();
-            }else{
-                TestNewFeaturesMode.enemyBlock = null;
-            }
-        }).growX().height(mobile ? 36f : 40f).left().padBottom(2f).row();
+        //the block button always opens the shared structures tab, so an armed block can be
+        //changed directly. The small cancel button disarms it without opening the catalogue.
+        section.table(row -> {
+            row.button(b -> {
+                b.left();
+                b.image().size(mobile ? 24f : 28f).padRight(6f).update(i -> {
+                    Block block = TestNewFeaturesMode.enemyBlock;
+                    if(block == null){
+                        i.setDrawable(Icon.add);
+                    }else if(block.uiIcon != null && block.uiIcon.found()){
+                        i.setDrawable(new TextureRegionDrawable(block.uiIcon));
+                    }else{
+                        i.setDrawable(Icon.distribution);
+                    }
+                    i.setScaling(Scaling.fit);
+                });
+                b.label(() -> TestNewFeaturesMode.enemyBlock == null
+                    ? Core.bundle.get("mode.testfeatures.buildings.select")
+                    : TestNewFeaturesMode.enemyBlock.localizedName).growX().wrap();
+            }, Styles.defaultt, () -> openCatalog(false)).growX().height(mobile ? 36f : 40f).left();
+            row.button(Icon.cancel, Styles.cleari, TestNewFeaturesMode::disarmStructureTools)
+                .size(mobile ? 36f : 40f).height(mobile ? 36f : 40f).left().padLeft(2f);
+        }).width(width).left().padBottom(2f).row();
 
         section.button("@mode.testfeatures.buildings.remove", Icon.cancel, Styles.cleart, () -> {
             TestNewFeaturesMode.enemyRemoving = !TestNewFeaturesMode.enemyRemoving;
-            if(TestNewFeaturesMode.enemyRemoving) TestNewFeaturesMode.enemyBlock = null;
+            //the remove mode is its own tool: it cannot share the cursor with a block
+            TestNewFeaturesMode.enemyBlock = null;
+            TestNewFeaturesMode.playerBlock = null;
         }).checked(b -> TestNewFeaturesMode.enemyRemoving).growX().left().padBottom(2f).row();
 
         section.button(b -> b.add(Core.bundle.format("mode.testfeatures.buildings.clear", TestNewFeaturesMode.enemyTeam.localized())).left(),
@@ -1039,17 +1052,18 @@ public class HudFragment{
         Table placer = new Table();
         placer.name = "enemybuildplacer";
         placer.touchable = Touchable.disabled;
-        placer.update(() -> placer.touchable = TestNewFeaturesMode.enemyToolArmed() ? Touchable.enabled : Touchable.disabled);
-        placer.clicked(this::placeEnemyAtCursor);
-        //right click disarms the tool: it also blocks aiming, which is how the normal build menu
-        //is dismissed, so the player can always get back to shooting in one click
+        placer.update(() -> placer.touchable =
+            TestNewFeaturesMode.enemyToolArmed() || TestNewFeaturesMode.playerToolArmed()
+            ? Touchable.enabled : Touchable.disabled);
+        placer.clicked(this::placeToolAtCursor);
+        //right click disarms the active tool: it also blocks aiming, which is how the normal
+        //build menu is dismissed, so the player can always get back to shooting in one click
         placer.addListener(new ClickListener(){
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
                 if(button != KeyCode.mouseRight) return false;
 
-                TestNewFeaturesMode.enemyBlock = null;
-                TestNewFeaturesMode.enemyRemoving = false;
+                TestNewFeaturesMode.disarmStructureTools();
                 event.stop();
                 return true;
             }
@@ -1063,11 +1077,19 @@ public class HudFragment{
         Events.run(Trigger.drawOver, () -> Draw.draw(Layer.plans, this::drawEnemyPlan));
     }
 
-    /** Drops (or removes) the enemy structure under the cursor. */
-    private void placeEnemyAtCursor(){
+    /** Drops (or removes) the armed structure under the cursor, for the player or the enemy team. */
+    private void placeToolAtCursor(){
         if(!state.isGame() || !TestNewFeaturesMode.active()) return;
 
         int x = World.toTile(Core.input.mouseWorldX()), y = World.toTile(Core.input.mouseWorldY());
+
+        if(TestNewFeaturesMode.playerToolArmed()){
+            Block block = TestNewFeaturesMode.playerBlock;
+            if(TestNewFeaturesMode.queuePlayerBuilding(block, x, y, control.input.rotation, block.nextConfig())){
+                block.placeSound.at(Core.input.mouseWorldX(), Core.input.mouseWorldY());
+            }
+            return;
+        }
 
         if(TestNewFeaturesMode.enemyRemoving){
             Block previous = world.tile(x, y) == null ? null : world.tile(x, y).block();
@@ -1092,21 +1114,40 @@ public class HudFragment{
             TestNewFeaturesMode.enemyTeam.localized(), removed), 3f);
     }
 
-    private void openEnemyBuildingDialog(){
-        if(enemyDialog == null){
-            enemyDialog = new EnemyBuildingDialog();
-        }
-        enemyDialog.show(() -> {});
+    /** Opens the shared units/structures catalogue on the requested tab. */
+    private void openCatalog(boolean units){
+        openCatalog(units, false);
     }
 
-    /** Draws the ghost of the armed enemy structure at the cursor, like a regular build plan. */
+    /**
+     * Opens the shared catalogue on the requested tab. On the structures tab, {@code armPlayer}
+     * decides which tool a picked structure arms: the player's team or the enemy team.
+     */
+    private void openCatalog(boolean units, boolean armPlayer){
+        if(catalogDialog == null){
+            catalogDialog = new TestFeaturesCatalogDialog();
+        }
+        if(units){
+            catalogDialog.showUnits();
+        }else{
+            catalogDialog.showBuildings(armPlayer);
+        }
+    }
+
+    /** Draws the ghost of the armed structure at the cursor, like a regular build plan. */
     private void drawEnemyPlan(){
-        if(!state.isGame() || !TestNewFeaturesMode.enemyToolArmed()) return;
+        if(!state.isGame()) return;
+
+        //the player tool wins when both are somehow armed; arming one clears the other
+        boolean forPlayer = TestNewFeaturesMode.playerToolArmed();
+        if(!forPlayer && !TestNewFeaturesMode.enemyToolArmed()) return;
+
+        Team team = forPlayer ? player.team() : TestNewFeaturesMode.enemyTeam;
+        Block block = forPlayer ? TestNewFeaturesMode.playerBlock : TestNewFeaturesMode.enemyBlock;
 
         Tile tile = world.tileWorld(Core.input.mouseWorldX(), Core.input.mouseWorldY());
         if(tile == null) return;
 
-        Block block = TestNewFeaturesMode.enemyBlock;
         int x = tile.x, y = tile.y;
         if(block != null && block.isMultiblock()){
             //preview the tile the structure would really land on: multiblocks clamp to their center
@@ -1114,7 +1155,7 @@ public class HudFragment{
             y = Mathf.clamp(y, (block.size - 1) / 2, world.height() - block.size / 2 - 1);
         }
 
-        Lines.stroke(2f, TestNewFeaturesMode.enemyTeam.color);
+        Lines.stroke(2f, team.color);
         Lines.rect(x * tilesize - tilesize / 2f, y * tilesize - tilesize / 2f, block == null ? tilesize : block.size * tilesize, block == null ? tilesize : block.size * tilesize);
         Draw.reset();
 
@@ -1123,7 +1164,8 @@ public class HudFragment{
         enemyPlan.set(x, y, control.input.rotation, block);
         enemyPlan.config = block.nextConfig();
         enemyPlan.animScale = 1f;
-        block.drawPlan(enemyPlan, emptyPlans, true);
+        block.drawPlan(enemyPlan, emptyPlans, forPlayer
+            || Build.validPlaceIgnoreUnits(block, TestNewFeaturesMode.enemyTeam, x, y, control.input.rotation, true, true));
         Draw.reset();
     }
 

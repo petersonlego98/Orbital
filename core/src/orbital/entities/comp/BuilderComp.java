@@ -158,7 +158,7 @@ abstract class BuilderComp implements Posc, Statusc, Teamc, Rotc{
                 Vars.control.sound.loop(Sounds.loopBuild, tile, 1.3f);
             }
 
-            boolean allowBuildCurrent = current.block != null && (state.isEditor() || (state.rules.waves && team == state.rules.waveTeam && current.block.isVisible()) || (current.block.unlockedNowHost() && current.block.environmentBuildable() && current.block.isPlaceable()));
+            boolean allowBuildCurrent = current.block != null && (state.isEditor() || (state.rules.waves && team == state.rules.waveTeam && current.block.isVisible()) || (current.block.unlockedNowHost() && (current.block.environmentBuildable() || TestNewFeaturesMode.active()) && current.block.isPlaceable()));
 
             if(!(tile.build instanceof ConstructBuild cb)){
                 if(!current.initialized && !current.breaking && Build.validPlaceIgnoreUnits(current.block, team, current.x, current.y, current.rotation, true, true) && allowBuildCurrent){
@@ -256,6 +256,10 @@ abstract class BuilderComp implements Posc, Statusc, Teamc, Rotc{
         if(idx != -1){
             plans.removeIndex(idx);
         }
+        //auto-build: a cancelled player plan is withdrawn from the builder units too
+        if(isLocal()){
+            orbital.input.AutoBuildSync.onPlayerPlanRemoved(x, y, breaking, team);
+        }
     }
 
     /** Return whether this builder's place queue contains items. */
@@ -295,6 +299,13 @@ abstract class BuilderComp implements Posc, Statusc, Teamc, Rotc{
             plans.addLast(place);
         }else{
             plans.addFirst(place);
+        }
+
+        //auto-build: the local player's plan is offered to the team builder units
+        //(see AutoBuildSync); other units never reach this, only the local player's
+        //own builder does
+        if(isLocal()){
+            orbital.input.AutoBuildSync.onPlayerPlanAdded(place, team);
         }
     }
 

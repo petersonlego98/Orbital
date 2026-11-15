@@ -8,6 +8,7 @@ import arc.discord.*;
 import arc.discord.DiscordRPC.*;
 import arc.filedialogs.*;
 import arc.files.*;
+import arc.graphics.gl.*;
 import arc.math.*;
 import arc.profiling.*;
 import arc.struct.*;
@@ -51,6 +52,20 @@ public class DesktopLauncher extends ClientLauncher{
             check32Bit();
             checkJavaVersion();
 
+            // DPI awareness has to be enabled before SDL creates the window. The provider is also
+            // used by the core to choose a consistent default UI scale on high-DPI displays.
+            if(OS.isWindows){
+                WindowsDpiSupport.install();
+                DpiPreference.scaleProvider = WindowsDpiSupport::recommendedUiScale;
+            }
+
+            // The desktop display API enumerates only modes supported by the user's computer and
+            // applies the selected size to the SDL window.
+            WindowPreference.provider = new DesktopDisplayProvider();
+            WindowResolution storedResolution = WindowPreferences.load();
+            WindowResolution preferredResolution = storedResolution != null
+                && WindowPreference.available().contains(storedResolution) ? storedResolution : null;
+
             // Vulkan is desktop-only. The renderer preference (Settings > Advanced Graphics) and the
             // -vulkan flag both resolve through VulkanBackend.select, which only returns VULKAN when
             // a usable Vulkan device is present (rendererReady). The preference has to be read from
@@ -91,10 +106,13 @@ public class DesktopLauncher extends ClientLauncher{
 
             new SdlApplication(new DesktopLauncher(arg), new SdlConfig(){{
                 title = "Orbital";
-                maximized = true;
+                maximized = preferredResolution == null;
                 coreProfile = true;
-                width = 900;
-                height = 700;
+                width = preferredResolution == null ? 900 : preferredResolution.width;
+                height = preferredResolution == null ? 700 : preferredResolution.height;
+                // Keep Arc's logical coordinate system. On a high-DPI Windows display the physical
+                // drawable can be larger; HdpiUtils maps logical UI coordinates to that drawable.
+                hdpiMode = HdpiMode.logical;
 
                 //on Windows, Intel drivers might be buggy with OpenGL 3.x, so only use 2.x. See https://github.com/Anuken/Orbital/issues/11041
                 if(IntelGpuCheck.wasIntel()){
