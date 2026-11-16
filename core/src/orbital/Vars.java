@@ -22,6 +22,7 @@ import orbital.gen.*;
 import orbital.graphics.*;
 import orbital.content.Blocks;
 import orbital.content.TurretLoadouts;
+import orbital.engine.OrbitalEngine;
 import orbital.input.*;
 import orbital.io.*;
 import orbital.logic.*;
@@ -416,6 +417,9 @@ public class Vars implements Loadable{
     public static void finishLaunch(){
         Core.settings.put("lastBuild", Version.build);
         Core.settings.put("lastBuildString", Version.buildString());
+
+        //graceful exit: drain engine workers instead of leaving daemon threads behind
+        OrbitalEngine.shutdownIfStarted();
 
         if(launchIDFile != null){
             launchIDFile.delete();

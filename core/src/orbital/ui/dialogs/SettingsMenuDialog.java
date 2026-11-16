@@ -20,6 +20,8 @@ import orbital.content.TechTree.*;
 import orbital.core.*;
 import orbital.core.RendererPreference;
 import orbital.ctype.*;
+import orbital.engine.OrbitalEngine;
+import orbital.engine.threading.OrbitalThreadConfig;
 import orbital.game.EventType.*;
 import orbital.gen.*;
 import orbital.input.*;
@@ -658,6 +660,23 @@ public class SettingsMenuDialog extends BaseDialog{
                     ui.showInfo(bundle.get("settings.renderer.restart") + "\n\n" + note);
                 }
             }, () -> bundle.get("setting.renderer.name")));
+
+            // Worker count for the Orbital engine. 0 means automatic and keeps one logical
+            // processor for the game thread. The slider is built by SettingsTable, which fires
+            // its callback once while constructing the row; only an actual change drains and
+            // rebuilds an already running pool, and a pool that has not started yet simply reads
+            // the stored value when it does.
+            advancedgraphics.sliderPref(OrbitalThreadConfig.key, OrbitalThreadConfig.automatic,
+                0, OrbitalThreadConfig.maxSelectable(), 1,
+                value -> value <= 0
+                    ? bundle.format("setting.orbitalworkers.auto", OrbitalThreadConfig.automaticWorkers())
+                    : bundle.format("setting.orbitalworkers.workers", value),
+                value -> {
+                    int active = OrbitalEngine.activeWorkerCount();
+                    if(active > 0 && active != OrbitalThreadConfig.resolve(value)){
+                        OrbitalEngine.reconfigure(value);
+                    }
+                });
         }
 
         dev.checkPref("console", false, val -> {

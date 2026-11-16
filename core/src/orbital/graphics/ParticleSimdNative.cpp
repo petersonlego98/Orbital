@@ -99,7 +99,7 @@ namespace{
 
 extern bool updateParticleBatchAvx2(float* data, int i, int head, float delta, float dragValue);
 
-extern "C" JNIEXPORT jint JNICALL Java_orbital_graphics_ParticleRenderer_updateNative(
+extern "C" JNIEXPORT jint JNICALL Java_orbital_engine_simd_SimdNative_updateParticlesNative(
     JNIEnv* env, jclass, jfloatArray array, jint count, jfloat delta){
     if(array == nullptr || count < 0) return -1;
     const jsize length = env->GetArrayLength(array);
@@ -130,4 +130,12 @@ extern "C" JNIEXPORT jint JNICALL Java_orbital_graphics_ParticleRenderer_updateN
 
     env->ReleaseFloatArrayElements(array, data, 0);
     return head / particleSize;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_orbital_engine_simd_SimdNative_backendLevelNative(
+    JNIEnv*, jclass){
+    // 0 = scalar, 1 = SSE2, 2 = AVX2; Java chooses a backend from this single answer so the
+    // detection cannot drift between the JNI loader and the kernels
+    static const int level = supportsAvx2() ? 2 : (supportsSse2() ? 1 : 0);
+    return level;
 }

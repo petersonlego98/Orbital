@@ -7,6 +7,8 @@ import arc.math.*;
 import arc.math.geom.*;
 import arc.util.*;
 import orbital.*;
+import orbital.engine.particles.ParticleVertexBuilder;
+import orbital.engine.simd.*;
 
 import java.util.concurrent.*;
 
@@ -137,29 +139,7 @@ public class ParticleRenderer{
 
     void buildVertices(){
         //TODO: cull based on camera viewport
-        float[] data = this.data;
-        float count = this.count * particleSize;
-
-        float[] vertices = vertexBuffer;
-
-        int bufferIndex = 0;
-
-        for(int i = 0; i < count; i += particleSize){
-            float color = data[i + 8]; //TODO: colorTo
-            float size = Mathf.lerp(data[i + 6], data[i + 7], Mathf.clamp(data[i] / data[i + 1]));
-
-            //xy
-            vertices[bufferIndex + 0] = data[i + 2];
-            vertices[bufferIndex + 1] = data[i + 3];
-            //size
-            vertices[bufferIndex + 2] = size;
-            //color
-            vertices[bufferIndex + 3] = color;
-
-            bufferIndex += particleVertexSize;
-        }
-
-        vertexBufferLength = bufferIndex;
+        vertexBufferLength = ParticleVertexBuilder.build(data, count, vertexBuffer);
     }
 
     void uploadMeshData(Mesh mesh){
@@ -171,128 +151,18 @@ public class ParticleRenderer{
         buffer.position(0);
     }
 
-    private static volatile boolean nativeSimdAvailable = loadNativeSimd();
-
-    private static boolean loadNativeSimd(){
-        String arch = System.getProperty("os.arch", "").toLowerCase(java.util.Locale.ROOT);
-        if(!OS.isWindows || !(arch.equals("amd64") || arch.equals("x86_64"))) return false;
-
-        String resource = "/native/windows-x86_64/orbital_particlesimd.dll";
-        try(var input = ParticleRenderer.class.getResourceAsStream(resource)){
-            if(input == null) return false;
-
-            byte[] bytes = input.readAllBytes();
-            // One stable file per build: the name carries a digest of the DLL, so a new build
-            // lands in a new file while an unchanged one is reused. A random temp name plus
-            // deleteOnExit was not enough - Windows cannot delete a DLL that is still mapped,
-            // so every launch used to leave another ~100 kB copy in %TEMP%.
-            java.nio.file.Path library = java.nio.file.Path.of(
-                System.getProperty("java.io.tmpdir"), "orbital-particlesimd-" + digest(bytes) + ".dll");
-            deleteLegacyCopies(library);
-
-            if(!java.nio.file.Files.isRegularFile(library)
-                || !java.util.Arrays.equals(java.nio.file.Files.readAllBytes(library), bytes)){
-                //stage next to the target and rename: the final name never holds a half-written file
-                java.nio.file.Path staging = java.nio.file.Files.createTempFile("orbital-particlesimd-", ".part");
-                try{
-                    java.nio.file.Files.write(staging, bytes);
-                    java.nio.file.Files.move(staging, library,
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                }catch(Exception copy){
-                    java.nio.file.Files.deleteIfExists(staging);
-                    throw copy;
-                }
-            }
-
-            System.load(library.toAbsolutePath().toString());
-            return true;
-        }catch(Exception | LinkageError ignored){
-            return false;
-        }
-    }
-
-    /**
-     * Best-effort removal of the random-named copies earlier builds left behind on every launch.
-     *
-     * <p>Only the decimal names of the old scheme match; the hashed names of this scheme are
-     * reused and skipped. A copy still mapped by another instance cannot be deleted on Windows,
-     * and that failure is swallowed on purpose.</p>
-     */
-    private static void deleteLegacyCopies(java.nio.file.Path keep){
-        try(var files = java.nio.file.Files.newDirectoryStream(
-            keep.getParent(), "orbital-particlesimd-*.dll")){
-            for(java.nio.file.Path candidate : files){
-                if(candidate.equals(keep)) continue;
-                //the old code used a random positive long in decimal; this build uses hex
-                if(!candidate.getFileName().toString().matches("orbital-particlesimd-\\d{1,20}\\.dll")) continue;
-                try{
-                    java.nio.file.Files.deleteIfExists(candidate);
-                }catch(Exception stillMapped){
-                }
-            }
-        }catch(Exception ignoredListing){
-        }
-    }
-
-    /** @return the first 16 hex digits of the SHA-256, used to name the extracted DLL per build. */
-    private static String digest(byte[] bytes){
-        try{
-            byte[] hash = java.security.MessageDigest.getInstance("SHA-256").digest(bytes);
-            StringBuilder hex = new StringBuilder(16);
-            for(int i = 0; i < 8; i++){
-                hex.append(Character.forDigit((hash[i] >> 4) & 0xF, 16));
-                hex.append(Character.forDigit(hash[i] & 0xF, 16));
-            }
-            return hex.toString();
-        }catch(java.security.NoSuchAlgorithmException fallback){
-            //SHA-256 is mandatory in every JRE; keep the method total anyway
-            return Integer.toHexString(java.util.Arrays.hashCode(bytes));
-        }
-    }
-
-    private static native int updateNative(float[] data, int count, float delta);
-
-    /** @return true when a native SIMD backend loaded; false means the scalar loop below runs. */
+    /** @return true when a native SIMD backend loaded; false means the scalar loop runs. */
     static boolean nativeSimdEnabled(){
-        return nativeSimdAvailable;
+        return SimdDispatcher.capabilities().nativeLoaded();
     }
 
     static int update(float[] data, int count, float delta){
-        if(nativeSimdAvailable){
-            try{
-                int updated = updateNative(data, count, delta);
-                if(updated >= 0) return updated;
-            }catch(LinkageError ignored){
-            }
-            nativeSimdAvailable = false;
-        }
-        return updateScalar(data, count, delta);
+        return SimdDispatcher.updateParticles(data, count, delta);
     }
 
+    /** Scalar reference path, kept for tests and for the engine's own fallback. */
     static int updateScalar(float[] data, int count, float delta){
-        int head = count * particleSize;
-
-        float dragValue = Math.max(1f - globalDrag * delta, 0f);
-
-        for(int i = 0; i < head; i += particleSize){
-            data[i] += delta;
-            if(data[i] >= data[i + 1]){
-                if(head > particleSize){
-                    //swap head
-                    System.arraycopy(data, head - particleSize, data, i, particleSize);
-                }
-                head -= particleSize;
-                i -= particleSize;
-            }else{
-                //velocity
-                data[i + 2] += data[i + 4] * delta;
-                data[i + 3] += data[i + 5] * delta;
-                data[i + 4] *= dragValue;
-                data[i + 5] *= dragValue;
-            }
-        }
-
-        return head / particleSize;
+        return SimdOperations.updateParticlesScalar(data, count, delta);
     }
 
     static void makeShader(){
