@@ -547,7 +547,9 @@ public class SettingsMenuDialog extends BaseDialog{
         if(!mobile){
             graphics.checkPref("mouseposition", false);
         }
-        graphics.checkPref("fps", false);
+        //FPS and ping are shown out of the box: they are the first thing a player needs when the
+        //frame rate drops, and the option stays available to turn them off
+        graphics.checkPref("fps", true);
         graphics.checkPref("playerindicators", true);
         graphics.checkPref("showpings", true);
         graphics.checkPref("showotherbuildplans", true);
