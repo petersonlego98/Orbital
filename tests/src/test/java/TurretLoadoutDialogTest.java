@@ -149,6 +149,51 @@ public class TurretLoadoutDialogTest{
         assertTrue(shots > 0, "the re-armed turret must fire");
     }
 
+    /**
+     * Regression for the loadout reported on the antumbra: the slot rail offered two free 2x2
+     * squares while every 2x2 module in the catalogue answered "no dorsal budget".
+     *
+     * <p>The hull's budget (18 144 px²) is smaller than the sum of its slots (24 576 px²), so one
+     * 4x4 module spends almost all of it. A free slot may only advertise the footprint the
+     * catalogue can still mount there, and shows as locked when nothing fits at all.</p>
+     */
+    @Test
+    void emptySlotAdvertisesOnlyTheSizeTheCatalogueCanStillPay(){
+        Unit unit = UnitTypes.antumbra.spawn(Team.sharded, 32 * 8f, 32 * 8f);
+        assertEquals(3, unit.type.turretSlots.size, "this regression is written for the antumbra");
+
+        Turret foreshadow = (Turret)Blocks.foreshadow;
+        assertTrue(unit.canMountAt(foreshadow, 0), "the 4x4 slot must accept the Foreshadow");
+        assertNotNull(unit.mountTurret(foreshadow, 0), "the module must mount into the 4x4 slot");
+
+        assertTrue(unit.loadoutCost() > unit.type.dorsalBudget() * 0.85f,
+            "this regression needs one module that spends nearly the whole dorsal budget");
+
+        for(int i = 1; i < unit.type.turretSlots.size; i++){
+            //the nominal 2x2 slot must not promise a 2x2 the budget cannot pay for
+            assertTrue(TurretLoadoutDialog.slotCapacity(unit, i) <= 1,
+                "slot " + i + " can only host a 1x1 after the 4x4 module");
+        }
+
+        //spending the last affordable 1x1 leaves the third slot with nothing at all
+        assertTrue(unit.canMountAt((Turret)Blocks.arc, 1), "a 1x1 must still fit the remaining budget");
+        assertNotNull(unit.mountTurret((Turret)Blocks.arc, 1));
+        assertEquals(0, TurretLoadoutDialog.slotCapacity(unit, 2),
+            "a slot no catalogue entry can fill must show as locked");
+    }
+
+    /** A free slot with budget available advertises its nominal capacity. */
+    @Test
+    void freeSlotWithBudgetAdvertisesItsNominalSize(){
+        Unit unit = UnitTypes.mega.spawn(Team.sharded, 32 * 8f, 32 * 8f);
+
+        assertTrue(unit.type.turretSlots.size >= 1);
+        for(int i = 0; i < unit.type.turretSlots.size; i++){
+            assertEquals(unit.type.turretSlots.get(i).maxSize, TurretLoadoutDialog.slotCapacity(unit, i),
+                "mega has budget and catalogue entries for slot " + i);
+        }
+    }
+
     /** @return a project source file, walking upward from the test working directory. */
     private static File source(String relative){
         File dir = new File(System.getProperty("user.dir")).getAbsoluteFile();

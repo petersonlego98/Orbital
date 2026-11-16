@@ -62,6 +62,8 @@ public class TurretLoadoutDialog extends BaseDialog{
     private static final float infoIconSize = 24f;
     /** the slot boxes, in slot order, so a drag can highlight the one under the pointer */
     private final Seq<Table> slotBoxes = new Seq<>();
+    /** slots the catalogue can no longer fill, in slot order; kept so a repaint restores them */
+    private boolean[] lockedSlots = {};
     /** slot highlighted by the drag in progress, -1 when none */
     private int hoverSlot = -1;
     /** colour selector group (swatch + button); visible only while a wall plate is installed */
@@ -252,6 +254,7 @@ public class TurretLoadoutDialog extends BaseDialog{
 
         if(unit == null) return;
 
+        lockedSlots = new boolean[unit.type.turretSlots.size];
         rebuildSlots();
 
         UnitType type = unit.type;
@@ -441,27 +444,38 @@ public class TurretLoadoutDialog extends BaseDialog{
         for(int i = 0; i < unit.type.turretSlots.size; i++){
             int index = i;
             boolean armed = armedSlot == index;
-            TurretSlot slot = unit.type.turretSlots.get(index);
             //a slot is either turret, plate or free: only one module fits in it
             Weapon weapon = mountedAt(index);
             WallMount plate = weapon == null ? mountedWallAt(index) : null;
             boolean free = weapon == null && plate == null;
+            //an empty slot only advertises the room the catalogue can still pay for: a hull whose
+            //budget is nearly spent used to show "+ max 2x2" while every 2x2 module answered
+            //"no dorsal budget"
+            int capacity = free ? slotCapacity(unit, index) : 0;
+            boolean locked = free && capacity == 0;
+            lockedSlots[index] = locked;
 
             String label = weapon != null
                 ? weaponName(weapon)
                 : plate != null
                     ? plate.block.localizedName
-                    : Core.bundle.format("weapon.module.slot.max", slot.maxSize, slot.maxSize);
+                    : locked
+                        ? Core.bundle.get("weapon.module.locked.budget")
+                        : Core.bundle.format("weapon.module.slot.max", capacity, capacity);
 
             Drawable icon = weapon != null
                 ? weaponIcon(weapon)
                 : plate != null
                     ? new TextureRegionDrawable(plate.block.uiIcon)
-                    : Icon.add;
+                    : locked
+                        ? Icon.lock
+                        : Icon.add;
 
             //the drop target is the box itself, so the index travels with the actor
-            Table box = slotBox(slotRow, icon, free ? Pal.accent : Color.white, label,
-                boxSize, slotImg, () -> {
+            Table box = slotBox(slotRow, icon,
+                free ? (locked ? Pal.remove : Pal.accent) : Color.white, label,
+                boxSize, slotImg, locked ? Pal.remove : Color.lightGray,
+                locked ? null : () -> {
                     if(weapon != null){
                         //dropping a module off its square also removes it; so does a click
                         if(unit.removeWeapon(weapon)){
@@ -480,8 +494,10 @@ public class TurretLoadoutDialog extends BaseDialog{
                     }
                 }, weapon != null ? new SlotDrag(weapon) : null);
 
-            box.setBackground(armed || hoverSlot == index ? tinted(Tex.pane, Pal.accent) : Tex.pane);
-            box.userObject = new SlotTag(index);
+            box.setBackground(armed || hoverSlot == index ? tinted(Tex.pane, Pal.accent)
+                : locked ? tinted(Tex.pane, Color.darkGray) : Tex.pane);
+            //a locked square keeps its place in the rail but is inert: no arming, no drop target
+            if(!locked) box.userObject = new SlotTag(index);
             slotBoxes.add(box);
 
             if((index + 1) % perRow == 0 && index != unit.type.turretSlots.size - 1) slotRow.row();
@@ -681,6 +697,12 @@ public class TurretLoadoutDialog extends BaseDialog{
      */
     private Table slotBox(Table row, Drawable icon, Color iconColor, String label, float boxSize,
         float slotImg, @Nullable Runnable click, @Nullable EventListener drag){
+        return slotBox(row, icon, iconColor, label, boxSize, slotImg, Color.lightGray, click, drag);
+    }
+
+    /** Slot square with an explicit caption colour, used by the locked slots. */
+    private Table slotBox(Table row, Drawable icon, Color iconColor, String label, float boxSize,
+        float slotImg, Color labelColor, @Nullable Runnable click, @Nullable EventListener drag){
         Table box = row.table(Tex.pane, cell -> {
             cell.margin(4f).top();
             //a fixed cell height for the icon keeps the captions on the same baseline everywhere,
@@ -691,7 +713,7 @@ public class TurretLoadoutDialog extends BaseDialog{
             //and its type is small enough that the longest category name ("Sobrecarga", "Ponto
             //de defesa") breaks between words instead of in the middle of one
             cell.add(label).width(boxSize - 12f).wrap().center().labelAlign(Align.center)
-                .fontScale(mobile ? 0.6f : 0.85f).color(Color.lightGray);
+                .fontScale(mobile ? 0.6f : 0.85f).color(labelColor);
         }).size(boxSize).pad(3f).get();
 
         if(click != null){
@@ -715,6 +737,14 @@ public class TurretLoadoutDialog extends BaseDialog{
      */
     private void place(Boolf<Integer> at, Prov<Boolean> anyFree){
         if(armedSlot >= 0){
+            //the armed slot may have lost its room while the player browsed (a module was mounted
+            //elsewhere); the rail already shows it as locked, so ignore the pick instead of
+            //silently dropping the module into another slot
+            if(armedSlot >= lockedSlots.length || lockedSlots[armedSlot]){
+                armedSlot = -1;
+                rebuild();
+                return;
+            }
             if(at.get(armedSlot)){
                 armedSlot = -1;
                 changed.run();
@@ -1004,6 +1034,50 @@ public class TurretLoadoutDialog extends BaseDialog{
         if(!SupportModuleCategory.isWallModule(block)) return false;
         if(block.isHidden() && !block.moduleOnly) return false;
         return type.hasSlotFor(block.size) && type.fitsSilhouette(block.size);
+    }
+
+    /**
+     * @return the largest footprint, in blocks, the catalogue can still install into this exact
+     * dorsal slot right now; 0 when nothing fits.
+     *
+     * <p>This is the rule the slot rail uses to decide what an empty slot may promise. It runs the
+     * same per-slot validation the mount call runs - slot capacity, silhouette, ammo, physical
+     * placement, occupancy and the remaining dorsal budget - so a free square can never advertise
+     * more room than the catalogue will accept. Budget is the case that shows up in practice: the
+     * antumbra allots 18 144 px² to slots that sum 24 576 px², so a single 4x4 module (16 384 px²)
+     * leaves only the cost of a 1x1 (1 024 px²) on the table.</p>
+     */
+    public static int slotCapacity(Unit unit, int slotIndex){
+        if(unit == null || unit.type == null) return 0;
+        if(slotIndex < 0 || slotIndex >= unit.type.turretSlots.size) return 0;
+
+        int limit = unit.type.turretSlots.get(slotIndex).maxSize;
+        int best = 0;
+
+        for(Block block : content.blocks()){
+            //cheap pre-filter: a block larger than the slot can never take it
+            if(block.size > limit) continue;
+
+            if(block instanceof Turret turret){
+                //same catalogue filter as rebuildTurretGrid: hidden blocks are skipped, except
+                //module-only vanilla turrets, whose only existence is as a module
+                if(block.isHidden() && !block.moduleOnly) continue;
+                if(TurretWeapon.canAdapt(turret) && unit.canMountAt(turret, slotIndex)){
+                    best = Math.max(best, turret.size);
+                }
+            }
+
+            //wall plates share the turret space, so they count as a valid filler for a free slot
+            if(wallCatalogEligible(block, unit.type) && unit.canPlaceWallAt(block, slotIndex)){
+                best = Math.max(best, block.size);
+            }
+        }
+
+        for(WeaponModules.Definition module : WeaponModules.all()){
+            if(module == null || module.weapon == null || module.size > limit) continue;
+            if(unit.canMountWeaponModuleAt(module, slotIndex)) best = Math.max(best, module.size);
+        }
+        return best;
     }
 
     /** Wall plates take turret space, so they get a catalogue of their own. */
@@ -1706,7 +1780,8 @@ public class TurretLoadoutDialog extends BaseDialog{
             Table box = slotBoxes.get(i);
             box.setBackground(i == index || i == armedSlot
                 ? tinted(Tex.pane, Pal.accent)
-                : Tex.pane);
+                //a slot the catalogue cannot fill keeps its dimmed, locked background
+                : i < lockedSlots.length && lockedSlots[i] ? tinted(Tex.pane, Color.darkGray) : Tex.pane);
         }
     }
 
