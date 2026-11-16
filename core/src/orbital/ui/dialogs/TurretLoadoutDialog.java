@@ -460,7 +460,7 @@ public class TurretLoadoutDialog extends BaseDialog{
                 : plate != null
                     ? plate.block.localizedName
                     : locked
-                        ? Core.bundle.get("weapon.module.locked.budget")
+                        ? Core.bundle.get("weapon.module.locked.slot")
                         : Core.bundle.format("weapon.module.slot.max", capacity, capacity);
 
             Drawable icon = weapon != null
@@ -1142,7 +1142,7 @@ public class TurretLoadoutDialog extends BaseDialog{
                         () -> place(slot -> unit.mountWallAt(block, slot) != null,
                             () -> unit.mountWall(block) != null),
                         slot -> unit.mountWallAt(block, slot) != null,
-                        fits ? null : reasonNoWall(block), block);
+                        fits ? null : reasonNoWall(), block);
                     if(count % columns() == 0) grid.row();
                 }
             });
@@ -1150,12 +1150,8 @@ public class TurretLoadoutDialog extends BaseDialog{
     }
 
     /** @return why this wall plate cannot be installed right now. */
-    private String reasonNoWall(Block block){
-        UnitType type = unit.type;
-        boolean slotsFree = unit.mountedTurrets() + unit.wallMounts.length < type.turretSlots.size;
-        return !slotsFree
-            ? Core.bundle.get("weapon.module.locked.slot")
-            : Core.bundle.get("weapon.module.locked.budget");
+    private String reasonNoWall(){
+        return Core.bundle.get("weapon.module.locked.slot");
     }
 
     /** Support modules, in one collapsible section per effect. */
@@ -1652,11 +1648,15 @@ public class TurretLoadoutDialog extends BaseDialog{
         return icon;
     }
 
-    /** @return why a dorsal module has no room: a full slot set, or an exhausted budget. */
+    /**
+     * @return why a dorsal module has no room right now.
+     *
+     * <p>The rail already advertises only the space that can still be filled, so a locked card
+     * always means "there is no slot this module fits" - the dorsal budget is no longer worth a
+     * separate message, and naming it only added jargon to a decision the UI already made.</p>
+     */
     private String reasonNoRoom(){
-        return unit.mountedTurrets() >= unit.type.turretSlots.size
-            ? Core.bundle.get("weapon.module.locked.slot")
-            : Core.bundle.get("weapon.module.locked.budget");
+        return Core.bundle.get("weapon.module.locked.slot");
     }
 
     /** @return why a support module cannot be installed: its category is already taken. */
