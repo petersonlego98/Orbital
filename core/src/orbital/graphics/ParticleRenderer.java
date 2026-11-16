@@ -178,26 +178,84 @@ public class ParticleRenderer{
         if(!OS.isWindows || !(arch.equals("amd64") || arch.equals("x86_64"))) return false;
 
         String resource = "/native/windows-x86_64/orbital_particlesimd.dll";
-        java.nio.file.Path library = null;
         try(var input = ParticleRenderer.class.getResourceAsStream(resource)){
             if(input == null) return false;
-            library = java.nio.file.Files.createTempFile("orbital-particlesimd-", ".dll");
-            java.nio.file.Files.copy(input, library, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            library.toFile().deleteOnExit();
+
+            byte[] bytes = input.readAllBytes();
+            // One stable file per build: the name carries a digest of the DLL, so a new build
+            // lands in a new file while an unchanged one is reused. A random temp name plus
+            // deleteOnExit was not enough - Windows cannot delete a DLL that is still mapped,
+            // so every launch used to leave another ~100 kB copy in %TEMP%.
+            java.nio.file.Path library = java.nio.file.Path.of(
+                System.getProperty("java.io.tmpdir"), "orbital-particlesimd-" + digest(bytes) + ".dll");
+            deleteLegacyCopies(library);
+
+            if(!java.nio.file.Files.isRegularFile(library)
+                || !java.util.Arrays.equals(java.nio.file.Files.readAllBytes(library), bytes)){
+                //stage next to the target and rename: the final name never holds a half-written file
+                java.nio.file.Path staging = java.nio.file.Files.createTempFile("orbital-particlesimd-", ".part");
+                try{
+                    java.nio.file.Files.write(staging, bytes);
+                    java.nio.file.Files.move(staging, library,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }catch(Exception copy){
+                    java.nio.file.Files.deleteIfExists(staging);
+                    throw copy;
+                }
+            }
+
             System.load(library.toAbsolutePath().toString());
             return true;
         }catch(Exception | LinkageError ignored){
-            if(library != null){
-                try{
-                    java.nio.file.Files.deleteIfExists(library);
-                }catch(Exception ignoredDelete){
-                }
-            }
             return false;
         }
     }
 
+    /**
+     * Best-effort removal of the random-named copies earlier builds left behind on every launch.
+     *
+     * <p>Only the decimal names of the old scheme match; the hashed names of this scheme are
+     * reused and skipped. A copy still mapped by another instance cannot be deleted on Windows,
+     * and that failure is swallowed on purpose.</p>
+     */
+    private static void deleteLegacyCopies(java.nio.file.Path keep){
+        try(var files = java.nio.file.Files.newDirectoryStream(
+            keep.getParent(), "orbital-particlesimd-*.dll")){
+            for(java.nio.file.Path candidate : files){
+                if(candidate.equals(keep)) continue;
+                //the old code used a random positive long in decimal; this build uses hex
+                if(!candidate.getFileName().toString().matches("orbital-particlesimd-\\d{1,20}\\.dll")) continue;
+                try{
+                    java.nio.file.Files.deleteIfExists(candidate);
+                }catch(Exception stillMapped){
+                }
+            }
+        }catch(Exception ignoredListing){
+        }
+    }
+
+    /** @return the first 16 hex digits of the SHA-256, used to name the extracted DLL per build. */
+    private static String digest(byte[] bytes){
+        try{
+            byte[] hash = java.security.MessageDigest.getInstance("SHA-256").digest(bytes);
+            StringBuilder hex = new StringBuilder(16);
+            for(int i = 0; i < 8; i++){
+                hex.append(Character.forDigit((hash[i] >> 4) & 0xF, 16));
+                hex.append(Character.forDigit(hash[i] & 0xF, 16));
+            }
+            return hex.toString();
+        }catch(java.security.NoSuchAlgorithmException fallback){
+            //SHA-256 is mandatory in every JRE; keep the method total anyway
+            return Integer.toHexString(java.util.Arrays.hashCode(bytes));
+        }
+    }
+
     private static native int updateNative(float[] data, int count, float delta);
+
+    /** @return true when a native SIMD backend loaded; false means the scalar loop below runs. */
+    static boolean nativeSimdEnabled(){
+        return nativeSimdAvailable;
+    }
 
     static int update(float[] data, int count, float delta){
         if(nativeSimdAvailable){

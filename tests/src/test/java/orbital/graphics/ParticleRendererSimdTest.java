@@ -6,9 +6,30 @@ import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class ParticleRendererSimdTest{
     private static final int particleSize = 9;
+
+    /**
+     * The comparisons below are only meaningful when the native library actually runs: without
+     * it, {@link ParticleRenderer#update} *is* {@link ParticleRenderer#updateScalar}, and every
+     * assertion passes without touching a single SIMD instruction. This test makes the packaged
+     * backend itself fail loudly instead of silently degrading.
+     */
+    @Test
+    void packagedSimdLibraryLoadsOnWindowsX64(){
+        assumeTrue(arc.util.OS.isWindows, "the SIMD backend ships for Windows only");
+        String arch = System.getProperty("os.arch", "").toLowerCase(java.util.Locale.ROOT);
+        assumeTrue(arch.equals("amd64") || arch.equals("x86_64"), "the SIMD backend targets x86_64");
+
+        assertNotNull(ParticleRenderer.class.getResource("/native/windows-x86_64/orbital_particlesimd.dll"),
+            "the SIMD DLL is missing from the packaged resources");
+        assertTrue(ParticleRenderer.nativeSimdEnabled(),
+            "the packaged SIMD DLL did not load; the update-vs-scalar checks above would compare a loop with itself");
+    }
 
     @Test
     void updateMatchesScalarForLiveParticlesAndTailSizes(){

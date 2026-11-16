@@ -310,7 +310,18 @@ project(":core"){
         outputs.dir(particleSimdResourceDir)
 
         doLast{
-            if(!System.getProperty("os.name").toLowerCase().contains("windows")) return
+            def outputDir = particleSimdResourceDir.get().dir("native/windows-x86_64").asFile
+            def nativeDll = new File(outputDir, "orbital_particlesimd.dll")
+            //when the toolchain is missing the stale DLL of a previous build must not be packaged
+            def skip = { String reason ->
+                nativeDll.delete()
+                logger.lifecycle("Particle SIMD native build skipped: " + reason + "; Java scalar fallback remains active.")
+            }
+
+            if(!System.getProperty("os.name").toLowerCase().contains("windows")){
+                skip("host is not Windows")
+                return
+            }
 
             def env = System.getenv()
             def vswhere = new File(env.get("ProgramFiles(x86)") ?: "C:/Program Files (x86)", "Microsoft Visual Studio/Installer/vswhere.exe")
@@ -336,7 +347,7 @@ project(":core"){
             }
 
             if(clPath == null){
-                logger.lifecycle("Particle SIMD native build skipped: cl.exe unavailable; Java scalar fallback remains active.")
+                skip("cl.exe unavailable")
                 return
             }
 
@@ -347,7 +358,7 @@ project(":core"){
             def vcTools = new File(vcRoot, "VC/Tools/MSVC")
             def vcVersionDir = vcTools.listFiles()?.findAll{ it.isDirectory() }?.sort{ a, b -> b.name <=> a.name }?.first()
             if(vcVersionDir == null){
-                logger.lifecycle("Particle SIMD native build skipped: MSVC tool headers/libraries unavailable; Java scalar fallback remains active.")
+                skip("MSVC tool headers/libraries unavailable")
                 return
             }
 
@@ -355,7 +366,7 @@ project(":core"){
             if(!new File(jdkHome, "include/jni.h").isFile()) jdkHome = jdkHome.parentFile
             def jniInclude = new File(jdkHome, "include")
             if(!new File(jniInclude, "jni.h").isFile()){
-                logger.lifecycle("Particle SIMD native build skipped: JNI headers unavailable; Java scalar fallback remains active.")
+                skip("JNI headers unavailable")
                 return
             }
 
@@ -363,11 +374,10 @@ project(":core"){
             def sdkIncludeRoot = new File(kitsRoot, "Include")
             def sdkVersionDir = sdkIncludeRoot.listFiles()?.findAll{ it.isDirectory() }?.sort{ a, b -> b.name <=> a.name }?.first()
             if(sdkVersionDir == null){
-                logger.lifecycle("Particle SIMD native build skipped: Windows SDK unavailable; Java scalar fallback remains active.")
+                skip("Windows SDK unavailable")
                 return
             }
 
-            def outputDir = particleSimdResourceDir.get().dir("native/windows-x86_64").asFile
             def objectDir = layout.buildDirectory.dir("particle-simd-objects").get().asFile
             outputDir.mkdirs()
             objectDir.mkdirs()

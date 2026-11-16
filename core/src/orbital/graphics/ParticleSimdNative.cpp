@@ -9,10 +9,13 @@ namespace{
     constexpr int particleSize = 9;
     constexpr float globalDrag = 0.05f;
 
-    bool supportsSse42(){
+    //the vector fallback only uses SSE1 intrinsics (add/mul/compare/movemask/prefetch), so the
+    //baseline SSE2 of every x86-64 CPU is the honest requirement - checking SSE4.2 used to
+    //refuse the vector path on older chips for no reason
+    bool supportsSse2(){
         int regs[4]{};
         __cpuid(regs, 1);
-        return (regs[2] & (1 << 20)) != 0;
+        return (regs[3] & (1 << 26)) != 0;
     }
 
     bool supportsAvx2(){
@@ -29,7 +32,7 @@ namespace{
         return (regs[1] & (1 << 5)) != 0;
     }
 
-    bool updateSse42(float* data, int i, int head, float delta, float dragValue){
+    bool updateSse2(float* data, int i, int head, float delta, float dragValue){
         constexpr int prefetchParticles = 8;
         const int prefetchIndex = i + prefetchParticles * particleSize;
         if(prefetchIndex < head){
@@ -102,20 +105,23 @@ extern "C" JNIEXPORT jint JNICALL Java_orbital_graphics_ParticleRenderer_updateN
     const jsize length = env->GetArrayLength(array);
     if(count > length / particleSize) return -1;
 
-    static const int simdMode = supportsAvx2() ? 2 : (supportsSse42() ? 1 : 0);
+    static const int simdMode = supportsAvx2() ? 2 : (supportsSse2() ? 1 : 0);
     jfloat* data = env->GetFloatArrayElements(array, nullptr);
     if(data == nullptr) return -1;
 
     int head = count * particleSize;
     const float dragValue = std::max(1.0f - globalDrag * delta, 0.0f);
     const bool avx2 = simdMode == 2;
-    const bool sse42 = simdMode == 1;
+    //an AVX2 machine can run the SSE batch too: when one lane expires the AVX2 batch aborts,
+    //and the four lanes below it may still be alive - without this they all fell back to the
+    //scalar loop one by one
+    const bool sse2 = simdMode >= 1;
 
     for(int i = 0; i < head; i += particleSize){
         const int remaining = head - i;
         if(avx2 && remaining >= 8 * particleSize && updateParticleBatchAvx2(data, i, head, delta, dragValue)){
             i += 7 * particleSize;
-        }else if(sse42 && remaining >= 4 * particleSize && updateSse42(data, i, head, delta, dragValue)){
+        }else if(sse2 && remaining >= 4 * particleSize && updateSse2(data, i, head, delta, dragValue)){
             i += 3 * particleSize;
         }else{
             updateScalar(data, i, head, delta, dragValue);
