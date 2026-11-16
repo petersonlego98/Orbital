@@ -14,6 +14,7 @@ import orbital.game.EventType.*;
 import orbital.game.*;
 import orbital.game.Teams.*;
 import orbital.gen.*;
+import orbital.engine.units.UnitMovementTick;
 import orbital.maps.*;
 import orbital.type.*;
 import orbital.type.Weather.*;
@@ -479,6 +480,9 @@ public class Logic implements ApplicationListener{
         if(editor){
             Groups.unit.update(u -> u.isPlayer() || u.spawnedByCore);
         }else{
+            //when enabled and worth it, the Orbital engine integrates velocity for this tick and
+            //flags the units; VelComp.update() then skips its own integration for flagged units
+            UnitMovementTick.tick();
             Groups.unit.update();
         }
         PerfCounter.unitUpdate.end();

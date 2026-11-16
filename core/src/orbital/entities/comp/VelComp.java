@@ -17,10 +17,20 @@ abstract class VelComp implements Posc{
 
     transient float drag = 0f;
 
+    /** Set by the Orbital engine when velocity integration already ran for this tick; consumed by {@link #update()}. */
+    transient boolean engineMoved;
+
     //velocity needs to be called first, as it affects delta and lastPosition
     @MethodPriority(-1)
     @Override
     public void update(){
+        //the Orbital engine integrated and committed this unit's movement for this tick;
+        //applying velocity again would move the unit twice
+        if(engineMoved){
+            engineMoved = false;
+            return;
+        }
+
         //do not update velocity on the client at all, unless it's non-interpolated
         //velocity conflicts with interpolation.
         if(!net.client() || isLocal()){

@@ -884,6 +884,9 @@ public class HudFragment{
             content.left();
             panel.add(content).growX().left().row();
             content.update(() -> {
+                //Fase 1: batch spawning and the evidence log run every frame of the test mode,
+                //even while the panel is collapsed
+                TestEnginePhase.update();
                 if(testFeaturesContentSignature != (testFeaturesPanelExpanded ? 1L : 0L)){
                     testFeaturesContentSignature = testFeaturesPanelExpanded ? 1L : 0L;
                     rebuildTestFeaturesContent(content, width);
@@ -937,7 +940,61 @@ public class HudFragment{
                 return unit == null || unit.type.turretSlots.isEmpty();
             });
 
+        buildEnginePhase(content);
+
         buildEnemyBuildings(content);
+    }
+
+    /**
+     * Fase 1 of the test mode: stress battle generator plus live measurements of everything the
+     * engine work claims - subsystem frame costs, unit/bullet counts, whether the parallel
+     * movement actually engaged, and its own capture/simulate/commit averages.
+     */
+    private void buildEnginePhase(Table panel){
+        float width = mobile ? 200f : 248f;
+
+        Table section = new Table();
+        section.left();
+        section.background(Tex.pane);
+        section.margin(8f);
+        panel.add(section).width(width).left().top().padTop(8f).row();
+
+        section.add("@mode.testfase1.title").color(Pal.accent).left().row();
+
+        //battle size buttons: 2048 is exactly the engine threshold, 8000 is the "big battle" case
+        Table sizes = new Table();
+        sizes.left();
+        for(int i = 0; i < TestEnginePhase.sizes.length; i++){
+            int count = TestEnginePhase.sizes[i];
+            sizes.button(String.valueOf(count), () -> TestEnginePhase.start(count))
+                .size((width - 16f - 8f * (TestEnginePhase.sizes.length - 1)) / TestEnginePhase.sizes.length, 34f)
+                .disabled(b -> TestEnginePhase.active());
+            if(i < TestEnginePhase.sizes.length - 1) sizes.add().width(4f);
+        }
+        section.add(sizes).left().padTop(4f).row();
+
+        section.label(() -> TestEnginePhase.generating()
+            ? Core.bundle.format("mode.testfase1.generating", TestEnginePhase.spawnedUnits(), TestEnginePhase.targetUnits())
+            : "")
+            .color(Color.lightGray).width(width).wrap().left().padTop(2f).row();
+
+        section.button("@mode.testfase1.stop", Icon.cancel, TestEnginePhase::stop)
+            .width(width).height(32f).padTop(4f).left()
+            .visible(() -> TestEnginePhase.active()).row();
+
+        //A/B switch: flips the parallel movement preference live; the same battle can be watched
+        //with the engine on and off, and the timings below answer whether it made any difference
+        section.button("@mode.testfase1.engine", () -> TestEnginePhase.setEngineToggle(!TestEnginePhase.engineToggle()))
+            .width(width).height(32f).padTop(4f).left()
+            .update(b -> b.setText(TestEnginePhase.engineToggle()
+                ? Core.bundle.get("mode.testfase1.engine.on")
+                : Core.bundle.get("mode.testfase1.engine.off"))).row();
+
+        section.label(TestEnginePhase::statsLine).color(Color.lightGray).width(width).wrap().left().padTop(6f).row();
+        section.label(TestEnginePhase::msLine1).color(Color.lightGray).width(width).wrap().left().row();
+        section.label(TestEnginePhase::msLine2).color(Color.lightGray).width(width).wrap().left().row();
+        section.label(TestEnginePhase::engineStatus).color(Color.lightGray).width(width).wrap().left().row();
+        section.label(TestEnginePhase::enginePhases).color(Color.lightGray).width(width).wrap().left().row();
     }
 
 

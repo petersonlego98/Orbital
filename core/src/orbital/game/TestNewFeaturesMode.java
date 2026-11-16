@@ -120,6 +120,8 @@ public final class TestNewFeaturesMode{
         playerBlock = null;
         enemyBlock = null;
         enemyRemoving = false;
+        //a stress battle from a previous session must never leak into a fresh one
+        TestEnginePhase.reset();
 
         //the tutorial belongs to this round, not to the save: replay the four hints on every
         //fresh visit so a player testing a different combination sees the explanations again

@@ -22,6 +22,7 @@ import orbital.core.RendererPreference;
 import orbital.ctype.*;
 import orbital.engine.OrbitalEngine;
 import orbital.engine.threading.OrbitalThreadConfig;
+import orbital.engine.units.UnitMovementTick;
 import orbital.game.EventType.*;
 import orbital.gen.*;
 import orbital.input.*;
@@ -677,6 +678,14 @@ public class SettingsMenuDialog extends BaseDialog{
                         OrbitalEngine.reconfigure(value);
                     }
                 });
+
+            //parallel unit movement is opt-in: when on, the Orbital engine integrates unit
+            //velocity for the tick and VelComp skips its own integration for flagged units
+            advancedgraphics.checkPref(UnitMovementTick.key, false, value -> {
+                if(value && !OrbitalEngine.parallelCapable()){
+                    ui.showInfo(bundle.get("settings.orbitalparallelmovement.unavailable"));
+                }
+            });
         }
 
         dev.checkPref("console", false, val -> {
