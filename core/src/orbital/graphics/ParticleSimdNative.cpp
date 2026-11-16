@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <intrin.h>
@@ -98,6 +99,94 @@ namespace{
 }
 
 extern bool updateParticleBatchAvx2(float* data, int i, int head, float delta, float dragValue);
+extern bool updateUnitBatchAvx2(float* x, float* y, float* vx, float* vy, float* drag,
+                                int i, int count, float delta, bool zeroUnmoved);
+
+namespace{
+    constexpr float equalEpsilon = 1e-6f; //arc.math.Mathf.equal(float, float)
+
+    //SSE2 batch of four units/projectiles. Returns false only when the caller must fall back.
+    bool updateUnitBatchSse2(float* x, float* y, float* vx, float* vy, float* drag,
+                             int i, int count, float delta, bool zeroUnmoved){
+        const int i1 = i + 1, i2 = i + 2, i3 = i + 3;
+        const __m128 dx = _mm_set1_ps(delta);
+        const __m128 one = _mm_set1_ps(1.0f);
+        const __m128 zero = _mm_setzero_ps();
+
+        __m128 px = _mm_setr_ps(x[i], x[i1], x[i2], x[i3]);
+        __m128 py = _mm_setr_ps(y[i], y[i1], y[i2], y[i3]);
+        __m128 sx = _mm_setr_ps(vx[i], vx[i1], vx[i2], vx[i3]);
+        __m128 sy = _mm_setr_ps(vy[i], vy[i1], vy[i2], vy[i3]);
+        __m128 d = _mm_setr_ps(drag[i], drag[i1], drag[i2], drag[i3]);
+
+        __m128 nx = _mm_add_ps(px, _mm_mul_ps(sx, dx));
+        __m128 ny = _mm_add_ps(py, _mm_mul_ps(sy, dx));
+
+        if(zeroUnmoved){
+            //Mathf.equal: fabs(px - nx) <= 1e-6f
+            const __m128 sign = _mm_set1_ps(-0.0f);
+            const __m128 eps = _mm_set1_ps(equalEpsilon);
+            __m128 stillX = _mm_cmple_ps(_mm_andnot_ps(sign, _mm_sub_ps(px, nx)), eps);
+            __m128 stillY = _mm_cmple_ps(_mm_andnot_ps(sign, _mm_sub_ps(py, ny)), eps);
+            sx = _mm_blendv_ps(sx, zero, stillX);
+            sy = _mm_blendv_ps(sy, zero, stillY);
+        }
+
+        __m128 scale = _mm_max_ps(zero, _mm_sub_ps(one, _mm_mul_ps(d, dx)));
+        float ox[4], oy[4], ovx[4], ovy[4];
+        _mm_storeu_ps(ox, nx);
+        _mm_storeu_ps(oy, ny);
+        _mm_storeu_ps(ovx, _mm_mul_ps(sx, scale));
+        _mm_storeu_ps(ovy, _mm_mul_ps(sy, scale));
+
+        const int lanes[4] = {i, i1, i2, i3};
+        for(int lane = 0; lane < 4; lane++){
+            x[lanes[lane]] = ox[lane];
+            y[lanes[lane]] = oy[lane];
+            vx[lanes[lane]] = ovx[lane];
+            vy[lanes[lane]] = ovy[lane];
+        }
+        return true;
+    }
+
+    void updateUnitScalar(float* x, float* y, float* vx, float* vy, float* drag,
+                          int i, float delta, bool zeroUnmoved){
+        float px = x[i], py = y[i];
+        float sx = vx[i], sy = vy[i];
+        float nx = px + sx * delta, ny = py + sy * delta;
+        if(zeroUnmoved){
+            if(std::fabs(px - nx) <= equalEpsilon) sx = 0.0f;
+            if(std::fabs(py - ny) <= equalEpsilon) sy = 0.0f;
+        }
+        float scale = std::max(1.0f - drag[i] * delta, 0.0f);
+        x[i] = nx;
+        y[i] = ny;
+        vx[i] = sx * scale;
+        vy[i] = sy * scale;
+    }
+
+    //Works on raw pointers, so workers may integrate disjoint slices of one shared direct buffer
+    //without JNI array pinning/copying (which is not safe from several threads at once).
+    void integrateUnitsRange(float* x, float* y, float* vx, float* vy, float* drag,
+                             int offset, int count, float delta, bool zero){
+        static const int simdMode = supportsAvx2() ? 2 : (supportsSse2() ? 1 : 0);
+        const int end = offset + count;
+        int i = offset;
+        while(i < end){
+            const int remaining = end - i;
+            if(simdMode == 2 && remaining >= 8
+               && updateUnitBatchAvx2(x, y, vx, vy, drag, i, end, delta, zero)){
+                i += 8;
+            }else if(simdMode >= 1 && remaining >= 4
+                    && updateUnitBatchSse2(x, y, vx, vy, drag, i, end, delta, zero)){
+                i += 4;
+            }else{
+                updateUnitScalar(x, y, vx, vy, drag, i, delta, zero);
+                i++;
+            }
+        }
+    }
+}
 
 extern "C" JNIEXPORT jint JNICALL Java_orbital_engine_simd_SimdNative_updateParticlesNative(
     JNIEnv* env, jclass, jfloatArray array, jint count, jfloat delta){
@@ -138,4 +227,64 @@ extern "C" JNIEXPORT jint JNICALL Java_orbital_engine_simd_SimdNative_backendLev
     // detection cannot drift between the JNI loader and the kernels
     static const int level = supportsAvx2() ? 2 : (supportsSse2() ? 1 : 0);
     return level;
+}
+
+/**
+ * Integrates unit/projectile velocity over SoA arrays in one native call.
+ * zeroUnmoved=true applies Mathf.equal(px, nx) and zeroes the axis; projectiles pass false.
+ */
+extern "C" JNIEXPORT jint JNICALL Java_orbital_engine_simd_SimdNative_updateUnitsNative(
+    JNIEnv* env, jclass, jfloatArray xArr, jfloatArray yArr, jfloatArray vxArr, jfloatArray vyArr,
+    jfloatArray dragArr, jint offset, jint count, jfloat delta, jboolean zeroUnmoved){
+    if(count < 0 || offset < 0 || xArr == nullptr || yArr == nullptr || vxArr == nullptr
+       || vyArr == nullptr || dragArr == nullptr) return -1;
+    const jsize xLen = env->GetArrayLength(xArr);
+    if(xLen - offset < count || env->GetArrayLength(yArr) - offset < count
+       || env->GetArrayLength(vxArr) - offset < count || env->GetArrayLength(vyArr) - offset < count
+       || env->GetArrayLength(dragArr) - offset < count) return -1;
+
+    jfloat* x = env->GetFloatArrayElements(xArr, nullptr);
+    jfloat* y = env->GetFloatArrayElements(yArr, nullptr);
+    jfloat* vx = env->GetFloatArrayElements(vxArr, nullptr);
+    jfloat* vy = env->GetFloatArrayElements(vyArr, nullptr);
+    jfloat* drag = env->GetFloatArrayElements(dragArr, nullptr);
+    if(x == nullptr || y == nullptr || vx == nullptr || vy == nullptr || drag == nullptr){
+        if(x != nullptr) env->ReleaseFloatArrayElements(xArr, x, JNI_ABORT);
+        if(y != nullptr) env->ReleaseFloatArrayElements(yArr, y, JNI_ABORT);
+        if(vx != nullptr) env->ReleaseFloatArrayElements(vxArr, vx, JNI_ABORT);
+        if(vy != nullptr) env->ReleaseFloatArrayElements(vyArr, vy, JNI_ABORT);
+        if(drag != nullptr) env->ReleaseFloatArrayElements(dragArr, drag, JNI_ABORT);
+        return -1;
+    }
+
+    integrateUnitsRange(x, y, vx, vy, drag, offset, count, delta, zeroUnmoved == JNI_TRUE);
+
+    env->ReleaseFloatArrayElements(xArr, x, 0);
+    env->ReleaseFloatArrayElements(yArr, y, 0);
+    env->ReleaseFloatArrayElements(vxArr, vx, 0);
+    env->ReleaseFloatArrayElements(vyArr, vy, 0);
+    env->ReleaseFloatArrayElements(dragArr, drag, 0);
+    return count;
+}
+
+/** Address of a direct ByteBuffer, so several workers can share one native SoA allocation. */
+extern "C" JNIEXPORT jlong JNICALL Java_orbital_engine_simd_SimdNative_directAddressNative(
+    JNIEnv* env, jclass, jobject buffer){
+    if(buffer == nullptr) return 0;
+    void* address = env->GetDirectBufferAddress(buffer);
+    return reinterpret_cast<jlong>(address);
+}
+
+/** Integrates a disjoint slice of direct buffers; no JNI array pinning, safe across workers. */
+extern "C" JNIEXPORT jint JNICALL Java_orbital_engine_simd_SimdNative_updateUnitsDirectNative(
+    JNIEnv*, jclass, jlong ax, jlong ay, jlong avx, jlong avy, jlong adrag,
+    jint offset, jint count, jfloat delta, jboolean zeroUnmoved){
+    if(count < 0 || offset < 0 || ax == 0 || ay == 0 || avx == 0 || avy == 0 || adrag == 0) return -1;
+
+    integrateUnitsRange(
+        reinterpret_cast<float*>(ax), reinterpret_cast<float*>(ay),
+        reinterpret_cast<float*>(avx), reinterpret_cast<float*>(avy),
+        reinterpret_cast<float*>(adrag),
+        offset, count, delta, zeroUnmoved == JNI_TRUE);
+    return count;
 }

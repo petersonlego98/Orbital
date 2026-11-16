@@ -115,6 +115,25 @@ public final class SimulationPipeline{
             snapshot.captureNanos(), snapshot.simulationNanos(), elapsed, true);
     }
 
+    /**
+     * Batched simulation: each worker receives a contiguous chunk and may feed it to a native
+     * kernel in one call. Used by the SIMD phases, where per-index dispatch would pay more overhead
+     * than the arithmetic it replaces.
+     */
+    public void simulateRanges(SimulationSnapshot snapshot, String name, int items, int batch,
+                               OrbitalJobSystem.RangeOperation operation){
+        requireOpen(snapshot);
+
+        long started = System.nanoTime();
+        jobs.parallelRanges(name, 0, items, batch, operation);
+        long elapsed = System.nanoTime() - started;
+
+        snapshot.addSimulationNanos(elapsed);
+        snapshot.markSimulated();
+        taskProfiler.record(name, items, elapsed);
+        simulationProfiler.recordSimulation(elapsed);
+    }
+
     /** Generic parallel range for a phase that does not use the unit/projectile buffers. */
     public void parallelFor(String name, int items, java.util.function.IntConsumer operation){
         jobs.parallelFor(name, 0, items, operation);

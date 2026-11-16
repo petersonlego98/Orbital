@@ -1,5 +1,7 @@
 package orbital.engine.simd;
 
+import orbital.engine.units.UnitMovementKernel;
+
 /**
  * Reference particle kernel and the stable facade over the SIMD layer.
  *
@@ -16,6 +18,17 @@ public final class SimdOperations{
 
     public static int updateParticles(float[] data, int count, float delta){
         return SimdDispatcher.updateParticles(data, count, delta);
+    }
+
+    /**
+     * Integrates a slice of unit or projectile SoA arrays in one native call.
+     *
+     * @param zeroUnmoved true for units (zero an axis that did not move), false for projectiles
+     * @return the number of rows integrated
+     */
+    public static int updateUnits(float[] x, float[] y, float[] vx, float[] vy, float[] drag,
+                                  int offset, int count, float delta, boolean zeroUnmoved){
+        return SimdDispatcher.updateUnits(x, y, vx, vy, drag, offset, count, delta, zeroUnmoved);
     }
 
     /** Scalar reference implementation. */

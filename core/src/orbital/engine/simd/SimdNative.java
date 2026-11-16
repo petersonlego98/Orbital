@@ -76,6 +76,31 @@ public final class SimdNative{
         return updateParticlesNative(data, count, delta);
     }
 
+    /**
+     * Integrates a whole SoA slice in one native call.
+     *
+     * @return the number of rows processed, or a negative value when the library cannot run the
+     * data (length mismatch, unloaded library).
+     */
+    public static int updateUnits(float[] x, float[] y, float[] vx, float[] vy, float[] drag,
+                                  int offset, int count, float delta, boolean zeroUnmoved){
+        if(!loaded) return -1;
+        return updateUnitsNative(x, y, vx, vy, drag, offset, count, delta, zeroUnmoved);
+    }
+
+    /** @return the native address of a direct buffer, or 0 when the library is unavailable. */
+    public static long directAddress(java.nio.ByteBuffer buffer){
+        if(!loaded || buffer == null || !buffer.isDirect()) return 0L;
+        return directAddressNative(buffer);
+    }
+
+    /** Integrates one disjoint slice of a shared direct SoA buffer. */
+    public static int updateUnitsDirect(long ax, long ay, long avx, long avy, long adrag,
+                                        int offset, int count, float delta, boolean zeroUnmoved){
+        if(!loaded) return -1;
+        return updateUnitsDirectNative(ax, ay, avx, avy, adrag, offset, count, delta, zeroUnmoved);
+    }
+
     private static String extractAndLoad(){
         try(var input = SimdNative.class.getResourceAsStream(resource)){
             if(input == null) return null;
@@ -152,5 +177,15 @@ public final class SimdNative{
 
     private static native int updateParticlesNative(float[] data, int count, float delta);
 
+    private static native int updateUnitsNative(float[] x, float[] y, float[] vx, float[] vy,
+                                                float[] drag, int offset, int count, float delta,
+                                                boolean zeroUnmoved);
+
     private static native int backendLevelNative();
+
+    private static native long directAddressNative(java.nio.ByteBuffer buffer);
+
+    private static native int updateUnitsDirectNative(long ax, long ay, long avx, long avy,
+                                                      long adrag, int offset, int count,
+                                                      float delta, boolean zeroUnmoved);
 }

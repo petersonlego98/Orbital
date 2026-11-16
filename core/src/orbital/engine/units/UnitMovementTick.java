@@ -9,6 +9,9 @@ import orbital.engine.memory.ProjectileData;
 import orbital.engine.memory.UnitData;
 import orbital.engine.simulation.SimulationPipeline;
 import orbital.engine.simulation.SimulationSnapshot;
+import orbital.engine.simd.SimdNative;
+import orbital.engine.simd.SimdOperations;
+import orbital.engine.simd.SimdSoaBuffer;
 import orbital.gen.Groups;
 import orbital.gen.Unit;
 
@@ -41,6 +44,8 @@ public final class UnitMovementTick{
     public static final String key = "orbitalparallelmovement";
     /** Below this many eligible units the vanilla sequential integration is cheaper than pool overhead. */
     public static final int parallelThreshold = 2048;
+    /** Rows per native SIMD call inside a worker's chunk. */
+    public static final int simdBatch = 256;
 
     /** Diagnostics evidence: whether the most recent tick actually ran the parallel integration. */
     public static volatile boolean lastEngaged;
@@ -54,6 +59,7 @@ public final class UnitMovementTick{
     private final UnitData staging = new UnitData();
     private final ProjectileData emptyProjectiles = new ProjectileData();
     private final SimulationSnapshot snapshot = new SimulationSnapshot();
+    private final SimdSoaBuffer simd = new SimdSoaBuffer();
     private long capturedFrames;
 
     //captured entity references for the commit step; workers never touch these
@@ -160,7 +166,17 @@ public final class UnitMovementTick{
         pipeline.capture(snapshot, capturedFrames++, staging, emptyProjectiles);
 
         float delta = Time.delta;
-        pipeline.simulateUnits(snapshot, (state, index) -> step(state.units(), dragBuffer, index, delta));
+        if(count >= simdBatch && SimdOperations.capabilities().nativeLoaded() && simd.usable()){
+            UnitData units = snapshot.units();
+            simd.upload(units.x, units.y, units.velocityX, units.velocityY, dragBuffer, count);
+            pipeline.simulateRanges(snapshot, "simulation.units.simd", count, simdBatch,
+                (from, to) -> SimdNative.updateUnitsDirect(
+                    simd.xAddress(), simd.yAddress(), simd.vxAddress(), simd.vyAddress(),
+                    simd.dragAddress(), from, to - from, delta, true));
+            simd.download(units.x, units.y, units.velocityX, units.velocityY, count);
+        }else{
+            pipeline.simulateUnits(snapshot, (state, index) -> step(state.units(), dragBuffer, index, delta));
+        }
 
         pipeline.commit(snapshot, (units, index) -> {
             Unit unit = refs[index];

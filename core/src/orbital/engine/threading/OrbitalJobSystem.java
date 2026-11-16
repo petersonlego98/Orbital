@@ -77,6 +77,39 @@ public final class OrbitalJobSystem implements AutoCloseable{
         return workers.invoke(new SumTask(start, end, batch, mapper));
     }
 
+    /** A chunk-level operation: unlike {@link IntConsumer}, it gets a range to process as a batch. */
+    @FunctionalInterface
+    public interface RangeOperation{
+        void accept(int from, int to);
+    }
+
+    /**
+     * Parallel for over contiguous chunks, for kernels that amortise a call over many rows (a
+     * native SIMD batch, for instance). Each leaf receives a disjoint {@code [from, to)} slice, so
+     * two workers never write the same slot.
+     */
+    public void parallelRanges(String name, int start, int end, int batch, RangeOperation operation){
+        ensureOpen();
+        Objects.requireNonNull(operation, "operation");
+
+        int length = end - start;
+        if(length <= 0) return;
+
+        metrics.recordSubmission();
+        int chunk = Math.max(batch, scheduler.batchSize(length, workerCount()));
+        if(workerCount() <= 1 || length <= chunk){
+            long begun = System.nanoTime();
+            try{
+                operation.accept(start, end);
+            }finally{
+                metrics.recordLeaf(name, OrbitalTaskPriority.NORMAL, length, System.nanoTime() - begun);
+            }
+            return;
+        }
+
+        this.<Void>invoke(new RangeTask(name, start, end, chunk, operation, metrics));
+    }
+
     /** Creates an empty group that can collect several ranges before a single dispatch. */
     public OrbitalTaskGroup newGroup(String name){
         ensureOpen();
@@ -129,6 +162,45 @@ public final class OrbitalJobSystem implements AutoCloseable{
 
     private <T> T invoke(java.util.concurrent.ForkJoinTask<T> task){
         return workers.invoke(task);
+    }
+
+    /** Range-splitting counterpart of {@link OrbitalTask}, used by batched SIMD kernels. */
+    private static final class RangeTask extends RecursiveAction{
+        private final String name;
+        private final int start;
+        private final int end;
+        private final int chunk;
+        private final RangeOperation operation;
+        private final OrbitalTaskMetrics metrics;
+
+        RangeTask(String name, int start, int end, int chunk, RangeOperation operation,
+                  OrbitalTaskMetrics metrics){
+            this.name = name;
+            this.start = start;
+            this.end = end;
+            this.chunk = chunk;
+            this.operation = operation;
+            this.metrics = metrics;
+        }
+
+        @Override
+        protected void compute(){
+            int length = end - start;
+            if(length <= chunk){
+                long begun = System.nanoTime();
+                try{
+                    operation.accept(start, end);
+                }finally{
+                    metrics.recordLeaf(name, OrbitalTaskPriority.NORMAL, length, System.nanoTime() - begun);
+                }
+                return;
+            }
+
+            int middle = start + (length >>> 1);
+            invokeAll(
+                new RangeTask(name, start, middle, chunk, operation, metrics),
+                new RangeTask(name, middle, end, chunk, operation, metrics));
+        }
     }
 
     private void ensureOpen(){

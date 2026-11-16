@@ -10,6 +10,7 @@ import orbital.engine.resources.MiningKernel;
 import orbital.engine.world.RegionNoise;
 import orbital.engine.simulation.*;
 import orbital.engine.simd.SimdOperations;
+import orbital.engine.units.UnitMovementKernel;
 import orbital.engine.threading.*;
 import orbital.engine.units.UnitMovementKernel;
 
@@ -126,6 +127,8 @@ public final class EngineValidation{
         cases.add(compareSpatialHash(seed, workers));
         cases.add(compareMining(seed, workers));
         cases.add(compareWorldRegions(workers));
+        cases.add(compareSimdUnits(seed, true));
+        cases.add(compareSimdUnits(seed, false));
 
         ArrayList<ScalingPoint> scaling = new ArrayList<>();
         for(int count : workerPlan(workers)){
@@ -427,6 +430,35 @@ public final class EngineValidation{
         boolean passed = Arrays.equals(expected, actual);
         return new CaseResult("world.regions", passed, size * size, sequentialNanos, parallelNanos,
             passed ? "region tiles match the full grid" : "REGIONS DIVERGE");
+    }
+
+    private static CaseResult compareSimdUnits(UnitData seed, boolean zeroUnmoved){
+        int count = seed.count;
+        float[] x = seed.x.clone(), y = seed.y.clone();
+        float[] vx = seed.velocityX.clone(), vy = seed.velocityY.clone();
+        float[] drag = new float[count];
+        for(int i = 0; i < count; i++){
+            drag[i] = i % 64 == 0 ? 0.5f : 0.05f;
+        }
+
+        float[] ex = x.clone(), ey = y.clone(), evx = vx.clone(), evy = vy.clone();
+        long start = System.nanoTime();
+        for(int i = 0; i < count; i++){
+            UnitMovementKernel.integrate(ex, ey, evx, evy, drag, i, delta, zeroUnmoved);
+        }
+        long sequentialNanos = System.nanoTime() - start;
+
+        start = System.nanoTime();
+        int processed = SimdOperations.updateUnits(x, y, vx, vy, drag, 0, count, delta, zeroUnmoved);
+        long nativeNanos = System.nanoTime() - start;
+
+        boolean passed = processed == count
+            && Arrays.equals(ex, x) && Arrays.equals(ey, y)
+            && Arrays.equals(evx, vx) && Arrays.equals(evy, vy);
+
+        return new CaseResult(zeroUnmoved ? "simd.units" : "simd.projectiles", passed, count,
+            sequentialNanos, nativeNanos,
+            passed ? "native SoA kernel matches the Java formula" : "SIMD KERNEL DIVERGES");
     }
 
     private static boolean aiEqual(AIData left, AIData right){

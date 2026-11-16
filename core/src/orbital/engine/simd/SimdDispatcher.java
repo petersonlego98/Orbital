@@ -1,6 +1,7 @@
 package orbital.engine.simd;
 
 import arc.util.*;
+import orbital.engine.units.UnitMovementKernel;
 
 import java.util.concurrent.atomic.*;
 
@@ -31,6 +32,21 @@ public final class SimdDispatcher{
 
     public static SimdBackend backend(){
         return backend.get();
+    }
+
+    /** Integrates a whole SoA slice, using one native call whenever the library can run it. */
+    public static int updateUnits(float[] x, float[] y, float[] vx, float[] vy, float[] drag,
+                                  int offset, int count, float delta, boolean zeroUnmoved){
+        if(count <= 0) return 0;
+
+        int result = SimdNative.updateUnits(x, y, vx, vy, drag, offset, count, delta, zeroUnmoved);
+        if(result >= 0) return result;
+
+        //the scalar path is the same formula the native kernel was tested against
+        for(int i = offset; i < offset + count; i++){
+            UnitMovementKernel.integrate(x, y, vx, vy, drag, i, delta, zeroUnmoved);
+        }
+        return count;
     }
 
     public static int updateParticles(float[] data, int count, float delta){

@@ -25,17 +25,23 @@ public final class UnitMovementKernel{
      * @param drag   per-row drag, the vanilla comp's {@code drag} field copied during capture
      */
     public static void integrate(UnitData units, float[] drag, int index, float delta){
-        float px = units.x[index], py = units.y[index];
-        float vx = units.velocityX[index], vy = units.velocityY[index];
+        integrate(units.x, units.y, units.velocityX, units.velocityY, drag, index, delta, true);
+    }
 
-        float nx = px + vx * delta, ny = py + vy * delta;
-        if(Mathf.equal(px, nx)) vx = 0f;
-        if(Mathf.equal(py, ny)) vy = 0f;
+    /** Raw-array form shared with the SIMD fallback, so the formula has one definition. */
+    public static void integrate(float[] x, float[] y, float[] vx, float[] vy, float[] drag,
+                                 int index, float delta, boolean zeroUnmoved){
+        float px = x[index], py = y[index];
+        float sx = vx[index], sy = vy[index];
+
+        float nx = px + sx * delta, ny = py + sy * delta;
+        if(zeroUnmoved && Mathf.equal(px, nx)) sx = 0f;
+        if(zeroUnmoved && Mathf.equal(py, ny)) sy = 0f;
 
         float scale = Math.max(1f - drag[index] * delta, 0f);
-        units.x[index] = nx;
-        units.y[index] = ny;
-        units.velocityX[index] = vx * scale;
-        units.velocityY[index] = vy * scale;
+        x[index] = nx;
+        y[index] = ny;
+        vx[index] = sx * scale;
+        vy[index] = sy * scale;
     }
 }

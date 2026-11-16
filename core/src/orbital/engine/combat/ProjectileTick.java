@@ -7,6 +7,9 @@ import orbital.engine.memory.ProjectileData;
 import orbital.engine.memory.UnitData;
 import orbital.engine.simulation.SimulationPipeline;
 import orbital.engine.simulation.SimulationSnapshot;
+import orbital.engine.simd.SimdNative;
+import orbital.engine.simd.SimdOperations;
+import orbital.engine.simd.SimdSoaBuffer;
 import orbital.gen.Bullet;
 import orbital.gen.Groups;
 
@@ -28,6 +31,8 @@ public final class ProjectileTick{
     public static final String key = "orbitalparallelbullets";
     /** Starting threshold; the test mode's numbers decide whether it should move. */
     public static final int parallelThreshold = 1024;
+    /** Rows per native SIMD call inside a worker's chunk. */
+    public static final int simdBatch = 256;
 
     /** Diagnostics evidence: whether the most recent tick actually ran the parallel integration. */
     public static volatile boolean lastEngaged;
@@ -41,6 +46,7 @@ public final class ProjectileTick{
     private final ProjectileData staging = new ProjectileData();
     private final UnitData emptyUnits = new UnitData();
     private final SimulationSnapshot snapshot = new SimulationSnapshot();
+    private final SimdSoaBuffer simd = new SimdSoaBuffer();
     private long capturedFrames;
 
     private Bullet[] refs = new Bullet[0];
@@ -126,8 +132,18 @@ public final class ProjectileTick{
         pipeline.capture(snapshot, capturedFrames++, emptyUnits, staging);
 
         float delta = Time.delta;
-        pipeline.simulateProjectiles(snapshot,
-            (state, index) -> ProjectileKernel.integrate(state.projectiles(), dragBuffer, index, delta));
+        if(count >= simdBatch && SimdOperations.capabilities().nativeLoaded() && simd.usable()){
+            ProjectileData bullets = snapshot.projectiles();
+            simd.upload(bullets.x, bullets.y, bullets.velocityX, bullets.velocityY, dragBuffer, count);
+            pipeline.simulateRanges(snapshot, "simulation.projectiles.simd", count, simdBatch,
+                (from, to) -> SimdNative.updateUnitsDirect(
+                    simd.xAddress(), simd.yAddress(), simd.vxAddress(), simd.vyAddress(),
+                    simd.dragAddress(), from, to - from, delta, false));
+            simd.download(bullets.x, bullets.y, bullets.velocityX, bullets.velocityY, count);
+        }else{
+            pipeline.simulateProjectiles(snapshot,
+                (state, index) -> ProjectileKernel.integrate(state.projectiles(), dragBuffer, index, delta));
+        }
 
         pipeline.commit(snapshot, null, (bullets, index) -> {
             Bullet bullet = refs[index];

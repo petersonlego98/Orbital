@@ -12,10 +12,11 @@ class EngineValidationTest{
         EngineValidation.Report report = EngineValidation.run(4);
 
         assertTrue(report.allPassed(), "a validation case failed:\n" + report.summary());
-        assertEquals(8, report.cases().size(), "every subsystem must be measured");
+        assertEquals(10, report.cases().size(), "every subsystem must be measured");
 
         for(String name : new String[]{"units.movement", "particles.vertices", "pipeline.transaction",
-            "ai.decisions", "navigation.flow", "physics.spatial", "resources.mining", "world.regions"}){
+            "ai.decisions", "navigation.flow", "physics.spatial", "resources.mining", "world.regions",
+            "simd.units", "simd.projectiles"}){
             EngineValidation.CaseResult result = report.find(name);
             assertNotNull(result, "missing case " + name);
             assertTrue(result.passed(), name + " failed: " + result.detail());
