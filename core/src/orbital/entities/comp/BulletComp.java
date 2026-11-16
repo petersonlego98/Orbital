@@ -43,6 +43,8 @@ abstract class BulletComp implements Timedc, Damagec, Hitboxc, Teamc, Posc, Draw
     //setting this variable to true prevents lifetime from decreasing for a frame.
     transient boolean keepAlive;
     transient boolean justSpawned = true;
+    /** Set by the Orbital engine when it already integrated this bullet's movement this tick. */
+    transient boolean engineMoved;
     /** Unlike the owner, the shooter is the original entity that created this bullet. For a second-stage missile, the shooter would be the turret, but the owner would be the last missile stage.*/
     transient Entityc shooter;
     transient @Nullable Tile aimTile;
@@ -162,9 +164,13 @@ abstract class BulletComp implements Timedc, Damagec, Hitboxc, Teamc, Posc, Draw
 
     @Override
     public void update(){
-        //for one frame, bullets do not move - this is because bullet.update() is called immediately after the weapon updates
-        //if the bullet moved immediately, it would spawn visually offset from the weapon at low FPS values
-        if(!justSpawned){
+        //the Orbital engine integrated and committed this bullet's movement for this tick;
+        //applying velocity again would move it twice
+        if(engineMoved){
+            engineMoved = false;
+        }else if(!justSpawned){
+            //for one frame, bullets do not move - this is because bullet.update() is called immediately after the weapon updates
+            //if the bullet moved immediately, it would spawn visually offset from the weapon at low FPS values
             x += vel.x * Time.delta;
             y += vel.y * Time.delta;
             vel.scl(Math.max(1f - type.drag * Time.delta, 0));

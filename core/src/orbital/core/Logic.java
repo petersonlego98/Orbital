@@ -496,7 +496,12 @@ public class Logic implements ApplicationListener{
         PerfCounter.buildingUpdate.end();
 
         PerfCounter.bulletUpdate.begin();
-        if(!editor) Groups.bullet.update();
+        if(!editor){
+            //when enabled and worth it, the Orbital engine integrates bullet velocity for this
+            //tick and flags the bullets; BulletComp.update() then skips its own integration
+            orbital.engine.combat.ProjectileTick.tick();
+            Groups.bullet.update();
+        }
         if(!editor) Groups.bullet.collide();
         PerfCounter.bulletUpdate.end();
 

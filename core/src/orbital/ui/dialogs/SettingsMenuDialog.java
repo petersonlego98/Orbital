@@ -686,6 +686,14 @@ public class SettingsMenuDialog extends BaseDialog{
                     ui.showInfo(bundle.get("settings.orbitalparallelmovement.unavailable"));
                 }
             });
+
+            //parallel bullet movement is opt-in too: collisions, lifetime and bullet behaviour stay
+            //on the game thread, only the velocity integration moves to the engine workers
+            advancedgraphics.checkPref(orbital.engine.combat.ProjectileTick.key, false, value -> {
+                if(value && !OrbitalEngine.parallelCapable()){
+                    ui.showInfo(bundle.get("settings.orbitalparallelbullets.unavailable"));
+                }
+            });
         }
 
         dev.checkPref("console", false, val -> {
