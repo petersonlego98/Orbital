@@ -13,6 +13,7 @@ import arc.util.*;
 import orbital.ai.*;
 import orbital.audio.*;
 import orbital.core.*;
+import orbital.engine.validation.EngineValidation;
 import orbital.ctype.*;
 import orbital.game.EventType.*;
 import orbital.game.Saves.*;
@@ -299,6 +300,11 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
     @Override
     public void init(){
         nextFrame = Time.nanos();
+        //headless opt-in for CI and for a quick machine check: -Dorbital.engine.validate=true runs
+        //the engine self-test before anything else and leaves the report in the log
+        if(Boolean.getBoolean("orbital.engine.validate")){
+            Log.info(EngineValidation.run().summary());
+        }
         setup();
     }
 

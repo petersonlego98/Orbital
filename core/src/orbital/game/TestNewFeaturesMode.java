@@ -127,6 +127,10 @@ public final class TestNewFeaturesMode{
         //fresh visit so a player testing a different combination sees the explanations again
         if(ui != null && ui.hints != null) ui.hints.resetModuleHints();
 
+        //every test session starts with engine evidence in the log: the parallel kernels against
+        //their sequential reference, and how the engine scales on this machine
+        arc.util.Log.info(orbital.engine.validation.EngineValidation.run().summary());
+
         initializeMono = true;
         //createSave = false: this is a disposable test session, it must never touch the save list
         control.playMap(testMap, rules, false, false);

@@ -45,7 +45,11 @@ public final class ParticleVertexBuilder{
         return particleCount * vertexStride;
     }
 
-    private static void writeVertex(float[] data, float[] vertices, int particle){
+    /**
+     * Writes one particle's vertex slot. Public so the validation harness can build the sequential
+     * reference without duplicating the lerp formula.
+     */
+    public static void writeVertex(float[] data, float[] vertices, int particle){
         int source = particle * particleStride;
         int target = particle * vertexStride;
 
