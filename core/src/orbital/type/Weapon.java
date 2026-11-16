@@ -223,11 +223,32 @@ public class Weapon implements Cloneable{
 
     /**
      * Drawing-only sprite scale for this weapon on a given unit. Native hull weapons always
-     * return 1; {@link TurretWeapon} overrides it with the value {@link DorsalVisual} derives
-     * from the carrier's measured hull size. The scale never reaches gameplay or serialization.
+     * return 1; a removable dorsal module - a turret block or a copy of a unit weapon - is
+     * shrunk by the value {@link DorsalVisual} derives from the carrier's measured hull size.
+     * The scale never reaches gameplay or serialization.
      */
     public float visualScale(Unit unit){
-        return 1f;
+        //a weapon module is a piece of hull equipment: without this it would keep the native
+        //sprite size of the hull it came from and cover the carrier it is mounted on
+        if(!removable || unit == null || unit.type == null) return 1f;
+        return DorsalGeometry.turretVisualScale(unit.type, Math.max(1, dorsalSize), regionPx());
+    }
+
+    /**
+     * @return the muzzle offset on the X axis, in world units, scaled to the drawn sprite.
+     *
+     * <p>A dorsal module is drawn smaller than its source block (see {@link #visualScale}), so
+     * the authored shot offset has to shrink with it. Otherwise the bullet would spawn past the
+     * drawn barrel - on a 5x5 module up to half a block outside the sprite - and read as a shot
+     * coming from empty space instead of from the turret on top of the hull.</p>
+     */
+    public float muzzleX(Unit unit){
+        return shootX * visualScale(unit);
+    }
+
+    /** @return the muzzle offset on the Y axis, in world units, scaled to the drawn sprite. */
+    public float muzzleY(Unit unit){
+        return shootY * visualScale(unit);
     }
 
     /**
@@ -259,7 +280,9 @@ public class Weapon implements Cloneable{
 
         float
         rotation = unit.rotation - 90,
-        realRecoil = Mathf.pow(mount.recoil, recoilPow) * recoil,
+        //the recoil kick is drawn in world units; a module shrunk by visualScale must not
+        //jump back at full block size while firing
+        realRecoil = Mathf.pow(mount.recoil, recoilPow) * recoil * visualScale(unit),
         weaponRotation  = rotation + (rotate ? mount.rotation : baseRotation),
         wx = unit.x + Angles.trnsx(rotation, x, y) + Angles.trnsx(weaponRotation, 0, -realRecoil),
         wy = unit.y + Angles.trnsy(rotation, x, y) + Angles.trnsy(weaponRotation, 0, -realRecoil);
@@ -286,7 +309,8 @@ public class Weapon implements Cloneable{
 
         float
         rotation = unit.rotation - 90,
-        realRecoil = Mathf.pow(mount.recoil, recoilPow) * recoil,
+        //recoil is drawn in world units, so it shrinks with the module sprite
+        realRecoil = Mathf.pow(mount.recoil, recoilPow) * recoil * scale,
         weaponRotation  = rotation + (rotate ? mount.rotation : baseRotation),
         wx = unit.x + Angles.trnsx(rotation, x, y) + Angles.trnsx(weaponRotation, 0, -realRecoil),
         wy = unit.y + Angles.trnsy(rotation, x, y) + Angles.trnsy(weaponRotation, 0, -realRecoil);
@@ -481,8 +505,10 @@ public class Weapon implements Cloneable{
 
         float
         weaponRotation = unit.rotation - 90 + (rotate ? mount.rotation : baseRotation),
-        bulletX = mountX + Angles.trnsx(weaponRotation, this.shootX, this.shootY),
-        bulletY = mountY + Angles.trnsy(weaponRotation, this.shootX, this.shootY),
+        //the muzzle belongs to the drawn sprite; a shrunk dorsal module keeps its shots on its
+        //own barrel instead of half a block ahead of it
+        bulletX = mountX + Angles.trnsx(weaponRotation, muzzleX(unit), muzzleY(unit)),
+        bulletY = mountY + Angles.trnsy(weaponRotation, muzzleX(unit), muzzleY(unit)),
         shootAngle = bulletRotation(unit, mount, bulletX, bulletY);
 
         if(alwaysShooting) mount.shoot = true;
@@ -603,14 +629,17 @@ public class Weapon implements Cloneable{
         if(!unit.isAdded()) return;
 
         mount.charging = false;
+        //muzzle and burst offsets are authored for the full-size block, so they all shrink with
+        //the module sprite: the shot must leave the drawn barrel, not the block's old edge
+        float muzzleScale = visualScale(unit);
         float
         xSpread = Mathf.range(xRand),
         ySpread = Mathf.range(yRand),
         weaponRotation = unit.rotation - 90 + (rotate ? mount.rotation : baseRotation),
         mountX = unit.x + Angles.trnsx(unit.rotation - 90, x, y),
         mountY = unit.y + Angles.trnsy(unit.rotation - 90, x, y),
-        bulletX = mountX + Angles.trnsx(weaponRotation, this.shootX + xOffset + xSpread, this.shootY + yOffset + ySpread),
-        bulletY = mountY + Angles.trnsy(weaponRotation, this.shootX + xOffset + xSpread, this.shootY + yOffset + ySpread),
+        bulletX = mountX + Angles.trnsx(weaponRotation, (this.shootX + xOffset + xSpread) * muzzleScale, (this.shootY + yOffset + ySpread) * muzzleScale),
+        bulletY = mountY + Angles.trnsy(weaponRotation, (this.shootX + xOffset + xSpread) * muzzleScale, (this.shootY + yOffset + ySpread) * muzzleScale),
         shootAngle = bulletRotation(unit, mount, bulletX, bulletY) + angleOffset,
         baseLife = (1f - lifeRnd) + Mathf.random(lifeRnd) + extraLife,
         lifeScl = bullet.scaleLife ? baseLife * Mathf.clamp(Mathf.dst(bulletX, bulletY, mount.aimX, mount.aimY) / bullet.range) : baseLife,
@@ -618,6 +647,7 @@ public class Weapon implements Cloneable{
 
         Entityc shooter = unit.controller() instanceof MissileAI ai ? ai.shooter : unit; //Pass the missile's shooter down to its bullets
         mount.bullet = bullet.create(unit, shooter, unit.team, bulletX, bulletY, angle, -1f, (1f - velocityRnd) + Mathf.random(velocityRnd) + extraVelocity, lifeScl, null, mover, mount.aimX, mount.aimY, mount.target);
+        raiseAboveHull(unit, mount.bullet);
         handleBullet(unit, mount, mount.bullet);
 
         if(!continuous){
@@ -648,14 +678,33 @@ public class Weapon implements Cloneable{
                 weaponRotation = unit.rotation - 90 + (rotate ? mount.rotation : baseRotation),
                 mountX = unit.x + Angles.trnsx(unit.rotation - 90, x, y),
                 mountY = unit.y + Angles.trnsy(unit.rotation - 90, x, y),
-                bulletX = mountX + Angles.trnsx(weaponRotation, this.shootX, this.shootY),
-                bulletY = mountY + Angles.trnsy(weaponRotation, this.shootX, this.shootY);
+                bulletX = mountX + Angles.trnsx(weaponRotation, muzzleX(unit), muzzleY(unit)),
+                bulletY = mountY + Angles.trnsy(weaponRotation, muzzleX(unit), muzzleY(unit));
             //make sure the length updates to the last set value
-            Tmp.v1.trns(bulletRotation(unit, mount, bulletX, bulletY), shootY + mount.lastLength).add(bulletX, bulletY);
+            Tmp.v1.trns(bulletRotation(unit, mount, bulletX, bulletY), muzzleY(unit) + mount.lastLength).add(bulletX, bulletY);
             bullet.aimX = Tmp.v1.x;
             bullet.aimY = Tmp.v1.y;
         }
     }
+
+    /**
+     * Brings a dorsal module's shot above the carrier hull.
+     *
+     * <p>Air hulls are drawn at {@code Layer.flyingUnit}, which sits <b>above</b> the bullet
+     * layer. That is fine for a weapon mounted under the wing, but a dorsal module is physically
+     * on the hull's top surface: its bullets would otherwise appear to come out from under the
+     * ship. Only removable modules are raised, so native hull weapons keep the engine's own
+     * layering, and low-altitude hulls (already below the bullet layer) need no change.</p>
+     */
+    private void raiseAboveHull(Unit unit, Bullet bullet){
+        if(!removable || bullet == null || unit == null || unit.type == null) return;
+
+        float hull = unit.elevation > 0.5f || unit.type.flying ? unit.type.flyingLayer : unit.type.groundLayer;
+        if(hull > bullet.type.layer){
+            bullet.layerOffset = hull + 0.5f - bullet.type.layer;
+        }
+    }
+
 
     public void flip(){
         x *= -1;

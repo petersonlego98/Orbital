@@ -53,6 +53,12 @@ abstract class BulletComp implements Timedc, Damagec, Hitboxc, Teamc, Posc, Draw
     transient boolean absorbed, hit;
     transient @Nullable Trail trail;
     transient int frags;
+    /**
+     * Drawing-only z offset added to {@link BulletType#layer}. A dorsal module sits on the hull's
+     * top surface, so its shots must be drawn over the carrier hull instead of under it; 0 means
+     * the authored layer, which is what every other bullet keeps.
+     */
+    transient float layerOffset;
 
     transient Posc stickyTarget;
     transient float stickyX, stickyY, stickyRotation, stickyRotationOffset;
@@ -320,7 +326,7 @@ abstract class BulletComp implements Timedc, Damagec, Hitboxc, Teamc, Posc, Draw
 
     @Override
     public void draw(){
-        Draw.z(type.layer);
+        Draw.z(type.layer + layerOffset);
 
         if(type.underwater){
             Drawf.underwater(() -> type.draw(self()));
