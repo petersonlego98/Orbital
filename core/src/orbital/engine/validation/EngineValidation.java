@@ -129,6 +129,7 @@ public final class EngineValidation{
         cases.add(compareWorldRegions(workers));
         cases.add(compareSimdUnits(seed, true));
         cases.add(compareSimdUnits(seed, false));
+        cases.add(compareParticleCulling());
 
         ArrayList<ScalingPoint> scaling = new ArrayList<>();
         for(int count : workerPlan(workers)){
@@ -430,6 +431,37 @@ public final class EngineValidation{
         boolean passed = Arrays.equals(expected, actual);
         return new CaseResult("world.regions", passed, size * size, sequentialNanos, parallelNanos,
             passed ? "region tiles match the full grid" : "REGIONS DIVERGE");
+    }
+
+    private static CaseResult compareParticleCulling(){
+        int particles = defaultItems;
+        float[] data = particles(particles);
+        float cameraWidth = 800f, cameraHeight = 600f, padding = 24f;
+        int[] offsets = new int[particles];
+        float[] parallel = new float[particles * ParticleVertexBuilder.vertexStride];
+        float[] expected = new float[parallel.length];
+
+        long start = System.nanoTime();
+        int visible = 0;
+        for(int i = 0; i < particles; i++){
+            float x = data[i * ParticleVertexBuilder.particleStride + 2];
+            float y = data[i * ParticleVertexBuilder.particleStride + 3];
+            if(Math.abs(x) > cameraWidth / 2f + padding || Math.abs(y) > cameraHeight / 2f + padding) continue;
+            ParticleVertexBuilder.writeVertex(data, expected, i, visible * ParticleVertexBuilder.vertexStride);
+            visible++;
+        }
+        long sequentialNanos = System.nanoTime() - start;
+
+        start = System.nanoTime();
+        int length = ParticleVertexBuilder.build(data, particles, parallel,
+            0f, 0f, cameraWidth, cameraHeight, padding, offsets);
+        long parallelNanos = System.nanoTime() - start;
+
+        boolean passed = length == visible * ParticleVertexBuilder.vertexStride
+            && Arrays.equals(expected, parallel);
+        return new CaseResult("particles.culling", passed, visible == 0 ? 1 : visible,
+            sequentialNanos, parallelNanos,
+            passed ? "culled buffer matches the sequential reference" : "CULLING DIVERGES");
     }
 
     private static CaseResult compareSimdUnits(UnitData seed, boolean zeroUnmoved){

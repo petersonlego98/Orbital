@@ -47,6 +47,8 @@ public class ParticleRenderer{
 
     Mesh mesh = new Mesh(false, maxParticles, 0, attributes);
     float[] vertexBuffer = new float[maxParticles * particleVertexSize];
+    /** Reusable compacted indices for viewport culling; one int per particle. */
+    int[] cullOffsets = new int[maxParticles];
     volatile int vertexBufferLength;
 
     @Nullable Future<?> asyncTask;
@@ -138,8 +140,10 @@ public class ParticleRenderer{
     }
 
     void buildVertices(){
-        //TODO: cull based on camera viewport
-        vertexBufferLength = ParticleVertexBuilder.build(data, count, vertexBuffer);
+        //particles drift after being added, so cull again here using the current camera bounds
+        vertexBufferLength = ParticleVertexBuilder.build(data, count, vertexBuffer,
+            Core.camera.position.x, Core.camera.position.y,
+            Core.camera.width, Core.camera.height, cullPadding, cullOffsets);
     }
 
     void uploadMeshData(Mesh mesh){
