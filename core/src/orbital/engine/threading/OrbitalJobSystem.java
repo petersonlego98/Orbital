@@ -1,8 +1,9 @@
 package orbital.engine.threading;
 
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
-import java.util.function.IntConsumer;
+import java.util.function.*;
 
 /**
  * Main entry point for engine parallelism.
@@ -50,6 +51,30 @@ public final class OrbitalJobSystem implements AutoCloseable{
         ensureOpen();
         Objects.requireNonNull(operation, "operation");
         dispatch(name, start, end, priority == null ? OrbitalTaskPriority.NORMAL : priority, operation, null);
+    }
+
+    /**
+     * Reduces a range in parallel, returning the sum. Unlike {@code parallelFor}, this is a
+     * {@link RecursiveTask} because the caller needs a result - useful for aggregating per-row
+     * counters such as mined resources or profiler totals.
+     */
+    public long parallelSum(int start, int end, IntToLongFunction mapper){
+        ensureOpen();
+        Objects.requireNonNull(mapper, "mapper");
+
+        int length = end - start;
+        if(length <= 0) return 0L;
+
+        int batch = scheduler.batchSize(length, workerCount());
+        if(workerCount() <= 1 || length <= batch){
+            long sum = 0L;
+            for(int i = start; i < end; i++){
+                sum += mapper.applyAsLong(i);
+            }
+            return sum;
+        }
+
+        return workers.invoke(new SumTask(start, end, batch, mapper));
     }
 
     /** Creates an empty group that can collect several ranges before a single dispatch. */
@@ -108,6 +133,39 @@ public final class OrbitalJobSystem implements AutoCloseable{
 
     private void ensureOpen(){
         if(closed.get()) throw new IllegalStateException("the Orbital job system is closed");
+    }
+
+    /** Result-carrying counterpart of {@link OrbitalTask}. */
+    private static final class SumTask extends RecursiveTask<Long>{
+        private final int start;
+        private final int end;
+        private final int batch;
+        private final IntToLongFunction mapper;
+
+        SumTask(int start, int end, int batch, IntToLongFunction mapper){
+            this.start = start;
+            this.end = end;
+            this.batch = batch;
+            this.mapper = mapper;
+        }
+
+        @Override
+        protected Long compute(){
+            int length = end - start;
+            if(length <= batch){
+                long sum = 0L;
+                for(int i = start; i < end; i++){
+                    sum += mapper.applyAsLong(i);
+                }
+                return sum;
+            }
+
+            int middle = start + (length >>> 1);
+            SumTask left = new SumTask(start, middle, batch, mapper);
+            SumTask right = new SumTask(middle, end, batch, mapper);
+            invokeAll(left, right);
+            return left.join() + right.join();
+        }
     }
 
     public int workerCount(){

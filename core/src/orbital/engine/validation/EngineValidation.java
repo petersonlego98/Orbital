@@ -5,6 +5,9 @@ import orbital.engine.ai.AIDecisionKernel;
 import orbital.engine.memory.*;
 import orbital.engine.navigation.FlowField;
 import orbital.engine.particles.ParticleVertexBuilder;
+import orbital.engine.physics.SpatialHash;
+import orbital.engine.resources.MiningKernel;
+import orbital.engine.world.RegionNoise;
 import orbital.engine.simulation.*;
 import orbital.engine.simd.SimdOperations;
 import orbital.engine.threading.*;
@@ -120,6 +123,9 @@ public final class EngineValidation{
         cases.add(runPipelineTransaction(seed, drag, workers));
         cases.add(compareAIDecisions(seed, workers));
         cases.add(compareNavigationFlow(workers));
+        cases.add(compareSpatialHash(seed, workers));
+        cases.add(compareMining(seed, workers));
+        cases.add(compareWorldRegions(workers));
 
         ArrayList<ScalingPoint> scaling = new ArrayList<>();
         for(int count : workerPlan(workers)){
@@ -320,6 +326,107 @@ public final class EngineValidation{
         }
         field.computeDistance(size - 1, size - 1);
         return field;
+    }
+
+    private static CaseResult compareSpatialHash(UnitData seed, int workers){
+        SpatialHash sequential = new SpatialHash(40_000f, 40_000f, 128f);
+        long start = System.nanoTime();
+        sequential.build(seed, null);
+        long sequentialNanos = System.nanoTime() - start;
+
+        SpatialHash parallel = new SpatialHash(40_000f, 40_000f, 128f);
+        long parallelNanos;
+        try(OrbitalJobSystem jobs = new OrbitalJobSystem(workers, OrbitalJobSystem.defaultBatchSize)){
+            start = System.nanoTime();
+            parallel.build(seed, jobs);
+            parallelNanos = System.nanoTime() - start;
+        }
+
+        boolean passed = sequential.itemCount() == seed.count
+            && parallel.itemCount() == seed.count && hashEqual(sequential, parallel);
+        return new CaseResult("physics.spatial", passed, seed.count, sequentialNanos, parallelNanos,
+            passed ? "both hashes hold the same buckets" : "BUCKETS DIVERGE");
+    }
+
+    private static boolean hashEqual(SpatialHash left, SpatialHash right){
+        for(int y = 0; y < left.rows(); y++){
+            for(int x = 0; x < left.cols(); x++){
+                int count = left.countInCell(x, y);
+                if(count != right.countInCell(x, y)) return false;
+                for(int slot = 0; slot < count; slot++){
+                    if(left.itemAt(x, y, slot) != right.itemAt(x, y, slot)) return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static CaseResult compareMining(UnitData seed, int workers){
+        ResourceData source = new ResourceData(seed.count);
+        float[] efficiency = new float[seed.count];
+        for(int i = 0; i < seed.count; i++){
+            source.add(i, seed.x[i], seed.y[i], 1f + i % 7, i % 50, 100f);
+            efficiency[i] = 0.5f + (i % 13) * 0.1f;
+        }
+
+        ResourceData sequential = new ResourceData();
+        copyResources(source, sequential);
+        long start = System.nanoTime();
+        for(int i = 0; i < sequential.count; i++){
+            MiningKernel.compute(sequential, efficiency, i, 0.75f);
+        }
+        long sequentialNanos = System.nanoTime() - start;
+
+        ResourceData parallel = new ResourceData();
+        copyResources(source, parallel);
+        long parallelNanos;
+        try(OrbitalJobSystem jobs = new OrbitalJobSystem(workers, OrbitalJobSystem.defaultBatchSize)){
+            start = System.nanoTime();
+            jobs.parallelFor("resources.mining", 0, parallel.count,
+                i -> MiningKernel.compute(parallel, efficiency, i, 0.75f));
+            parallelNanos = System.nanoTime() - start;
+        }
+
+        boolean passed = Arrays.equals(sequential.extracted, parallel.extracted)
+            && Arrays.equals(sequential.amount, parallel.amount);
+        return new CaseResult("resources.mining", passed, seed.count, sequentialNanos, parallelNanos,
+            passed ? "sequential and parallel proposals agree" : "MINING DIVERGES");
+    }
+
+    private static void copyResources(ResourceData from, ResourceData to){
+        to.ensureCapacity(from.count);
+        System.arraycopy(from.rate, 0, to.rate, 0, from.count);
+        System.arraycopy(from.amount, 0, to.amount, 0, from.count);
+        System.arraycopy(from.capacity, 0, to.capacity, 0, from.count);
+        System.arraycopy(from.extracted, 0, to.extracted, 0, from.count);
+        to.count = from.count;
+    }
+
+    private static CaseResult compareWorldRegions(int workers){
+        int size = 128;
+        float[] expected = new float[size * size];
+        float[] actual = new float[size * size];
+
+        long start = System.nanoTime();
+        RegionNoise.fill(expected, size, size, 0, 0, size, size, 77123L, 0, size);
+        long sequentialNanos = System.nanoTime() - start;
+
+        long parallelNanos;
+        try(OrbitalJobSystem jobs = new OrbitalJobSystem(workers, OrbitalJobSystem.defaultBatchSize)){
+            start = System.nanoTime();
+            int chunks = (size + 7) / 8;
+            jobs.parallelFor("world.region", 0, chunks,
+                chunk -> {
+                    int first = chunk * 8;
+                    RegionNoise.fill(actual, size, size,
+                        0, 0, size, size, 77123L, first, Math.min(size, first + 8));
+                });
+            parallelNanos = System.nanoTime() - start;
+        }
+
+        boolean passed = Arrays.equals(expected, actual);
+        return new CaseResult("world.regions", passed, size * size, sequentialNanos, parallelNanos,
+            passed ? "region tiles match the full grid" : "REGIONS DIVERGE");
     }
 
     private static boolean aiEqual(AIData left, AIData right){

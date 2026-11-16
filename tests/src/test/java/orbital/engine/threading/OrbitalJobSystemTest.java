@@ -102,6 +102,17 @@ class OrbitalJobSystemTest{
     }
 
     @Test
+    void recursiveTaskReducesARangeToItsSum(){
+        try(OrbitalJobSystem jobs = new OrbitalJobSystem(4, 16)){
+            long sum = jobs.parallelSum(0, 100_000, i -> i % 7);
+            long expected = 0;
+            for(int i = 0; i < 100_000; i++) expected += i % 7;
+            assertEquals(expected, sum);
+            assertEquals(0L, jobs.parallelSum(5, 5, i -> 1L));
+        }
+    }
+
+    @Test
     void schedulerSizesBatchesForTheMachine(){
         OrbitalTaskScheduler scheduler = new OrbitalTaskScheduler(256);
         assertEquals(1, scheduler.batchSize(0, 4));
