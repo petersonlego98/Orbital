@@ -483,6 +483,9 @@ public class Logic implements ApplicationListener{
             //when enabled and worth it, the Orbital engine integrates velocity for this tick and
             //flags the units; VelComp.update() then skips its own integration for flagged units
             UnitMovementTick.tick();
+            //AI decisions are computed in parallel into a diagnostic buffer; the vanilla AI
+            //controllers keep owning the entities until an explicit integration step is added
+            orbital.engine.ai.AITick.tick();
             Groups.unit.update();
         }
         PerfCounter.unitUpdate.end();

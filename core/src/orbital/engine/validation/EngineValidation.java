@@ -1,7 +1,9 @@
 package orbital.engine.validation;
 
 import orbital.engine.OrbitalEngine;
+import orbital.engine.ai.AIDecisionKernel;
 import orbital.engine.memory.*;
+import orbital.engine.navigation.FlowField;
 import orbital.engine.particles.ParticleVertexBuilder;
 import orbital.engine.simulation.*;
 import orbital.engine.simd.SimdOperations;
@@ -116,6 +118,8 @@ public final class EngineValidation{
         cases.add(compareUnitMovement(seed, drag, workers));
         cases.add(compareParticleVertices());
         cases.add(runPipelineTransaction(seed, drag, workers));
+        cases.add(compareAIDecisions(seed, workers));
+        cases.add(compareNavigationFlow(workers));
 
         ArrayList<ScalingPoint> scaling = new ArrayList<>();
         for(int count : workerPlan(workers)){
@@ -240,6 +244,91 @@ public final class EngineValidation{
         return simulation.commit((units, index) -> {
             if(committed != null) committed.incrementAndGet(index);
         }, null);
+    }
+
+    private static CaseResult compareAIDecisions(UnitData seed, int workers){
+        AIData source = new AIData(seed.count);
+        java.util.Random random = new java.util.Random(20261119L);
+        for(int i = 0; i < seed.count; i++){
+            source.add(i, seed.x[i], seed.y[i],
+                (random.nextFloat() - 0.5f) * 2000f,
+                (random.nextFloat() - 0.5f) * 2000f, 0);
+        }
+
+        AIData sequential = new AIData();
+        sequential.copyFrom(source);
+        long start = System.nanoTime();
+        for(int i = 0; i < sequential.count; i++){
+            AIDecisionKernel.decide(sequential, i);
+        }
+        long sequentialNanos = System.nanoTime() - start;
+
+        AIData parallel = new AIData();
+        parallel.copyFrom(source);
+        long parallelNanos;
+        try(OrbitalJobSystem jobs = new OrbitalJobSystem(workers, OrbitalJobSystem.defaultBatchSize)){
+            start = System.nanoTime();
+            jobs.parallelFor("validation.ai", 0, parallel.count,
+                index -> AIDecisionKernel.decide(parallel, index));
+            parallelNanos = System.nanoTime() - start;
+        }
+
+        boolean passed = aiEqual(sequential, parallel);
+        return new CaseResult("ai.decisions", passed, source.count, sequentialNanos, parallelNanos,
+            passed ? "sequential and parallel steering agree" : "DECISIONS DIVERGE");
+    }
+
+    private static CaseResult compareNavigationFlow(int workers){
+        int size = 128;
+        FlowField expected = navigationField(size);
+        FlowField actual = navigationField(size);
+
+        long start = System.nanoTime();
+        expected.computeFlowSequential();
+        long sequentialNanos = System.nanoTime() - start;
+
+        long parallelNanos;
+        try(OrbitalJobSystem jobs = new OrbitalJobSystem(workers, OrbitalJobSystem.defaultBatchSize)){
+            start = System.nanoTime();
+            actual.computeFlow(jobs);
+            parallelNanos = System.nanoTime() - start;
+        }
+
+        boolean passed = true;
+        for(int y = 0; y < size && passed; y++){
+            for(int x = 0; x < size; x++){
+                if(expected.distanceAt(x, y) != actual.distanceAt(x, y)
+                    || expected.flowXAt(x, y) != actual.flowXAt(x, y)
+                    || expected.flowYAt(x, y) != actual.flowYAt(x, y)){
+                    passed = false;
+                    break;
+                }
+            }
+        }
+
+        return new CaseResult("navigation.flow", passed, size * size, sequentialNanos, parallelNanos,
+            passed ? "sequential and parallel fields agree" : "FLOW FIELD DIVERGES");
+    }
+
+    private static FlowField navigationField(int size){
+        FlowField field = new FlowField(size, size);
+        //a deterministic wall with a gap, so blocked cells and paths are both exercised
+        for(int y = 0; y < size; y++){
+            if(y < size / 3 || y > 2 * size / 3){
+                field.setBlocked(size / 2, y, true);
+            }
+        }
+        field.computeDistance(size - 1, size - 1);
+        return field;
+    }
+
+    private static boolean aiEqual(AIData left, AIData right){
+        if(left.count != right.count) return false;
+        for(int i = 0; i < left.count; i++){
+            if(left.desiredX[i] != right.desiredX[i] || left.desiredY[i] != right.desiredY[i]
+                || left.distance[i] != right.distance[i]) return false;
+        }
+        return true;
     }
 
     //endregion

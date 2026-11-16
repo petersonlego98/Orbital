@@ -694,6 +694,14 @@ public class SettingsMenuDialog extends BaseDialog{
                     ui.showInfo(bundle.get("settings.orbitalparallelbullets.unavailable"));
                 }
             });
+
+            //AI steering decisions run on the workers, but are not applied to entities yet: the
+            //vanilla controllers stay authoritative, so this is a measurement tool for now
+            advancedgraphics.checkPref(orbital.engine.ai.AITick.key, false, value -> {
+                if(value && !OrbitalEngine.parallelCapable()){
+                    ui.showInfo(bundle.get("settings.orbitalparallelai.unavailable"));
+                }
+            });
         }
 
         dev.checkPref("console", false, val -> {
