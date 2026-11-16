@@ -512,12 +512,17 @@ public class TurretLoadoutDialog extends BaseDialog{
             slots.add(supportRow).growX().row();
 
             int count = 0;
-            for(SupportAnchor anchor : unit.type.supportAnchors){
+            for(int s = 0; s < unit.type.supportAnchors.size; s++){
+                SupportAnchor anchor = unit.type.supportAnchors.get(s);
                 count++;
                 SupportMount mounted = mountedSupport(anchor.category);
                 //a built-in effect occupies its anchor for good: shown locked, like any other
                 //fixed module, instead of pretending the slot is free
                 boolean natived = unit.type.hasNativeSupport(anchor.category);
+                //an anchor square is only offered when the catalogue can fill it: anchors that
+                //share a physical spot with an installed module (repair projector vs unit-repair
+                //tower) or that no module fits must not show a '+'
+                boolean locked = mounted == null && !natived && !supportAnchorAcceptsSomething(unit, s);
 
                 Drawable icon;
                 Color color;
@@ -537,13 +542,18 @@ public class TurretLoadoutDialog extends BaseDialog{
                     icon = new TextureRegionDrawable(nativeIcon(anchor.category).uiIcon);
                     color = Color.white;
                     name = Core.bundle.get("support.category." + anchor.category.name());
+                }else if(locked){
+                    icon = Icon.lock;
+                    color = Pal.remove;
+                    name = Core.bundle.get("weapon.module.locked.slot");
                 }else{
                     icon = Icon.add;
                     color = Pal.accent;
                     name = Core.bundle.get("support.category." + anchor.category.name());
                 }
 
-                slotBox(supportRow, icon, color, name, boxSize, slotImg, click, null);
+                slotBox(supportRow, icon, color, name, boxSize, slotImg,
+                    locked ? Pal.remove : Color.lightGray, click, null);
                 if(count % perRow == 0) supportRow.row();
             }
         }
@@ -1078,6 +1088,26 @@ public class TurretLoadoutDialog extends BaseDialog{
             if(unit.canMountWeaponModuleAt(module, slotIndex)) best = Math.max(best, module.size);
         }
         return best;
+    }
+
+    /**
+     * @return true when the catalogue still holds a support module this exact anchor can take.
+     *
+     * <p>An anchor is not a promise of room: several anchors can share the same physical spot as
+     * alternatives (a repair projector and a unit-repair tower sit at the same offset on the
+     * antumbra), so installing one blocks the others, and the hull may simply lack a module that
+     * fits the anchor's capacity. The rail therefore keeps the square - it is part of the hull's
+     * layout - but shows it locked with the same reason the catalogue cards give.</p>
+     */
+    public static boolean supportAnchorAcceptsSomething(Unit unit, int anchorIndex){
+        if(unit == null || unit.type == null) return false;
+        if(anchorIndex < 0 || anchorIndex >= unit.type.supportAnchors.size) return false;
+
+        for(Block block : content.blocks()){
+            if(!supportCatalogEligible(block, unit.type)) continue;
+            if(unit.canMountSupportAt(block, anchorIndex)) return true;
+        }
+        return false;
     }
 
     /** Wall plates take turret space, so they get a catalogue of their own. */

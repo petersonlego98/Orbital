@@ -1155,5 +1155,44 @@ public class SupportLoadoutTest{
         assertEquals(0f, unit.shield, 0.001f);
     }
 
+    /**
+     * Regression for the support rail reported in game: five anchors showed a free '+' while the
+     * catalogue answered "no free slot" for every module of their categories.
+     *
+     * <p>Several anchors are alternatives for the same physical spot - on the antumbra the repair
+     * projector and the unit-repair tower share one offset - so installing one blocks the others,
+     * and a square that can no longer be filled must not be offered as free.</p>
+     */
+    @Test
+    void anchorTakenByAnotherModuleIsNotOfferedAsFree(){
+        Unit unit = UnitTypes.antumbra.spawn(Team.sharded, 32 * 8f, 32 * 8f);
+
+        int repairAnchor = -1, unitRepairAnchor = -1, liquidAnchor = -1;
+        for(int i = 0; i < unit.type.supportAnchors.size; i++){
+            SupportModuleCategory category = unit.type.supportAnchors.get(i).category;
+            if(category == SupportModuleCategory.repair) repairAnchor = i;
+            if(category == SupportModuleCategory.unitRepair) unitRepairAnchor = i;
+            if(category == SupportModuleCategory.liquid) liquidAnchor = i;
+        }
+        assertTrue(repairAnchor >= 0 && unitRepairAnchor >= 0 && liquidAnchor >= 0,
+            "this regression is written for the antumbra anchor set");
+        assertEquals(unit.type.supportAnchors.get(repairAnchor).offsetX,
+            unit.type.supportAnchors.get(unitRepairAnchor).offsetX, 0.001f,
+            "these two categories are alternatives for the same spot");
+
+        //with the hull empty both are offered by the catalogue
+        assertTrue(TurretLoadoutDialog.supportAnchorAcceptsSomething(unit, repairAnchor));
+        assertTrue(TurretLoadoutDialog.supportAnchorAcceptsSomething(unit, unitRepairAnchor));
+
+        SupportMount mounted = unit.mountSupport(Blocks.mender);
+        assertNotNull(mounted, "the repair projector must install");
+        assertEquals(repairAnchor, mounted.anchorIndex);
+
+        assertFalse(TurretLoadoutDialog.supportAnchorAcceptsSomething(unit, unitRepairAnchor),
+            "the unit-repair anchor shares the projector's spot: it must show as locked");
+        assertTrue(TurretLoadoutDialog.supportAnchorAcceptsSomething(unit, liquidAnchor),
+            "an unrelated anchor with room must stay available");
+    }
+
     //endregion
 }

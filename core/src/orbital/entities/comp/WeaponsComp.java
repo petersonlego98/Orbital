@@ -541,25 +541,38 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
 
     /** @return the first free support anchor for this block, or -1 if it cannot be mounted. */
     public int findSupportAnchor(Block block){
-        //wall plates take turret space, not a support anchor; they mount through mountWall()
-        if(SupportModuleCategory.isWallModule(block)) return -1;
-
-        SupportModuleCategory category = SupportModuleCategory.of(block);
-        if(category == null || type == null || hasSupportCategory(category)) return -1;
-        //a hull with a built-in equivalent already provides this effect as a fixed module
-        if(type.hasNativeSupport(category)) return -1;
-
-        float footprint = DorsalGeometry.footprint(block.size);
+        if(block == null || type == null) return -1;
         for(int i = 0; i < type.supportAnchors.size; i++){
-            SupportAnchor anchor = type.supportAnchors.get(i);
-            if(!anchor.accepts(block)) continue;
-            if(!DorsalGeometry.fitsHull(type, anchor.offsetX, anchor.offsetY, footprint)) continue;
-            float drawn = supportVisualFootprintAt(anchor, block);
-            if(overlapsTurretMounts(anchor.offsetX, anchor.offsetY, drawn)) continue;
-            if(overlapsSupportMounts(anchor.offsetX, anchor.offsetY, drawn)) continue;
-            return i;
+            if(canMountSupportAt(block, i)) return i;
         }
         return -1;
+    }
+
+    /**
+     * @return true when this exact support anchor can take this block right now.
+     *
+     * <p>Same rules as {@link #findSupportAnchor}, checked for one anchor: the block must belong
+     * to a category the hull still lacks, the anchor must accept its size, the footprint must fit
+     * the silhouette and nothing already mounted may overlap it. The loadout dialog uses this to
+     * tell whether an anchor square can still be offered.</p>
+     */
+    public boolean canMountSupportAt(Block block, int anchorIndex){
+        //wall plates take turret space, not a support anchor; they mount through mountWall()
+        if(SupportModuleCategory.isWallModule(block)) return false;
+        if(type == null || anchorIndex < 0 || anchorIndex >= type.supportAnchors.size) return false;
+
+        SupportModuleCategory category = SupportModuleCategory.of(block);
+        if(category == null || hasSupportCategory(category)) return false;
+        //a hull with a built-in equivalent already provides this effect as a fixed module
+        if(type.hasNativeSupport(category)) return false;
+
+        SupportAnchor anchor = type.supportAnchors.get(anchorIndex);
+        if(!anchor.accepts(block)) return false;
+        if(!DorsalGeometry.fitsHull(type, anchor.offsetX, anchor.offsetY, DorsalGeometry.footprint(block.size))) return false;
+
+        float drawn = supportVisualFootprintAt(anchor, block);
+        if(overlapsTurretMounts(anchor.offsetX, anchor.offsetY, drawn)) return false;
+        return !overlapsSupportMounts(anchor.offsetX, anchor.offsetY, drawn);
     }
 
     /**
