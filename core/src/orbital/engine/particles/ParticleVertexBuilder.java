@@ -2,6 +2,7 @@ package orbital.engine.particles;
 
 import arc.math.Mathf;
 import orbital.engine.OrbitalEngine;
+import orbital.engine.validation.EngineCalibration;
 
 /**
  * Builds the particle vertex buffer, with optional viewport culling, in parallel when worth it.
@@ -65,7 +66,8 @@ public final class ParticleVertexBuilder{
 
         //pass 2: disjoint writes, parallel for large batches
         boolean parallel = OrbitalEngine.parallelForIfUseful(
-            "graphics.particles.vertices", particleCount, parallelThreshold,
+            "graphics.particles.vertices", particleCount,
+            EngineCalibration.thresholdFor("particles", parallelThreshold),
             index -> {
                 int slot = offsets[index];
                 if(slot >= 0) writeVertex(data, vertices, index, slot);

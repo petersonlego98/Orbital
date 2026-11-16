@@ -10,6 +10,7 @@ import orbital.engine.simulation.SimulationSnapshot;
 import orbital.engine.simd.SimdNative;
 import orbital.engine.simd.SimdOperations;
 import orbital.engine.simd.SimdSoaBuffer;
+import orbital.engine.validation.EngineCalibration;
 import orbital.gen.Bullet;
 import orbital.gen.Groups;
 
@@ -64,7 +65,8 @@ public final class ProjectileTick{
     }
 
     public static int threshold(){
-        return thresholdOverride > 0 ? thresholdOverride : parallelThreshold;
+        if(thresholdOverride > 0) return thresholdOverride;
+        return EngineCalibration.thresholdFor("projectiles", parallelThreshold);
     }
 
     /** Test-only threshold override; pass -1 to restore the production threshold. */

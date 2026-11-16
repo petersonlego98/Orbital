@@ -5,6 +5,7 @@ import orbital.engine.OrbitalEngine;
 import orbital.engine.memory.*;
 import orbital.engine.simulation.SimulationPipeline;
 import orbital.engine.simulation.SimulationSnapshot;
+import orbital.engine.validation.EngineCalibration;
 import orbital.gen.Groups;
 import orbital.gen.Unit;
 
@@ -47,7 +48,8 @@ public final class AITick{
     }
 
     public static int threshold(){
-        return thresholdOverride > 0 ? thresholdOverride : parallelThreshold;
+        if(thresholdOverride > 0) return thresholdOverride;
+        return EngineCalibration.thresholdFor("ai", parallelThreshold);
     }
 
     public static void overrideThreshold(int units){

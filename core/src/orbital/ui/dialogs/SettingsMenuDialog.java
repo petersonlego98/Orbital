@@ -23,6 +23,7 @@ import orbital.ctype.*;
 import orbital.engine.OrbitalEngine;
 import orbital.engine.threading.OrbitalThreadConfig;
 import orbital.engine.units.UnitMovementTick;
+import orbital.engine.validation.EngineCalibration;
 import orbital.game.EventType.*;
 import orbital.gen.*;
 import orbital.input.*;
@@ -702,6 +703,10 @@ public class SettingsMenuDialog extends BaseDialog{
                     ui.showInfo(bundle.get("settings.orbitalparallelai.unavailable"));
                 }
             });
+
+            //thresholds are measured per machine; turning this off restores the documented fixed
+            //values, and changing it drops the cached measurements
+            advancedgraphics.checkPref(EngineCalibration.key, true, value -> EngineCalibration.reset());
         }
 
         dev.checkPref("console", false, val -> {

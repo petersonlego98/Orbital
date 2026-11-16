@@ -12,6 +12,7 @@ import orbital.engine.simulation.SimulationSnapshot;
 import orbital.engine.simd.SimdNative;
 import orbital.engine.simd.SimdOperations;
 import orbital.engine.simd.SimdSoaBuffer;
+import orbital.engine.validation.EngineCalibration;
 import orbital.gen.Groups;
 import orbital.gen.Unit;
 
@@ -82,7 +83,8 @@ public final class UnitMovementTick{
 
     /** @return the unit count the engine needs before it engages. */
     public static int threshold(){
-        return thresholdOverride > 0 ? thresholdOverride : parallelThreshold;
+        if(thresholdOverride > 0) return thresholdOverride;
+        return EngineCalibration.thresholdFor("units", parallelThreshold);
     }
 
     /**
