@@ -5,9 +5,11 @@ import orbital.content.Liquids;
 import orbital.type.ItemStack;
 import orbital.type.LiquidStack;
 import orbital.world.blocks.production.GenericCrafter;
+import orbital.world.Block;
 import orbital.world.blocks.storage.CoreBlock.CoreBuild;
 import orbital.entities.units.BuildPlan;
 import orbital.engine.world.AutoInfrastructure;
+import orbital.engine.world.TransportTier;
 import orbital.game.Team;
 import orbital.world.Tile;
 import org.junit.jupiter.api.*;
@@ -191,6 +193,30 @@ class AutoInfrastructureTest{
 
     private static float MathfDist(int dx, int dy){
         return dx * dx + dy * dy;
+    }
+
+    @Test
+    void fastestTransportFollowsTheThroughputRanking(){
+        CoreBuild core = (CoreBuild)world.tile(10, 10).build;
+        assertNotNull(core);
+        for(var item : content.items()){
+            core.items.add(item, 500);
+        }
+
+        Block shortHaul = TransportTier.fastestItem(core, 0);
+        float bestShort = 0f;
+        for(TransportTier.Method method : TransportTier.ITEMS){
+            if(method.unlockedAndAffordable(core)) bestShort = Math.max(bestShort, method.unitsPerSecond());
+        }
+        float chosenShort = -1f;
+        for(TransportTier.Method method : TransportTier.ITEMS){
+            if(method.block() == shortHaul) chosenShort = method.unitsPerSecond();
+        }
+        assertTrue(chosenShort >= 0f);
+        assertEquals(bestShort, chosenShort, 0f, "short routes must use the fastest ready method");
+
+        Block longHaul = TransportTier.fastestItem(core, TransportTier.longHaulTiles + 1);
+        assertEquals(Blocks.massDriver, longHaul, "long routes use the mass driver when payable");
     }
 
     @Test

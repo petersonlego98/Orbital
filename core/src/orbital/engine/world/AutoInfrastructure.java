@@ -3,6 +3,7 @@ package orbital.engine.world;
 import arc.Core;
 import arc.math.geom.Point2;
 import orbital.world.blocks.distribution.ItemBridge;
+import orbital.world.blocks.distribution.MassDriver;
 import arc.struct.Seq;
 import arc.util.pooling.Pools;
 import orbital.content.Blocks;
@@ -66,8 +67,9 @@ public final class AutoInfrastructure{
         CoreBuild core = closestCore(team, factory.x, factory.y);
         if(core == null) return result;
 
-        Block itemBlock = fastestItem(team, core);
-        Block liquidBlock = fastestLiquid(team, core);
+        int haul = Math.abs(factory.x - core.tileX()) + Math.abs(factory.y - core.tileY());
+        Block itemBlock = TransportTier.fastestItem(core, haul);
+        Block liquidBlock = TransportTier.fastestLiquid(core);
 
         //inputs first: the transport exists before the factory starts consuming
         if(itemInput){
@@ -195,6 +197,23 @@ public final class AutoInfrastructure{
 
         Seq<Point2> points = Placement.pathfindLine(true, sx, sy, tx, ty);
         try{
+            if(transport instanceof MassDriver && points.size > 4){
+                //a mass driver is a single shot between two endpoints; no belts in between
+                Point2 a = points.get(1), b = points.get(points.size - 2);
+                Tile ta = world.tile(a.x, a.y), tb = world.tile(b.x, b.y);
+                if(ta != null && tb != null && ta.block() == Blocks.air && tb.block() == Blocks.air){
+                    BuildPlan first = new BuildPlan(a.x, a.y, 0, transport);
+                    BuildPlan second = new BuildPlan(b.x, b.y, 0, transport);
+                    if(first.placeable(team) && second.placeable(team)){
+                        first.config = new Point2(b.x - a.x, b.y - a.y);
+                        second.config = new Point2(a.x - b.x, a.y - b.y);
+                        plans.add(first);
+                        plans.add(second);
+                        return;
+                    }
+                }
+            }
+
             int step = Math.max(1, points.size / maxRouteLength);
             for(int i = 0; i < points.size - 1; i += step){
                 Point2 from = points.get(i);
@@ -246,11 +265,11 @@ public final class AutoInfrastructure{
      * are too far apart for a plain belt. Connect them with a bridge instead of leaving a hole.
      */
     private static void linkGaps(Seq<BuildPlan> plans, int firstAdded, Block transport, Team team){
-        Block bridge = transport != null && transport.isDuct ? Blocks.ductBridge : Blocks.itemBridge;
-        //the basic bridge is treated as a fallback tier, like the basic conveyor
-        if(bridge == null) return;
         CoreBuild core = closestCore(team, 0, 0);
-        if(!affordable(bridge, core)) return;
+        Block bridge = transport != null && transport.isDuct
+            ? TransportTier.fastestDuctBridge(core)
+            : TransportTier.fastestBridge(core);
+        if(bridge == null) return;
 
         int range = bridge instanceof ItemBridge itemBridge ? itemBridge.range : 4;
         for(int i = firstAdded + 1; i < plans.size; i++){
@@ -418,24 +437,6 @@ public final class AutoInfrastructure{
         }finally{
             Pools.freeAll(points);
         }
-    }
-
-    /** Fastest unlocked tier the core can actually pay for, with a fallback to slower tiers. */
-    private static Block fastestItem(Team team, CoreBuild core){
-        Block[] candidates = {Blocks.surgeConveyor, Blocks.plastaniumConveyor,
-            Blocks.titaniumConveyor, Blocks.armoredConveyor, Blocks.conveyor};
-        for(Block block : candidates){
-            if(block != null && block.unlockedNow() && affordable(block, core)) return block;
-        }
-        return Blocks.conveyor;
-    }
-
-    private static Block fastestLiquid(Team team, CoreBuild core){
-        Block[] candidates = {Blocks.armoredDuct, Blocks.duct, Blocks.pulseConduit, Blocks.conduit};
-        for(Block block : candidates){
-            if(block != null && block.unlockedNow() && affordable(block, core)) return block;
-        }
-        return Blocks.conduit;
     }
 
     private static boolean affordable(Block block, CoreBuild core){
