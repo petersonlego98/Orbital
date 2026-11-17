@@ -128,6 +128,40 @@ class FactoryChainPlannerTest{
     }
 
     @Test
+    void missingExactOreStillBuildsALocalSupplyChain(){
+        //no thorium on this map, but the unit must still build a drill, an unloader and belts
+        orbital.world.blocks.production.GenericCrafter rare =
+            new orbital.world.blocks.production.GenericCrafter("test-rare"){{
+                //a test-only block still needs the same filters content init would create
+                itemFilter = new boolean[content.items().size];
+                itemFilter[Items.thorium.id] = true;
+                liquidFilter = new boolean[content.liquids().size];
+                hasItems = true;
+                outputItem = new orbital.type.ItemStack(Items.graphite, 1);
+            }};
+
+        Seq<BuildPlan> plans = FactoryChainPlanner.build(rare, 0, Team.sharded);
+
+        boolean drill = false, unloader = false, belt = false, factory = false;
+        BuildPlan factoryPlan = null;
+        for(BuildPlan plan : plans){
+            if(plan.block == Blocks.mechanicalDrill || plan.block == Blocks.pneumaticDrill
+                || plan.block == Blocks.laserDrill) drill = true;
+            if(plan.block == Blocks.unloader) unloader = true;
+            if(isBelt(plan.block)) belt = true;
+            if(plan.block == rare){
+                factory = true;
+                factoryPlan = plan;
+            }
+        }
+        assertTrue(drill, "a drill must be present even when the exact ore is absent");
+        assertTrue(unloader, "the fallback drill still needs an unloader");
+        assertTrue(belt, "the fallback supply still needs aligned transport");
+        assertTrue(factory, "the factory is always planned");
+        assertNotNull(factoryPlan);
+    }
+
+    @Test
     void catalogChoiceEnqueuesTheChainWithoutAPlayerLocation(){
         int before = orbital.Vars.player.unit().plans.size;
 

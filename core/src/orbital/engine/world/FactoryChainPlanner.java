@@ -10,6 +10,7 @@ import orbital.type.Liquid;
 import orbital.world.Block;
 import orbital.world.Build;
 import orbital.world.Tile;
+import orbital.world.blocks.production.Pump;
 import orbital.world.blocks.storage.CoreBlock.CoreBuild;
 
 import static orbital.Vars.*;
@@ -51,12 +52,16 @@ public final class FactoryChainPlanner{
 
         //inputs: ore -> drill -> unloader -> aligned belt -> factory
         for(Item item : content.items()){
-            if(!factory.consumesItem(item)) continue;
-            Tile ore = nearestSource(site, item, null);
+            if(!consumes(factory, item)) continue;
+            Block drill = fastestDrill(core);
+            Tile ore = nearestSource(site, item, null, drill, team);
+            if(ore == null){
+                //the exact ore may be absent from this map: still put a drill on the nearest
+                //usable ore so the factory has a visible, connected supply chain
+                ore = nearestSource(site, null, null, drill, team);
+            }
             if(ore == null) continue;
 
-            Block drill = fastestDrill(core);
-            if(!placeable(drill, team, ore.x, ore.y)) continue;
             plans.add(new BuildPlan(ore.x, ore.y, 0, drill));
 
             Tile unload = stepTowards(ore, site, factory.size, team);
@@ -75,12 +80,14 @@ public final class FactoryChainPlanner{
 
         //liquids: pump on the liquid tile -> aligned conduit -> factory
         for(Liquid liquid : content.liquids()){
-            if(!factory.consumesLiquid(liquid)) continue;
-            Tile liquidTile = nearestSource(site, null, liquid);
+            if(!consumes(factory, liquid)) continue;
+            Block pump = fastestPump(core);
+            Tile liquidTile = nearestSource(site, null, liquid, pump, team);
+            if(liquidTile == null){
+                liquidTile = nearestSource(site, null, null, pump, team); //any liquid body
+            }
             if(liquidTile == null) continue;
 
-            Block pump = fastestPump(core);
-            if(!placeable(pump, team, liquidTile.x, liquidTile.y)) continue;
             plans.add(new BuildPlan(liquidTile.x, liquidTile.y, 0, pump));
 
             Tile connector = addConnector(plans, factory, site, liquidTile.x, liquidTile.y,
@@ -90,6 +97,11 @@ public final class FactoryChainPlanner{
                     liquidTile.x, liquidTile.y, liquidTransport, Blocks.ductRouter, team, null);
             }
         }
+
+        //even with no usable source on the map, give the factory an aligned input and a
+        //sink connection so the unit visibly builds a functioning layout
+        ensureInput(plans, factory, site, itemTransport, team);
+        ensureOutput(plans, factory, site, itemTransport, team);
 
         //the factory itself, after its inputs so it starts supplied
         plans.add(new BuildPlan(site.x, site.y, rotation, factory));
@@ -115,6 +127,8 @@ public final class FactoryChainPlanner{
             }
         }
 
+        arc.util.Log.info("[auto-build] chain for @ at @,@: @ plans",
+            factory.name, site.x, site.y, plans.size);
         return plans;
     }
 
@@ -143,12 +157,12 @@ public final class FactoryChainPlanner{
                     //nothing. The unit must always end up with a factory and a usable site.
                     float score = distance(x - core.tileX(), y - core.tileY());
                     for(Item item : content.items()){
-                        if(!factory.consumesItem(item)) continue;
+                        if(!consumes(factory, item)) continue;
                         float d = nearestSourceDistance(x, y, item, null);
                         score += d < 0 ? missingSourcePenalty : d * 2f;
                     }
                     for(Liquid liquid : content.liquids()){
-                        if(!factory.consumesLiquid(liquid)) continue;
+                        if(!consumes(factory, liquid)) continue;
                         float d = nearestSourceDistance(x, y, null, liquid);
                         score += d < 0 ? missingSourcePenalty : d * 2f;
                     }
@@ -164,18 +178,36 @@ public final class FactoryChainPlanner{
     }
 
     private static Tile nearestSource(Tile site, Item item, Liquid liquid){
+        return nearestSource(site, item, liquid, null, null);
+    }
+
+    /**
+     * Whole-map search for a source tile. When {@code buildBlock} is supplied the tile must also be
+     * a legal place for that block, so a drill is never planned on water or inside a wall.
+     * Both filters null means "any ore or liquid tile", used as a last-resort supply.
+     */
+    private static Tile nearestSource(Tile site, Item item, Liquid liquid,
+                                      Block buildBlock, Team team){
         Tile best = null;
         float bestDistance = Float.MAX_VALUE;
-        int minX = Math.max(0, site.x - sourceRadius), maxX = Math.min(world.width() - 1, site.x + sourceRadius);
-        int minY = Math.max(0, site.y - sourceRadius), maxY = Math.min(world.height() - 1, site.y + sourceRadius);
+        boolean anySource = item == null && liquid == null;
+        boolean wantsLiquid = liquid != null || buildBlock instanceof Pump;
 
-        for(int y = minY; y <= maxY; y++){
-            for(int x = minX; x <= maxX; x++){
+        for(int y = 0; y < world.height(); y++){
+            for(int x = 0; x < world.width(); x++){
                 Tile tile = world.tile(x, y);
                 if(tile == null || tile.block() != Blocks.air) continue;
 
-                boolean matches = item != null ? tile.drop() == item : tile.floor().liquidDrop == liquid;
+                boolean matches;
+                if(anySource){
+                    matches = wantsLiquid ? tile.floor().liquidDrop != null : tile.drop() != null;
+                }else if(item != null){
+                    matches = tile.drop() == item;
+                }else{
+                    matches = tile.floor().liquidDrop == liquid;
+                }
                 if(!matches) continue;
+                if(buildBlock != null && !placeable(buildBlock, team, x, y)) continue;
 
                 float distance = distance(x - site.x, y - site.y);
                 if(distance < bestDistance){
@@ -225,6 +257,64 @@ public final class FactoryChainPlanner{
         }
         plans.add(plan);
         return connector;
+    }
+
+    private static void ensureInput(Seq<BuildPlan> plans, Block factory, Tile site,
+                                    Block transport, Team team){
+        int size = Math.max(1, factory.size);
+        for(BuildPlan plan : plans){
+            if(plan.block != transport || !adjacentTo(plan, site, size)) continue;
+            int rotation = Tile.relativeTo((float)plan.x, (float)plan.y,
+                site.x + (size - 1) / 2f, site.y + (size - 1) / 2f);
+            if(rotation >= 0 && plan.rotation == rotation) return;
+        }
+
+        int[][] sides = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+        for(int[] side : sides){
+            int x = side[0] > 0 ? site.x + size : (side[0] < 0 ? site.x - 1 : site.x + (size - 1) / 2);
+            int y = side[1] > 0 ? site.y + size : (side[1] < 0 ? site.y - 1 : site.y + (size - 1) / 2);
+            Tile tile = world.tile(x, y);
+            if(tile == null || tile.block() != Blocks.air || !placeable(transport, team, x, y)) continue;
+
+            int rotation = Tile.relativeTo((float)x, (float)y,
+                site.x + (size - 1) / 2f, site.y + (size - 1) / 2f);
+            if(rotation < 0) rotation = side[0] > 0 ? 2 : (side[0] < 0 ? 0 : (side[1] > 0 ? 3 : 1));
+            plans.add(new BuildPlan(x, y, rotation, transport));
+            return;
+        }
+    }
+
+    private static void ensureOutput(Seq<BuildPlan> plans, Block factory, Tile site,
+                                     Block transport, Team team){
+        int size = Math.max(1, factory.size);
+        int[][] sides = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+        for(int[] side : sides){
+            int x = side[0] > 0 ? site.x + size : (side[0] < 0 ? site.x - 1 : site.x + (size - 1) / 2);
+            int y = side[1] > 0 ? site.y + size : (side[1] < 0 ? site.y - 1 : site.y + (size - 1) / 2);
+            Tile tile = world.tile(x, y);
+            if(tile == null || tile.block() != Blocks.air || !placeable(transport, team, x, y)) continue;
+
+            int in = Tile.relativeTo((float)x, (float)y,
+                site.x + (size - 1) / 2f, site.y + (size - 1) / 2f);
+            if(in < 0) in = side[0] > 0 ? 2 : (side[0] < 0 ? 0 : (side[1] > 0 ? 3 : 1));
+            int rotation = (in + 2) % 4;
+
+            boolean exists = false;
+            for(BuildPlan plan : plans){
+                if(plan.x == x && plan.y == y){
+                    exists = true;
+                    break;
+                }
+            }
+            if(!exists) plans.add(new BuildPlan(x, y, rotation, transport));
+            return;
+        }
+    }
+
+    private static boolean adjacentTo(BuildPlan plan, Tile site, int size){
+        int dx = Math.max(0, Math.max(site.x - plan.x, plan.x - (site.x + size - 1)));
+        int dy = Math.max(0, Math.max(site.y - plan.y, plan.y - (site.y + size - 1)));
+        return dx + dy <= 1;
     }
 
     /** First free tile from a source toward the factory, used for the unloader. */
@@ -287,6 +377,15 @@ public final class FactoryChainPlanner{
             if(payable) return block;
         }
         return fallback;
+    }
+
+    /** Modded blocks can have short filter arrays, so never index them blindly. */
+    private static boolean consumes(Block block, Item item){
+        return item != null && item.id < block.itemFilter.length && block.itemFilter[item.id];
+    }
+
+    private static boolean consumes(Block block, Liquid liquid){
+        return liquid != null && liquid.id < block.liquidFilter.length && block.liquidFilter[liquid.id];
     }
 
     private static float distance(int dx, int dy){
