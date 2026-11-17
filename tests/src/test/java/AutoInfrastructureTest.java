@@ -1,5 +1,7 @@
 import arc.Core;
 import orbital.content.Blocks;
+import orbital.content.Items;
+import orbital.world.blocks.storage.CoreBlock.CoreBuild;
 import orbital.entities.units.BuildPlan;
 import orbital.engine.world.AutoInfrastructure;
 import orbital.game.Team;
@@ -49,7 +51,9 @@ class AutoInfrastructureTest{
                 || plan.block == Blocks.conduit || plan.block == Blocks.pulseConduit
                 || plan.block == Blocks.duct || plan.block == Blocks.armoredDuct
                 || plan.block == Blocks.plastaniumConveyor || plan.block == Blocks.surgeConveyor
-                || plan.block == Blocks.junction || plan.block == Blocks.ductRouter,
+                || plan.block == Blocks.junction || plan.block == Blocks.ductRouter
+                || plan.block == Blocks.powerNode || plan.block == Blocks.powerNodeLarge
+                || plan.block == Blocks.overflowGate || plan.block == Blocks.liquidRouter,
                 "only transport blocks may be planned, got " + plan.block);
         }
 
@@ -75,6 +79,27 @@ class AutoInfrastructureTest{
 
         assertTrue(AutoInfrastructure.plan(factory, Team.crux).isEmpty(),
             "without a destination there is no route to plan");
+    }
+
+    @Test
+    void factoryFarFromAnyPowerNetworkGetsPowerNodes(){
+        var core = world.tile(10, 10).build;
+        assertNotNull(core);
+        CoreBuild coreBuild = (CoreBuild)core;
+        coreBuild.items.add(Items.copper, 200);
+        coreBuild.items.add(Items.lead, 200);
+        coreBuild.items.add(Items.titanium, 200);
+        coreBuild.items.add(Items.silicon, 200);
+
+        BuildPlan factory = new BuildPlan(45, 45, 0, Blocks.siliconSmelter);
+
+        arc.struct.Seq<BuildPlan> plans = AutoInfrastructure.plan(factory, Team.sharded);
+
+        boolean hasNode = false;
+        for(BuildPlan plan : plans){
+            if(plan.block == Blocks.powerNode || plan.block == Blocks.powerNodeLarge) hasNode = true;
+        }
+        assertTrue(hasNode, "a power-hungry factory far from the network must get nodes");
     }
 
     @Test

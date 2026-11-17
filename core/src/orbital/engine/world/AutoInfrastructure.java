@@ -16,6 +16,8 @@ import orbital.world.blocks.storage.CoreBlock.CoreBuild;
 import orbital.world.blocks.production.Drill;
 import orbital.world.blocks.production.GenericCrafter;
 import orbital.world.blocks.production.Pump;
+import orbital.world.blocks.power.PowerNode;
+import orbital.world.blocks.storage.StorageBlock;
 
 import static orbital.Vars.*;
 
@@ -80,12 +82,21 @@ public final class AutoInfrastructure{
             }
         }
 
-        //then the outputs back to the core
-        if(itemOutput && itemBlock != null){
-            addRoute(result, factory.x, factory.y, core.tileX(), core.tileY(), itemBlock, Blocks.junction, team);
+        //then the outputs back to a sink: the core, or the closest storage/tank
+        Building itemSink = closestSink(factory.x, factory.y, team, false);
+        Building liquidSink = closestSink(factory.x, factory.y, team, true);
+        if(itemOutput && itemBlock != null && itemSink != null){
+            addRoute(result, factory.x, factory.y, itemSink.tileX(), itemSink.tileY(),
+                itemBlock, Blocks.junction, team, multiItemOutput(block) ? Blocks.overflowGate : null);
         }
-        if(liquidOutput && liquidBlock != null){
-            addRoute(result, factory.x, factory.y, core.tileX(), core.tileY(), liquidBlock, Blocks.ductRouter, team);
+        if(liquidOutput && liquidBlock != null && liquidSink != null){
+            addRoute(result, factory.x, factory.y, liquidSink.tileX(), liquidSink.tileY(),
+                liquidBlock, Blocks.ductRouter, team, multiLiquidOutput(block) ? Blocks.liquidRouter : null);
+        }
+
+        //a factory that consumes power needs a network; lay nodes toward the closest one
+        if(block.consumesPower && !hasPowerNear(factory.x, factory.y)){
+            addPower(result, factory, core, team);
         }
 
         if(result.size > maxPlansPerFactory){
@@ -169,6 +180,11 @@ public final class AutoInfrastructure{
 
     private static void addRoute(Seq<BuildPlan> plans, int sx, int sy, int tx, int ty,
                                  Block transport, Block junction, Team team){
+        addRoute(plans, sx, sy, tx, ty, transport, junction, team, null);
+    }
+
+    private static void addRoute(Seq<BuildPlan> plans, int sx, int sy, int tx, int ty,
+                                 Block transport, Block junction, Team team, Block firstTile){
         if(transport == null || plans.size >= maxPlansPerFactory) return;
 
         Seq<Point2> points = Placement.pathfindLine(true, sx, sy, tx, ty);
@@ -188,7 +204,10 @@ public final class AutoInfrastructure{
 
                 //a corner needs a junction, otherwise the line stops at the turn
                 Block block = transport;
-                if(i + step < points.size - 1){
+                if(firstTile != null && i <= step){
+                    //the tile leaving a multi-output factory sorts/overflows the mixed stream
+                    block = firstTile;
+                }else if(i + step < points.size - 1){
                     Point2 next = points.get(Math.min(i + step * 2, points.size - 1));
                     int nextRotation = Tile.relativeTo(to.x, to.y, next.x, next.y);
                     if(nextRotation != rotation && junction != null){
@@ -208,6 +227,97 @@ public final class AutoInfrastructure{
                 }
                 if(!duplicate) plans.add(plan);
                 if(plans.size >= maxPlansPerFactory) break;
+            }
+        }finally{
+            Pools.freeAll(points);
+        }
+    }
+
+    private static boolean multiItemOutput(Block block){
+        return block instanceof GenericCrafter crafter
+            && crafter.outputItems != null && crafter.outputItems.length > 1;
+    }
+
+    private static boolean multiLiquidOutput(Block block){
+        return block instanceof GenericCrafter crafter
+            && crafter.outputLiquids != null && crafter.outputLiquids.length > 1;
+    }
+
+    /** Nearest storage/tank that can receive output; the core is always the fallback. */
+    private static Building closestSink(int x, int y, Team team, boolean liquid){
+        Building best = null;
+        float bestDistance = Float.MAX_VALUE;
+        int minX = Math.max(0, x - sourceRadius), maxX = Math.min(world.width() - 1, x + sourceRadius);
+        int minY = Math.max(0, y - sourceRadius), maxY = Math.min(world.height() - 1, y + sourceRadius);
+
+        for(int ty = minY; ty <= maxY; ty++){
+            for(int tx = minX; tx <= maxX; tx++){
+                Tile tile = world.tile(tx, ty);
+                if(tile == null || tile.build == null || tile.build.team != team) continue;
+                if(!(tile.build.block instanceof StorageBlock)) continue;
+
+                float distance = distanceSq(tx - x, ty - y);
+                if(distance < bestDistance){
+                    bestDistance = distance;
+                    best = tile.build;
+                }
+            }
+        }
+        if(best != null) return best;
+
+        CoreBuild core = closestCore(team, x, y);
+        return core;
+    }
+
+    private static boolean hasPowerNear(int x, int y){
+        int radius = 10;
+        for(int ty = Math.max(0, y - radius); ty <= Math.min(world.height() - 1, y + radius); ty++){
+            for(int tx = Math.max(0, x - radius); tx <= Math.min(world.width() - 1, x + radius); tx++){
+                Tile tile = world.tile(tx, ty);
+                if(tile == null || tile.build == null) continue;
+                if(tile.build.power != null && tile.build.power.graph != null) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Lays power nodes from the factory toward the core when no network is in range. */
+    private static void addPower(Seq<BuildPlan> plans, BuildPlan factory, CoreBuild core, Team team){
+        Block node = null;
+        int range = 0;
+        if(Blocks.powerNodeLarge != null && Blocks.powerNodeLarge.unlockedNow()
+            && affordable(Blocks.powerNodeLarge, core)){
+            node = Blocks.powerNodeLarge;
+            range = (int)((PowerNode)Blocks.powerNodeLarge).laserRange;
+        }else if(Blocks.powerNode != null && affordable(Blocks.powerNode, core)){
+            node = Blocks.powerNode;
+            range = (int)((PowerNode)Blocks.powerNode).laserRange;
+        }
+        if(node == null) return;
+
+        int spacing = Math.max(2, range - 1);
+        Seq<Point2> points = Placement.pathfindLine(true, factory.x, factory.y, core.tileX(), core.tileY());
+        try{
+            int placed = 0;
+            for(int i = 2; i < points.size && placed < 12 && plans.size < maxPlansPerFactory; i += spacing){
+                Point2 point = points.get(i);
+                Tile tile = world.tile(point.x, point.y);
+                if(tile == null || tile.block() != Blocks.air) continue;
+
+                BuildPlan plan = new BuildPlan(point.x, point.y, 0, node);
+                if(!plan.placeable(team)) continue;
+
+                boolean duplicate = false;
+                for(BuildPlan existing : plans){
+                    if(existing.samePos(plan)){
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if(!duplicate){
+                    plans.add(plan);
+                    placed++;
+                }
             }
         }finally{
             Pools.freeAll(points);
