@@ -11,15 +11,19 @@ import static org.junit.jupiter.api.Assertions.*;
 class AutoInfrastructureWiringTest{
 
     @Test
-    void catalogQueuesInfrastructureBeforeTheFactory() throws Exception{
+    void catalogChoosesTheSiteAndEnqueuesTheWholeChain() throws Exception{
         String source = Files.readString(
             Paths.get("../../core/src/orbital/game/TestNewFeaturesMode.java"),
             StandardCharsets.UTF_8);
 
-        int plan = source.indexOf("AutoInfrastructure.plan(plan, player.team())");
-        int factory = source.indexOf("unit.addBuild(plan, true)");
-        assertTrue(plan >= 0, "the catalog must plan the infrastructure");
-        assertTrue(factory > plan, "transport must be queued before the factory plan");
+        assertTrue(source.contains("FactoryChainPlanner.build(block, 0, player.team())"),
+            "the catalog must ask the planner for the full chain");
+        assertTrue(source.contains("playerBlock = null"),
+            "the player must not keep a placement cursor");
+        int choice = source.indexOf("FactoryChainPlanner.build(");
+        int enqueue = source.indexOf("unit.addBuild(plan, true)");
+        assertTrue(choice >= 0 && enqueue > choice,
+            "the chain must be planned before it is enqueued");
     }
 
     @Test

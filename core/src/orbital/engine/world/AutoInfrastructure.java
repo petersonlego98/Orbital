@@ -137,7 +137,7 @@ public final class AutoInfrastructure{
                 || (crafter.outputLiquids != null && crafter.outputLiquids.length > 0));
     }
 
-    private static CoreBuild closestCore(Team team, int x, int y){
+    public static CoreBuild closestCore(Team team, int x, int y){
         CoreBuild best = null;
         float bestDistance = Float.MAX_VALUE;
         for(CoreBuild core : state.teams.cores(team)){
@@ -184,12 +184,12 @@ public final class AutoInfrastructure{
         return core == null ? null : core;
     }
 
-    private static void addRoute(Seq<BuildPlan> plans, int sx, int sy, int tx, int ty,
+    public static void addRoute(Seq<BuildPlan> plans, int sx, int sy, int tx, int ty,
                                  Block transport, Block junction, Team team){
         addRoute(plans, sx, sy, tx, ty, transport, junction, team, null);
     }
 
-    private static void addRoute(Seq<BuildPlan> plans, int sx, int sy, int tx, int ty,
+    public static void addRoute(Seq<BuildPlan> plans, int sx, int sy, int tx, int ty,
                                  Block transport, Block junction, Team team, Block firstTile){
         if(transport == null || plans.size >= maxPlansPerFactory) return;
 
@@ -329,7 +329,7 @@ public final class AutoInfrastructure{
     }
 
     /** Nearest storage/tank that can receive output; the core is always the fallback. */
-    private static Building closestSink(int x, int y, Team team, boolean liquid){
+    public static Building closestSink(int x, int y, Team team, boolean liquid){
         Building best = null;
         float bestDistance = Float.MAX_VALUE;
         int minX = Math.max(0, x - sourceRadius), maxX = Math.min(world.width() - 1, x + sourceRadius);
@@ -355,7 +355,7 @@ public final class AutoInfrastructure{
     }
 
     /** Nearest friendly generator/battery with a live power graph; the core is the fallback. */
-    private static Building closestPowerSource(int x, int y, Team team){
+    public static Building closestPowerSource(int x, int y, Team team){
         Building best = null;
         float bestDistance = Float.MAX_VALUE;
         int radius = 48;
@@ -382,7 +382,7 @@ public final class AutoInfrastructure{
         return core;
     }
 
-    private static boolean hasPowerNear(int x, int y){
+    public static boolean hasPowerNear(int x, int y){
         int radius = 10;
         for(int ty = Math.max(0, y - radius); ty <= Math.min(world.height() - 1, y + radius); ty++){
             for(int tx = Math.max(0, x - radius); tx <= Math.min(world.width() - 1, x + radius); tx++){
@@ -395,7 +395,7 @@ public final class AutoInfrastructure{
     }
 
     /** Lays power nodes from the factory toward the core when no network is in range. */
-    private static void addPower(Seq<BuildPlan> plans, BuildPlan factory, Building source, Team team){
+    public static void addPower(Seq<BuildPlan> plans, BuildPlan factory, Building source, Team team){
         CoreBuild core = closestCore(team, factory.x, factory.y);
         Block node = null;
         int range = 0;

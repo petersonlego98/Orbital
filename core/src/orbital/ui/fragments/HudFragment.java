@@ -919,7 +919,7 @@ public class HudFragment{
             .width(width).height(40f).left().row();
         content.button("@mode.testfeatures.catalog.buildings", Icon.distribution, () -> openCatalog(false, true))
             .width(width).height(40f).left()
-            .update(b -> b.setChecked(TestNewFeaturesMode.playerBlock != null)).row();
+            .update(b -> b.setChecked(TestNewFeaturesMode.lastFactory != null)).row();
 
         Table modules = new Table();
         modules.left();

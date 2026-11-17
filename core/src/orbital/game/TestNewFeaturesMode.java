@@ -52,6 +52,8 @@ public final class TestNewFeaturesMode{
     public static boolean enemyRemoving;
     /** Block armed by the player-building tool; null means nothing is selected. */
     public static @Nullable Block playerBlock;
+    /** Last factory type chosen by the player; the unit picks the site, not the cursor. */
+    public static @Nullable Block lastFactory;
 
     private TestNewFeaturesMode(){
     }
@@ -118,6 +120,7 @@ public final class TestNewFeaturesMode{
         setupOpen = true;
         wavesStarted = false;
         playerBlock = null;
+        lastFactory = null;
         enemyBlock = null;
         enemyRemoving = false;
         //a stress battle from a previous session must never leak into a fresh one
@@ -806,9 +809,9 @@ public final class TestNewFeaturesMode{
         return active() && (enemyBlock != null || enemyRemoving);
     }
 
-    /** @return whether the player-building tool is armed. */
+    /** @return whether the player has chosen a factory for the unit to build. */
     public static boolean playerToolArmed(){
-        return active() && playerBlock != null;
+        return active() && lastFactory != null;
     }
 
     /** Arms the enemy tool with a structure, clearing the player tool. */
@@ -818,16 +821,29 @@ public final class TestNewFeaturesMode{
         playerBlock = null;
     }
 
-    /** Arms the player tool with a structure, clearing the enemy tool. */
+    /**
+     * Chooses a factory type for the unit to build. The unit picks the site and enqueues the whole
+     * production chain; the player never positions anything on the map.
+     */
     public static void armPlayerBlock(Block block){
-        playerBlock = block;
+        lastFactory = block;
+        playerBlock = null;
         enemyBlock = null;
         enemyRemoving = false;
+
+        Unit unit = playerUnit();
+        if(unit == null || block == null) return;
+
+        Seq<BuildPlan> plans = orbital.engine.world.FactoryChainPlanner.build(block, 0, player.team());
+        for(BuildPlan plan : plans){
+            unit.addBuild(plan, true);
+        }
     }
 
     /** Disarms every structure tool of the test panel. */
     public static void disarmStructureTools(){
         playerBlock = null;
+        lastFactory = null;
         enemyBlock = null;
         enemyRemoving = false;
     }
