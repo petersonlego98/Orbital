@@ -1,6 +1,10 @@
 import arc.Core;
 import orbital.content.Blocks;
 import orbital.content.Items;
+import orbital.content.Liquids;
+import orbital.type.ItemStack;
+import orbital.type.LiquidStack;
+import orbital.world.blocks.production.GenericCrafter;
 import orbital.world.blocks.storage.CoreBlock.CoreBuild;
 import orbital.entities.units.BuildPlan;
 import orbital.engine.world.AutoInfrastructure;
@@ -124,6 +128,40 @@ class AutoInfrastructureTest{
             if(plan.block == Blocks.powerNode || plan.block == Blocks.powerNodeLarge) hasNode = true;
         }
         assertTrue(hasNode, "a power-hungry factory far from the network must get nodes");
+    }
+
+    @Test
+    void multipleItemOutputsUseAnOverflowGate(){
+        GenericCrafter multi = new GenericCrafter("test-multi-item"){{
+            outputItems = new ItemStack[]{
+                new ItemStack(Items.copper, 1), new ItemStack(Items.lead, 1)};
+        }};
+        BuildPlan factory = new BuildPlan(20, 20, 0, multi);
+
+        arc.struct.Seq<BuildPlan> plans = AutoInfrastructure.plan(factory, Team.sharded);
+
+        boolean overflow = false;
+        for(BuildPlan plan : plans){
+            if(plan.block == Blocks.overflowGate) overflow = true;
+        }
+        assertTrue(overflow, "multiple item outputs need an overflow gate");
+    }
+
+    @Test
+    void multipleLiquidOutputsUseARouter(){
+        GenericCrafter multi = new GenericCrafter("test-multi-liquid"){{
+            outputLiquids = new LiquidStack[]{
+                new LiquidStack(Liquids.water, 1f), new LiquidStack(Liquids.oil, 1f)};
+        }};
+        BuildPlan factory = new BuildPlan(20, 20, 0, multi);
+
+        arc.struct.Seq<BuildPlan> plans = AutoInfrastructure.plan(factory, Team.sharded);
+
+        boolean router = false;
+        for(BuildPlan plan : plans){
+            if(plan.block == Blocks.liquidRouter) router = true;
+        }
+        assertTrue(router, "multiple liquid outputs need a liquid router");
     }
 
     @Test
