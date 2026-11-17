@@ -835,12 +835,25 @@ public final class TestNewFeaturesMode{
         enemyRemoving = false;
 
         Unit unit = playerUnit();
-        if(unit == null || block == null) return;
+        if(unit == null || block == null){
+            arc.util.Log.warn("[auto-build] no player unit, nothing queued for @", block == null ? "?" : block.name);
+            return;
+        }
 
         Seq<BuildPlan> plans = orbital.engine.world.FactoryChainPlanner.build(block, 0, player.team());
-        for(BuildPlan plan : plans){
-            unit.addBuild(plan, true);
+        if(unit.canBuild()){
+            for(BuildPlan plan : plans){
+                unit.addBuild(plan, true);
+            }
+        }else{
+            //a non-builder pilot must still get the chain built: hand it to the team builders
+            for(BuildPlan plan : plans){
+                player.team().data().plans.add(new Teams.BlockPlan(
+                    plan.x, plan.y, (short)plan.rotation, plan.block, plan.config));
+            }
         }
+        arc.util.Log.info("[auto-build] @ plans queued for @ (unit builder: @)",
+            plans.size, block.name, unit.canBuild());
     }
 
     /** Disarms every structure tool of the test panel. */

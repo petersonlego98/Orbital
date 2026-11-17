@@ -27,7 +27,9 @@ public final class FactoryChainPlanner{
     /** Maximum radius from the core where a site may be chosen. */
     public static final int siteRadius = 24;
     /** Radius used to look for ore/liquid tiles that feed the factory. */
-    public static final int sourceRadius = 20;
+    public static final int sourceRadius = 40;
+    /** Penalty for a site that cannot reach one of the required sources. */
+    public static final float missingSourcePenalty = 400f;
 
     private FactoryChainPlanner(){
     }
@@ -137,29 +139,19 @@ public final class FactoryChainPlanner{
                     if(tile.drop() != null || tile.floor().liquidDrop != null) continue;
                     if(!placeable(factory, team, x, y)) continue;
 
+                    //best effort: a missing source is expensive, but never a reason to build
+                    //nothing. The unit must always end up with a factory and a usable site.
                     float score = distance(x - core.tileX(), y - core.tileY());
-                    boolean complete = true;
                     for(Item item : content.items()){
                         if(!factory.consumesItem(item)) continue;
                         float d = nearestSourceDistance(x, y, item, null);
-                        if(d < 0){
-                            complete = false;
-                            break;
-                        }
-                        score += d * 2f;
+                        score += d < 0 ? missingSourcePenalty : d * 2f;
                     }
-                    if(!complete) continue;
-
                     for(Liquid liquid : content.liquids()){
                         if(!factory.consumesLiquid(liquid)) continue;
                         float d = nearestSourceDistance(x, y, null, liquid);
-                        if(d < 0){
-                            complete = false;
-                            break;
-                        }
-                        score += d * 2f;
+                        score += d < 0 ? missingSourcePenalty : d * 2f;
                     }
-                    if(!complete) continue;
 
                     if(score < bestScore){
                         bestScore = score;
@@ -167,7 +159,6 @@ public final class FactoryChainPlanner{
                     }
                 }
             }
-            if(best != null) break; //the smallest usable ring is the best neighbourhood
         }
         return best;
     }
