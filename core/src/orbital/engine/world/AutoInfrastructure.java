@@ -95,9 +95,12 @@ public final class AutoInfrastructure{
                 liquidBlock, Blocks.ductRouter, team, multiLiquidOutput(block) ? Blocks.liquidRouter : null);
         }
 
-        //a factory that consumes power needs a network; lay nodes toward the closest one
+        //a factory that consumes power needs a network; lay nodes toward a real generator/battery
         if(block.consumesPower && !hasPowerNear(factory.x, factory.y)){
-            addPower(result, factory, core, team);
+            Building source = closestPowerSource(factory.x, factory.y, team);
+            if(source != null){
+                addPower(result, factory, source, team);
+            }
         }
 
         if(result.size > maxPlansPerFactory){
@@ -332,6 +335,34 @@ public final class AutoInfrastructure{
         return core;
     }
 
+    /** Nearest friendly generator/battery with a live power graph; the core is the fallback. */
+    private static Building closestPowerSource(int x, int y, Team team){
+        Building best = null;
+        float bestDistance = Float.MAX_VALUE;
+        int radius = 48;
+        int minX = Math.max(0, x - radius), maxX = Math.min(world.width() - 1, x + radius);
+        int minY = Math.max(0, y - radius), maxY = Math.min(world.height() - 1, y + radius);
+
+        for(int ty = minY; ty <= maxY; ty++){
+            for(int tx = minX; tx <= maxX; tx++){
+                Tile tile = world.tile(tx, ty);
+                if(tile == null || tile.build == null || tile.build.team != team) continue;
+                if(!tile.build.block.outputsPower) continue;
+                if(tile.build.power == null || tile.build.power.graph == null) continue;
+
+                float distance = distanceSq(tx - x, ty - y);
+                if(distance < bestDistance){
+                    bestDistance = distance;
+                    best = tile.build;
+                }
+            }
+        }
+        if(best != null) return best;
+
+        CoreBuild core = closestCore(team, x, y);
+        return core;
+    }
+
     private static boolean hasPowerNear(int x, int y){
         int radius = 10;
         for(int ty = Math.max(0, y - radius); ty <= Math.min(world.height() - 1, y + radius); ty++){
@@ -345,7 +376,8 @@ public final class AutoInfrastructure{
     }
 
     /** Lays power nodes from the factory toward the core when no network is in range. */
-    private static void addPower(Seq<BuildPlan> plans, BuildPlan factory, CoreBuild core, Team team){
+    private static void addPower(Seq<BuildPlan> plans, BuildPlan factory, Building source, Team team){
+        CoreBuild core = closestCore(team, factory.x, factory.y);
         Block node = null;
         int range = 0;
         if(Blocks.powerNodeLarge != null && Blocks.powerNodeLarge.unlockedNow()
@@ -359,7 +391,8 @@ public final class AutoInfrastructure{
         if(node == null) return;
 
         int spacing = Math.max(2, range - 1);
-        Seq<Point2> points = Placement.pathfindLine(true, factory.x, factory.y, core.tileX(), core.tileY());
+        Seq<Point2> points = Placement.pathfindLine(true, factory.x, factory.y,
+            source.tileX(), source.tileY());
         try{
             int placed = 0;
             for(int i = 2; i < points.size && placed < 12 && plans.size < maxPlansPerFactory; i += spacing){

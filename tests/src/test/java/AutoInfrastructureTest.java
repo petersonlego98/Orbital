@@ -127,6 +127,35 @@ class AutoInfrastructureTest{
     }
 
     @Test
+    void powerChainAimsAtTheNearestGenerator(){
+        CoreBuild coreBuild = (CoreBuild)world.tile(10, 10).build;
+        assertNotNull(coreBuild);
+        coreBuild.items.add(Items.copper, 200);
+        coreBuild.items.add(Items.lead, 200);
+        coreBuild.items.add(Items.titanium, 200);
+        coreBuild.items.add(Items.silicon, 200);
+
+        world.tile(25, 45).setBlock(Blocks.combustionGenerator, Team.sharded);
+        state.teams.updateTeamStats();
+
+        BuildPlan factory = new BuildPlan(45, 45, 0, Blocks.siliconSmelter);
+        arc.struct.Seq<BuildPlan> plans = AutoInfrastructure.plan(factory, Team.sharded);
+
+        boolean towardsGenerator = false;
+        for(BuildPlan plan : plans){
+            if(plan.block != Blocks.powerNode && plan.block != Blocks.powerNodeLarge) continue;
+            float toGenerator = MathfDist(plan.x - 25, plan.y - 45);
+            float toCore = MathfDist(plan.x - 10, plan.y - 10);
+            if(toGenerator < toCore) towardsGenerator = true;
+        }
+        assertTrue(towardsGenerator, "the node chain must be laid toward the generator, not the core");
+    }
+
+    private static float MathfDist(int dx, int dy){
+        return dx * dx + dy * dy;
+    }
+
+    @Test
     void normalPlacementToggleIsOptIn(){
         Core.settings.put(AutoInfrastructure.key, false);
         assertFalse(AutoInfrastructure.normalPlacementEnabled());
