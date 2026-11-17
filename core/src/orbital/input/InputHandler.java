@@ -1914,6 +1914,15 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
             if(plan.block != null && validPlace(plan.x, plan.y, plan.block, plan.rotation, null, true)){
                 BuildPlan copy = plan.copy();
                 plan.block.onNewPlan(copy);
+
+                //opt-in: ordinary placement also brings the transport routes that feed and drain
+                //the chosen factory, queued before the factory itself
+                if(orbital.engine.world.AutoInfrastructure.normalPlacementEnabled()){
+                    for(BuildPlan extra : orbital.engine.world.AutoInfrastructure.plan(copy, player.team())){
+                        player.unit().addBuild(extra);
+                    }
+                }
+
                 player.unit().addBuild(copy);
                 playerPlanTree.insert(copy);
             }

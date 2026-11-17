@@ -854,7 +854,15 @@ public final class TestNewFeaturesMode{
         //on an invalid spot does not leave a plan stuck on the hull forever
         if(!Build.validPlaceIgnoreUnits(block, player.team(), x, y, rotation, true, true)) return false;
 
-        unit.addBuild(new BuildPlan(x, y, rotation, block, config), true);
+        BuildPlan plan = new BuildPlan(x, y, rotation, block, config);
+
+        //the catalog is the "choose a structure, the unit builds it" flow: always include the
+        //transport routes first, so the factory is supplied the moment it finishes
+        Seq<BuildPlan> infrastructure = orbital.engine.world.AutoInfrastructure.plan(plan, player.team());
+        for(BuildPlan extra : infrastructure){
+            unit.addBuild(extra, true);
+        }
+        unit.addBuild(plan, true);
         return true;
     }
 

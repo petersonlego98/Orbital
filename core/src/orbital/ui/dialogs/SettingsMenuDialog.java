@@ -389,6 +389,8 @@ public class SettingsMenuDialog extends BaseDialog{
         constructions.checkPref("autobuild", true);
         //the classic fixed build menu is opt-in; the command tablet is the default interface
         constructions.checkPref(BuildMenuPreference.oldMenuKey, false);
+        //opt-in: placing a factory also queues the transport routes it needs
+        constructions.checkPref(orbital.engine.world.AutoInfrastructure.key, false);
 
         sound.checkPref("alwaysmusic", false);
         sound.sliderPref("musicvol", 100, 0, 100, 1, i -> i + "%");
