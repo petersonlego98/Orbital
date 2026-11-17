@@ -2,6 +2,7 @@ package orbital.engine.world;
 
 import arc.Core;
 import arc.math.geom.Point2;
+import orbital.world.blocks.distribution.ItemBridge;
 import arc.struct.Seq;
 import arc.util.pooling.Pools;
 import orbital.content.Blocks;
@@ -187,6 +188,8 @@ public final class AutoInfrastructure{
                                  Block transport, Block junction, Team team, Block firstTile){
         if(transport == null || plans.size >= maxPlansPerFactory) return;
 
+        int firstAdded = plans.size;
+
         Seq<Point2> points = Placement.pathfindLine(true, sx, sy, tx, ty);
         try{
             int step = Math.max(1, points.size / maxRouteLength);
@@ -230,6 +233,66 @@ public final class AutoInfrastructure{
             }
         }finally{
             Pools.freeAll(points);
+        }
+
+        linkGaps(plans, firstAdded, transport, team);
+    }
+
+    /**
+     * Where the pathfinder had to step around an occupied tile, the two neighbours on either side
+     * are too far apart for a plain belt. Connect them with a bridge instead of leaving a hole.
+     */
+    private static void linkGaps(Seq<BuildPlan> plans, int firstAdded, Block transport, Team team){
+        Block bridge = transport != null && transport.isDuct ? Blocks.ductBridge : Blocks.itemBridge;
+        //the basic bridge is treated as a fallback tier, like the basic conveyor
+        if(bridge == null) return;
+        CoreBuild core = closestCore(team, 0, 0);
+        if(!affordable(bridge, core)) return;
+
+        int range = bridge instanceof ItemBridge itemBridge ? itemBridge.range : 4;
+        for(int i = firstAdded + 1; i < plans.size; i++){
+            BuildPlan before = plans.get(i - 1);
+            BuildPlan after = plans.get(i);
+            if(before.block == null || after.block == null) continue;
+
+            int dx = Math.abs(before.x - after.x);
+            int dy = Math.abs(before.y - after.y);
+            if(dx + dy <= 1 || dx > range || dy > range) continue;
+            if(before.block instanceof ItemBridge || after.block instanceof ItemBridge) continue;
+
+            //bridges only link straight tiles; add the corner of an L so the jump is orthogonal
+            if(dx > 0 && dy > 0){
+                int ix = after.x, iy = before.y;
+                Tile corner = world.tile(ix, iy);
+                if(corner == null || corner.block() != Blocks.air) continue;
+
+                boolean occupied = false;
+                for(BuildPlan existing : plans){
+                    if(existing.x == ix && existing.y == iy){
+                        occupied = true;
+                        break;
+                    }
+                }
+                if(occupied) continue;
+
+                BuildPlan middle = new BuildPlan(ix, iy,
+                    Tile.relativeTo(ix, iy, after.x, after.y), transport);
+                if(!middle.placeable(team)) continue;
+
+                plans.insert(i, middle);
+                after = middle;
+                dx = Math.abs(before.x - after.x);
+                dy = Math.abs(before.y - after.y);
+            }
+            if(dx + dy <= 1 || (dx != 0 && dy != 0)) continue;
+
+            if(bridge instanceof ItemBridge itemBridge
+               && !itemBridge.positionsValid(before.x, before.y, after.x, after.y)) continue;
+
+            before.block = bridge;
+            after.block = bridge;
+            //the receiving end stores the relative link back to the sender
+            after.config = new Point2(before.x - after.x, before.y - after.y);
         }
     }
 

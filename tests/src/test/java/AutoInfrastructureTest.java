@@ -82,6 +82,30 @@ class AutoInfrastructureTest{
     }
 
     @Test
+    void routeAcrossAWallUsesABridge(){
+        CoreBuild coreBuild = (CoreBuild)world.tile(10, 10).build;
+        assertNotNull(coreBuild);
+        coreBuild.items.add(Items.copper, 200);
+        coreBuild.items.add(Items.lead, 200);
+        coreBuild.items.add(Items.titanium, 200);
+        coreBuild.items.add(Items.silicon, 200);
+
+        //a wall across the whole map forces the straight fallback route to cross an obstacle
+        for(int y = 0; y < world.height(); y++){
+            world.tile(15, y).setBlock(Blocks.sandWall);
+        }
+
+        BuildPlan factory = new BuildPlan(20, 20, 0, Blocks.siliconSmelter);
+        arc.struct.Seq<BuildPlan> plans = AutoInfrastructure.plan(factory, Team.sharded);
+
+        boolean bridged = false;
+        for(BuildPlan plan : plans){
+            if(plan.block == Blocks.itemBridge) bridged = true;
+        }
+        assertTrue(bridged, "a gap in the route must be closed with an item bridge");
+    }
+
+    @Test
     void factoryFarFromAnyPowerNetworkGetsPowerNodes(){
         var core = world.tile(10, 10).build;
         assertNotNull(core);
