@@ -1142,6 +1142,7 @@ public class HudFragment{
 
         if(TestNewFeaturesMode.playerToolArmed()){
             Block block = TestNewFeaturesMode.playerBlock;
+            if(block == null) return;
             if(TestNewFeaturesMode.queuePlayerBuilding(block, x, y, control.input.rotation, block.nextConfig())){
                 block.placeSound.at(Core.input.mouseWorldX(), Core.input.mouseWorldY());
             }

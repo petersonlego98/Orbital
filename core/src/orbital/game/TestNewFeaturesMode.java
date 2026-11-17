@@ -809,9 +809,12 @@ public final class TestNewFeaturesMode{
         return active() && (enemyBlock != null || enemyRemoving);
     }
 
-    /** @return whether the player has chosen a factory for the unit to build. */
+    /**
+     * @return whether a cursor placement tool is armed. Choosing a factory does NOT arm it: the
+     * unit picks the site, so the full-screen map placer must stay disabled.
+     */
     public static boolean playerToolArmed(){
-        return active() && lastFactory != null;
+        return active() && playerBlock != null;
     }
 
     /** Arms the enemy tool with a structure, clearing the player tool. */

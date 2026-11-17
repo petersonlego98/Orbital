@@ -134,6 +134,8 @@ class FactoryChainPlannerTest{
         TestNewFeaturesMode.armPlayerBlock(Blocks.graphitePress);
 
         assertNull(TestNewFeaturesMode.playerBlock, "the player must not keep a placement cursor");
+        assertFalse(TestNewFeaturesMode.playerToolArmed(),
+            "the full-screen map placer must stay off, or clicking the map dereferences a null block");
         assertEquals(Blocks.graphitePress, TestNewFeaturesMode.lastFactory);
         assertTrue(orbital.Vars.player.unit().plans.size > before,
             "choosing the type must enqueue the whole chain on the unit");
