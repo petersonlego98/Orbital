@@ -188,7 +188,7 @@ public class TestFeaturesCatalogDialog extends BaseDialog{
                     hide();
                 });
                 button.update(() -> button.setChecked(armPlayerTool
-                    ? TestNewFeaturesMode.lastFactory == block
+                    ? TestNewFeaturesMode.lastPlayerBlock == block
                     : TestNewFeaturesMode.enemyBlock == block));
 
                 index++;

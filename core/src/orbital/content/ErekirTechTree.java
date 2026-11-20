@@ -301,7 +301,9 @@ public class ErekirTechTree{
 
 
                 node(radar, Seq.with(new Research(beamNode), new Research(turbineCondenser), new Research(tankFabricator), new OnSector(SectorPresets.aegis)), () -> {
+                    node(planetDrill, () -> {
 
+                    });
                 });
             });
 

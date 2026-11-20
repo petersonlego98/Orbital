@@ -4,6 +4,7 @@ import arc.math.*;
 import arc.struct.*;
 import arc.util.*;
 import orbital.content.*;
+import orbital.game.*;
 import orbital.gen.*;
 import orbital.logic.*;
 import orbital.type.*;
@@ -93,7 +94,9 @@ public class StorageBlock extends Block{
 
         @Override
         public int getMaximumAccepted(Item item){
-            return linkedCore != null ? linkedCore.getMaximumAccepted(item) : itemCapacity;
+            return linkedCore != null
+                ? linkedCore.getMaximumAccepted(item)
+                : Mathf.round(itemCapacity * BuildingLevels.capacityMultiplier(level));
         }
 
         @Override

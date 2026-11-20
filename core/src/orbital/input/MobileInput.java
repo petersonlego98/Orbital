@@ -739,6 +739,18 @@ public class MobileInput extends InputHandler implements GestureListener{
 
         float worldx = Core.input.mouseWorld(x, y).x, worldy = Core.input.mouseWorld(x, y).y;
 
+        //Fixed-camera mode: tap picks the move destination or an allied unit.
+        if(FixedCameraControl.enabled() && !Core.scene.hasMouse(x, y) && count < 2){
+            arc.math.geom.Vec2 world = Core.input.mouseWorld(x, y).cpy();
+            if(FixedCameraControl.awaitingDestination()){
+                FixedCameraControl.moveTo(world);
+                return true;
+            }
+            Unit tapped = selectedCommandUnit(worldx, worldy);
+            FixedCameraControl.select(tapped);
+            if(tapped != null) return true;
+        }
+
         //get tile on cursor
         Tile cursor = tileAt(x, y);
 

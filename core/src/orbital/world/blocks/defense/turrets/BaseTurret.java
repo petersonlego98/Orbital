@@ -6,6 +6,7 @@ import arc.struct.*;
 import arc.util.*;
 import orbital.content.*;
 import orbital.entities.*;
+import orbital.game.*;
 import orbital.gen.*;
 import orbital.graphics.*;
 import orbital.logic.*;
@@ -122,7 +123,7 @@ public class BaseTurret extends Block{
 
         @Override
         public float range(){
-            return range;
+            return range * BuildingLevels.rangeMultiplier(level);
         }
 
         @Override

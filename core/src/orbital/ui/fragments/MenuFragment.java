@@ -17,6 +17,7 @@ import arc.util.*;
 import orbital.core.*;
 import orbital.game.EventType.*;
 import orbital.game.TestNewFeaturesMode;
+import orbital.game.BattleRoyaleMode;
 import orbital.gen.*;
 import orbital.graphics.*;
 import orbital.ui.*;
@@ -302,6 +303,7 @@ public class MenuFragment{
                         new MenuButton("@starmap", Icon.planet, () -> checkPlay(ui.planet::show)),
                         new MenuButton("Expedição asteroidária", Icon.terrain, () -> checkPlay(ui.expedition::show)),
                         new MenuButton("@mode.testfeatures.name", Icon.terrain, () -> checkPlay(TestNewFeaturesMode::start)),
+                        new MenuButton("@mode.battleRoyale.name", Icon.units, () -> checkPlay(BattleRoyaleMode::start)),
                         new MenuButton("@joingame", Icon.add, () -> checkPlay(ui.join::show)),
                         new MenuButton("@customgame", Icon.terrain, () -> checkPlay(ui.custom::show)),
                         new MenuButton("@loadgame", Icon.download, () -> checkPlay(ui.load::show))

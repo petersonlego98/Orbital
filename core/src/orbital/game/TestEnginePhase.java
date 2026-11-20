@@ -90,8 +90,16 @@ public final class TestEnginePhase{
      *
      * @return whether the battle could be started (test mode active and a positive count).
      */
+    /** Cap for integrated/Intel GPUs: thousands of armed AI units collapse their frame rate. */
+    private static final int intelUnitCap = 256;
+
     public static boolean start(int count){
         if(!TestNewFeaturesMode.active() || count <= 0) return false;
+
+        if(orbital.graphics.IntelGpuCheck.wasIntel() && count > intelUnitCap){
+            count = intelUnitCap;
+            arc.util.Log.info("[Fase 1] Intel GPU detected: limiting stress battle to @ units", count);
+        }
 
         stop();
         state.rules.disableUnitCap = true;

@@ -238,6 +238,7 @@ public class DesktopInput extends InputHandler{
         boolean panCam = false;
         float camSpeed = (!Core.input.keyDown(Binding.boost) ? panSpeed : panBoostSpeed) * Time.delta;
         boolean detached = settings.getBool("detach-camera", false);
+        boolean fixedCamera = FixedCameraControl.enabled();
 
         if(!scene.hasField() && !scene.hasDialog()){
             if(input.keyTap(Binding.debugHitboxes)) Core.settings.toggle("drawhitboxes");
@@ -270,7 +271,8 @@ public class DesktopInput extends InputHandler{
             }
         }
 
-        panning |= detached;
+        //Fixed camera: never follow the controlled unit; the player pans by dragging instead.
+        panning |= detached || fixedCamera;
 
 
         if(!locked){
@@ -903,6 +905,18 @@ public class DesktopInput extends InputHandler{
 
     @Override
     public boolean tap(float x, float y, int count, KeyCode button){
+        //Fixed-camera mode: a tap either picks the move destination or selects an allied unit.
+        if(FixedCameraControl.enabled() && !scene.hasMouse() && button == KeyCode.mouseLeft && count < 2){
+            Vec2 world = input.mouseWorld(x, y);
+            if(FixedCameraControl.awaitingDestination()){
+                FixedCameraControl.moveTo(world.cpy());
+                return true;
+            }
+            Unit tapped = selectedCommandUnit(world.x, world.y);
+            FixedCameraControl.select(tapped);
+            return tapped != null;
+        }
+
         if(scene.hasMouse() || !commandMode) return false;
 
         tappedOne = true;
@@ -980,7 +994,7 @@ public class DesktopInput extends InputHandler{
         float ya = Core.input.axis(Binding.moveY);
         boolean boosted = (unit instanceof Mechc && unit.isFlying());
 
-        if(settings.getBool("detach-camera")){
+        if(settings.getBool("detach-camera") && !FixedCameraControl.enabled()){
             Vec2 targetPos = camera.position;
 
             movement.set(targetPos).sub(player).limit(speed);

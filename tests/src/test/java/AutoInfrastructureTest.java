@@ -68,7 +68,9 @@ class AutoInfrastructureTest{
             for(int j = i + 1; j < plans.size; j++){
                 assertFalse(plans.get(i).samePos(plans.get(j)), "route must not plan the same tile twice");
             }
-            assertFalse(plans.get(i).samePos(factory));
+            assertFalse(plans.get(i).samePos(factory),
+                "transport plan overlaps factory: " + plans.get(i).block.name + " at "
+                    + plans.get(i).x + "," + plans.get(i).y);
         }
     }
 
@@ -217,6 +219,24 @@ class AutoInfrastructureTest{
 
         Block longHaul = TransportTier.fastestItem(core, TransportTier.longHaulTiles + 1);
         assertEquals(Blocks.massDriver, longHaul, "long routes use the mass driver when payable");
+    }
+
+    @Test
+    void shortMassDriverRouteFallsBackToContinuousBelts(){
+        arc.struct.Seq<BuildPlan> plans = new arc.struct.Seq<>();
+
+        AutoInfrastructure.addRoute(plans, 20, 20, 27, 20,
+            Blocks.massDriver, Blocks.junction, Team.sharded);
+
+        assertFalse(plans.isEmpty(), "short routes should still get transport");
+        boolean reachesDestination = false;
+        for(BuildPlan plan : plans){
+            assertNotEquals(Blocks.massDriver, plan.block,
+                "a short route must not become adjacent mass drivers");
+            if(plan.x == 26 && plan.y == 20) reachesDestination = true;
+        }
+        assertTrue(reachesDestination,
+            "the transport tile immediately before the destination must be built");
     }
 
     @Test

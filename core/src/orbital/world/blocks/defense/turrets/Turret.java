@@ -347,9 +347,9 @@ public class Turret extends ReloadTurret{
         @Override
         public float range(){
             if(peekAmmo() != null){
-                return range + peekAmmo().rangeChange;
+                return (range + peekAmmo().rangeChange) * BuildingLevels.rangeMultiplier(level);
             }
-            return range;
+            return range * BuildingLevels.rangeMultiplier(level);
         }
 
         public float trackingRange(){

@@ -1,6 +1,7 @@
 package orbital.world.blocks.defense.turrets;
 
 import arc.math.*;
+import orbital.game.*;
 import orbital.world.consumers.*;
 import orbital.world.meta.*;
 
@@ -30,7 +31,7 @@ public class ReloadTurret extends BaseTurret{
                 float capacity = coolant instanceof ConsumeLiquidFilter filter ? filter.getConsumed(this).heatCapacity : (coolant.consumes(liquids.current()) ? liquids.current().heatCapacity : 0.4f);
                 float amount = coolant.amount * coolant.efficiency(this);
                 coolant.update(this);
-                reloadCounter += amount * edelta() * capacity * coolantMultiplier * ammoReloadMultiplier();
+                reloadCounter += amount * edelta() * capacity * coolantMultiplier * ammoReloadMultiplier() * BuildingLevels.speedMultiplier(level);
 
                 if(Mathf.chance(0.06 * amount)){
                     coolEffect.at(x + Mathf.range(size * tilesize / 2f), y + Mathf.range(size * tilesize / 2f));
@@ -43,7 +44,7 @@ public class ReloadTurret extends BaseTurret{
         }
 
         protected float baseReloadSpeed(){
-            return efficiency;
+            return efficiency * BuildingLevels.speedMultiplier(level);
         }
     }
 }

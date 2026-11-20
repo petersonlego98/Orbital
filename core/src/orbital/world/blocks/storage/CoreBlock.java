@@ -750,7 +750,9 @@ public class CoreBlock extends StorageBlock{
 
         @Override
         public int getMaximumAccepted(Item item){
-            return state.rules.coreIncinerates ? Integer.MAX_VALUE/2 : storageCapacity;
+            return state.rules.coreIncinerates
+                ? Integer.MAX_VALUE/2
+                : Mathf.round(storageCapacity * BuildingLevels.capacityMultiplier(level));
         }
 
         @Override

@@ -365,18 +365,22 @@ public class HudFragment{
         //minimap + position
         parent.fill(t -> {
             t.name = "minimap/position";
-            t.visible(() -> Core.settings.getBool("minimap") && shown());
-            //minimap
-            t.add(new Minimap()).name("minimap");
-            t.row();
-            //position
-            t.label(() ->
-                (Core.settings.getBool("position") ? player.tileX() + "," + player.tileY() + "\n" : "") +
-                (Core.settings.getBool("mouseposition") ? "[lightgray]" + World.toTile(Core.input.mouseWorldX()) + "," + World.toTile(Core.input.mouseWorldY()) : ""))
-            .visible(() -> Core.settings.getBool("position") || Core.settings.getBool("mouseposition"))
-            .touchable(Touchable.disabled)
-            .style(Styles.outlineLabel)
-            .name("position");
+            t.visible(() -> (Core.settings.getBool("minimap") || state.isCampaign()) && shown());
+
+            //minimap + coordinates
+            t.table(m -> {
+                m.top().right();
+                m.add(new Minimap()).name("minimap");
+                m.row();
+                m.label(() ->
+                    (Core.settings.getBool("position") ? player.tileX() + "," + player.tileY() + "\n" : "") +
+                    (Core.settings.getBool("mouseposition") ? "[lightgray]" + World.toTile(Core.input.mouseWorldX()) + "," + World.toTile(Core.input.mouseWorldY()) : ""))
+                .visible(() -> Core.settings.getBool("position") || Core.settings.getBool("mouseposition"))
+                .touchable(Touchable.disabled)
+                .style(Styles.outlineLabel)
+                .name("position");
+            }).visible(() -> Core.settings.getBool("minimap"));
+
             t.top().right();
         });
 
@@ -480,7 +484,38 @@ public class HudFragment{
                 cont.row();
             }
 
+            //top controls: research menu (always pinned) + fixed-camera controls
+            cont.table(fixed -> {
+                fixed.left();
+                fixed.button(Icon.tree, Styles.clearNonei, 30f, () -> ui.research.show())
+                    .name("research-pinned")
+                    .tooltip("@research")
+                    .padRight(4f);
+
+                fixed.button(Icon.lockOpen, Styles.clearNoneTogglei, 30f,
+                    orbital.input.FixedCameraControl::toggle)
+                    .name("fixed-camera-toggle")
+                    .tooltip("@fixedcamera.toggle")
+                    .update(b -> b.setChecked(orbital.input.FixedCameraControl.enabled()))
+                    .padRight(4f);
+
+                fixed.button(Icon.move, Styles.clearNonei, 30f,
+                    orbital.input.FixedCameraControl::armMove)
+                    .name("fixed-camera-move")
+                    .tooltip("@fixedcamera.move")
+                    .visible(() -> orbital.input.FixedCameraControl.enabled()
+                        && orbital.input.FixedCameraControl.selected() != null)
+                    .update(b -> b.setColor(orbital.input.FixedCameraControl.awaitingDestination()
+                        ? Pal.accent : Color.white));
+            }).left().padLeft(4f).row();
+
             cont.update(() -> {
+                //right click / escape cancels a pending fixed-camera move destination
+                if(orbital.input.FixedCameraControl.awaitingDestination() &&
+                    (Core.input.keyTap(KeyCode.escape) || Core.input.keyTap(KeyCode.mouseRight))){
+                    orbital.input.FixedCameraControl.cancelMove();
+                }
+
                 if(Core.input.keyTap(Binding.toggleMenus) && !ui.chatfrag.shown() && !Core.scene.hasDialog() && !Core.scene.hasField()){
                     Core.settings.getBoolOnce("ui-hidden", () -> {
                         ui.announce(Core.bundle.format("showui",  Binding.toggleMenus.value.key.toString(), 11));
@@ -919,7 +954,7 @@ public class HudFragment{
             .width(width).height(40f).left().row();
         content.button("@mode.testfeatures.catalog.buildings", Icon.distribution, () -> openCatalog(false, true))
             .width(width).height(40f).left()
-            .update(b -> b.setChecked(TestNewFeaturesMode.lastFactory != null)).row();
+            .update(b -> b.setChecked(TestNewFeaturesMode.lastPlayerBlock != null)).row();
 
         Table modules = new Table();
         modules.left();
@@ -1132,6 +1167,18 @@ public class HudFragment{
 
         //the plan preview uses the same layer the regular build plans are drawn on
         Events.run(Trigger.drawOver, () -> Draw.draw(Layer.plans, this::drawEnemyPlan));
+
+        //Fixed-camera move: show a crosshair at the pending destination.
+        Events.run(Trigger.drawOver, () -> {
+            if(!orbital.input.FixedCameraControl.awaitingDestination()) return;
+            Draw.color(Pal.accent);
+            Lines.stroke(2f);
+            float mx = Core.input.mouseWorldX(), my = Core.input.mouseWorldY();
+            Lines.circle(mx, my, 10f);
+            Lines.line(mx - 16f, my, mx + 16f, my);
+            Lines.line(mx, my - 16f, mx, my + 16f);
+            Draw.reset();
+        });
     }
 
     /** Drops (or removes) the armed structure under the cursor, for the player or the enemy team. */

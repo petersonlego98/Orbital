@@ -5,7 +5,6 @@ import arc.math.geom.Point2;
 import orbital.world.blocks.distribution.ItemBridge;
 import orbital.world.blocks.distribution.MassDriver;
 import arc.struct.Seq;
-import arc.util.pooling.Pools;
 import orbital.content.Blocks;
 import orbital.entities.units.BuildPlan;
 import orbital.game.Team;
@@ -67,15 +66,29 @@ public final class AutoInfrastructure{
         CoreBuild core = closestCore(team, factory.x, factory.y);
         if(core == null) return result;
 
-        int haul = Math.abs(factory.x - core.tileX()) + Math.abs(factory.y - core.tileY());
-        Block itemBlock = TransportTier.fastestItem(core, haul);
+        Block itemBlock = TransportTier.fastestItem(core, 0);
         Block liquidBlock = TransportTier.fastestLiquid(core);
+
+        //Power nodes are queued first: a long transport route can otherwise consume the whole
+        //maxPlansPerFactory budget and leave a power-hungry factory permanently unsupplied.
+        //Building the network first is also the correct construction order.
+        //a factory that consumes power needs a network; lay nodes toward a real generator/battery
+        if(block.hasPower && block.consPower != null && block.consPower.usage > 0f
+            && !hasPowerNear(factory.x, factory.y, block, team)){
+            Building source = closestPowerSource(factory.x, factory.y, team);
+            if(source != null){
+                addPower(result, factory, source, team);
+            }
+        }
 
         //inputs first: the transport exists before the factory starts consuming
         if(itemInput){
             Building source = closestSource(factory.x, factory.y, team, false);
             if(source != null){
-                addRoute(result, source.tileX(), source.tileY(), factory.x, factory.y, itemBlock, Blocks.junction, team);
+                int haul = Math.abs(factory.x - source.tileX()) + Math.abs(factory.y - source.tileY());
+                Block routeBlock = TransportTier.fastestItem(core, haul);
+                addRoute(result, source.tileX(), source.tileY(), factory.x, factory.y,
+                    routeBlock, Blocks.junction, team);
             }
         }
         if(liquidInput){
@@ -89,20 +102,14 @@ public final class AutoInfrastructure{
         Building itemSink = closestSink(factory.x, factory.y, team, false);
         Building liquidSink = closestSink(factory.x, factory.y, team, true);
         if(itemOutput && itemBlock != null && itemSink != null){
+            int haul = Math.abs(factory.x - itemSink.tileX()) + Math.abs(factory.y - itemSink.tileY());
+            Block outputBlock = TransportTier.fastestItem(core, haul);
             addRoute(result, factory.x, factory.y, itemSink.tileX(), itemSink.tileY(),
-                itemBlock, Blocks.junction, team, multiItemOutput(block) ? Blocks.overflowGate : null);
+                outputBlock, Blocks.junction, team, multiItemOutput(block) ? Blocks.overflowGate : null);
         }
         if(liquidOutput && liquidBlock != null && liquidSink != null){
             addRoute(result, factory.x, factory.y, liquidSink.tileX(), liquidSink.tileY(),
                 liquidBlock, Blocks.ductRouter, team, multiLiquidOutput(block) ? Blocks.liquidRouter : null);
-        }
-
-        //a factory that consumes power needs a network; lay nodes toward a real generator/battery
-        if(block.consumesPower && !hasPowerNear(factory.x, factory.y)){
-            Building source = closestPowerSource(factory.x, factory.y, team);
-            if(source != null){
-                addPower(result, factory, source, team);
-            }
         }
 
         if(result.size > maxPlansPerFactory){
@@ -191,17 +198,34 @@ public final class AutoInfrastructure{
 
     public static void addRoute(Seq<BuildPlan> plans, int sx, int sy, int tx, int ty,
                                  Block transport, Block junction, Team team, Block firstTile){
+        addRoute(plans, sx, sy, tx, ty, transport, junction, team, firstTile, null);
+    }
+
+    /**
+     * @param avoid an extra building footprint that is not in {@code plans} yet (the factory is
+     *              appended only after its input routes, so it must be protected explicitly).
+     */
+    public static void addRoute(Seq<BuildPlan> plans, int sx, int sy, int tx, int ty,
+                                 Block transport, Block junction, Team team, Block firstTile,
+                                 BuildPlan avoid){
         if(transport == null || plans.size >= maxPlansPerFactory) return;
 
         int firstAdded = plans.size;
 
         Seq<Point2> points = Placement.pathfindLine(true, sx, sy, tx, ty);
         try{
-            if(transport instanceof MassDriver && points.size > 4){
-                //a mass driver is a single shot between two endpoints; no belts in between
-                Point2 a = points.get(1), b = points.get(points.size - 2);
-                Tile ta = world.tile(a.x, a.y), tb = world.tile(b.x, b.y);
-                if(ta != null && tb != null && ta.block() == Blocks.air && tb.block() == Blocks.air){
+            if(transport instanceof MassDriver){
+                //A mass driver is a paired long-range link, never a per-tile belt. The old
+                //fallback below placed one driver on every path tile when endpoints were too
+                //close or either endpoint could not be placed, producing adjacent dead drivers.
+                Point2 a = points.size >= 6 ? points.get(2) : null;
+                Point2 b = points.size >= 6 ? points.get(points.size - 3) : null;
+                boolean farEnough = a != null && b != null
+                    && Math.abs(a.x - b.x) + Math.abs(a.y - b.y) >= 8;
+                Tile ta = farEnough ? world.tile(a.x, a.y) : null;
+                Tile tb = farEnough ? world.tile(b.x, b.y) : null;
+                if(farEnough && ta != null && tb != null
+                    && ta.block() == Blocks.air && tb.block() == Blocks.air){
                     BuildPlan first = new BuildPlan(a.x, a.y, 0, transport);
                     BuildPlan second = new BuildPlan(b.x, b.y, 0, transport);
                     if(first.placeable(team) && second.placeable(team)){
@@ -212,6 +236,8 @@ public final class AutoInfrastructure{
                         return;
                     }
                 }
+                //If a valid, separated pair cannot be placed, use the fastest continuous belt.
+                transport = TransportTier.fastestItem(closestCore(team, sx, sy), 0);
             }
 
             int step = Math.max(1, points.size / maxRouteLength);
@@ -219,11 +245,16 @@ public final class AutoInfrastructure{
                 Point2 from = points.get(i);
                 Point2 to = points.get(Math.min(i + step, points.size - 1));
 
-                //endpoints are existing buildings; only the tiles in between get transport
-                if((from.x == sx && from.y == sy) || (to.x == tx && to.y == ty)) continue;
+                //The start is an existing building. The last "from" tile must still be built:
+                //it is the transport tile immediately before the destination.
+                if(from.x == sx && from.y == sy) continue;
 
                 Tile tile = world.tile(from.x, from.y);
                 if(tile == null || tile.block() != Blocks.air) continue;
+                //multi-tile buildings live in the same queue as belts. Checking only exact
+                //positions lets a route overwrite a drill's second tile or a crafter's edge.
+                if(overlapsPlannedFootprint(plans, from.x, from.y)
+                    || overlapsFootprint(avoid, from.x, from.y)) continue;
 
                 int rotation = Tile.relativeTo(from.x, from.y, to.x, to.y);
 
@@ -254,17 +285,21 @@ public final class AutoInfrastructure{
                 if(plans.size >= maxPlansPerFactory) break;
             }
         }finally{
-            Pools.freeAll(points);
+            //Placement.pathfindLine owns this sequence. It frees the Point2 instances at the start
+            //of its next call. Freeing here double-frees them: Arc's Pools.freeAll(Seq) does not
+            //clear the sequence, so the next pathfindLine frees the same instances again and hands
+            //out aliased points. See the audit in ConstructionAuditTest.
         }
 
-        linkGaps(plans, firstAdded, transport, team);
+        linkGaps(plans, firstAdded, transport, team, avoid);
     }
 
     /**
      * Where the pathfinder had to step around an occupied tile, the two neighbours on either side
      * are too far apart for a plain belt. Connect them with a bridge instead of leaving a hole.
      */
-    private static void linkGaps(Seq<BuildPlan> plans, int firstAdded, Block transport, Team team){
+    private static void linkGaps(Seq<BuildPlan> plans, int firstAdded, Block transport, Team team,
+                                  BuildPlan avoid){
         CoreBuild core = closestCore(team, 0, 0);
         Block bridge = transport != null && transport.isDuct
             ? TransportTier.fastestDuctBridge(core)
@@ -296,9 +331,11 @@ public final class AutoInfrastructure{
                     }
                 }
                 if(occupied) continue;
+                if(overlapsFootprint(avoid, ix, iy)) continue;
 
                 BuildPlan middle = new BuildPlan(ix, iy,
                     Tile.relativeTo(ix, iy, after.x, after.y), transport);
+                if(overlapsPlannedFootprint(plans, ix, iy)) continue;
                 if(!middle.placeable(team)) continue;
 
                 plans.insert(i, middle);
@@ -383,12 +420,25 @@ public final class AutoInfrastructure{
     }
 
     public static boolean hasPowerNear(int x, int y){
-        int radius = 10;
-        for(int ty = Math.max(0, y - radius); ty <= Math.min(world.height() - 1, y + radius); ty++){
-            for(int tx = Math.max(0, x - radius); tx <= Math.min(world.width() - 1, x + radius); tx++){
+        return hasPowerNear(x, y, Blocks.air, null);
+    }
+
+    /** Checks for an adjacent power graph that actually has a same-team producer. */
+    public static boolean hasPowerNear(int x, int y, Block target, Team team){
+        int size = target == null ? 1 : Math.max(1, target.size);
+        int middle = (size - 1) / 2;
+        int minX = x - middle, minY = y - middle;
+        int maxX = minX + size - 1, maxY = minY + size - 1;
+        for(int ty = Math.max(0, minY - 1); ty <= Math.min(world.height() - 1, maxY + 1); ty++){
+            for(int tx = Math.max(0, minX - 1); tx <= Math.min(world.width() - 1, maxX + 1); tx++){
+                if(tx >= minX && tx <= maxX && ty >= minY && ty <= maxY) continue;
                 Tile tile = world.tile(tx, ty);
-                if(tile == null || tile.build == null) continue;
-                if(tile.build.power != null && tile.build.power.graph != null) return true;
+                if(tile == null || tile.build == null || (team != null && tile.build.team != team)
+                    || tile.build.power == null || tile.build.power.graph == null) continue;
+                for(Building producer : tile.build.power.graph.producers){
+                    if(producer != null && producer.block.outputsPower
+                        && (team == null || producer.team == team)) return true;
+                }
             }
         }
         return false;
@@ -412,31 +462,57 @@ public final class AutoInfrastructure{
         int spacing = Math.max(2, range - 1);
         Seq<Point2> points = Placement.pathfindLine(true, factory.x, factory.y,
             source.tileX(), source.tileY());
+        //The transport route usually runs along this same line. A node on the exact path tile
+        //would collide with the already-planned belts, so probe a small perpendicular fan.
+        int[][] offsets = {{0, 0}, {0, 2}, {0, -2}, {2, 0}, {-2, 0},
+            {0, 3}, {0, -3}, {3, 0}, {-3, 0}, {2, 2}, {-2, -2}};
         try{
             int placed = 0;
             for(int i = 2; i < points.size && placed < 12 && plans.size < maxPlansPerFactory; i += spacing){
                 Point2 point = points.get(i);
-                Tile tile = world.tile(point.x, point.y);
-                if(tile == null || tile.block() != Blocks.air) continue;
+                for(int[] offset : offsets){
+                    int x = point.x + offset[0], y = point.y + offset[1];
+                    Tile tile = world.tile(x, y);
+                    if(tile == null || tile.block() != Blocks.air) continue;
+                    if(overlapsPlannedFootprint(plans, x, y)) continue;
 
-                BuildPlan plan = new BuildPlan(point.x, point.y, 0, node);
-                if(!plan.placeable(team)) continue;
+                    BuildPlan plan = new BuildPlan(x, y, 0, node);
+                    if(!plan.placeable(team)) continue;
 
-                boolean duplicate = false;
-                for(BuildPlan existing : plans){
-                    if(existing.samePos(plan)){
-                        duplicate = true;
-                        break;
+                    boolean duplicate = false;
+                    for(BuildPlan existing : plans){
+                        if(existing.samePos(plan)){
+                            duplicate = true;
+                            break;
+                        }
                     }
-                }
-                if(!duplicate){
-                    plans.add(plan);
-                    placed++;
+                    if(!duplicate){
+                        plans.add(plan);
+                        placed++;
+                    }
+                    break;
                 }
             }
         }finally{
-            Pools.freeAll(points);
+            //The points belong to Placement.pathfindLine; see the note in addRoute.
         }
+    }
+
+    private static boolean overlapsPlannedFootprint(Seq<BuildPlan> plans, int x, int y){
+        for(BuildPlan plan : plans){
+            if(plan.block == null) continue;
+            int size = Math.max(1, plan.block.size);
+            int minX = plan.x - (size - 1) / 2, minY = plan.y - (size - 1) / 2;
+            if(x >= minX && x < minX + size && y >= minY && y < minY + size) return true;
+        }
+        return false;
+    }
+
+    private static boolean overlapsFootprint(BuildPlan plan, int x, int y){
+        if(plan == null || plan.block == null) return false;
+        int size = Math.max(1, plan.block.size);
+        int minX = plan.x - (size - 1) / 2, minY = plan.y - (size - 1) / 2;
+        return x >= minX && x < minX + size && y >= minY && y < minY + size;
     }
 
     private static boolean affordable(Block block, CoreBuild core){

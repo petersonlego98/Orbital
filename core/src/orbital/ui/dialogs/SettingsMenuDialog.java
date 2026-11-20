@@ -475,7 +475,7 @@ public class SettingsMenuDialog extends BaseDialog{
         graphics.sliderPref("bloomintensity", 6, 0, 16, i -> (int)(i / 4f * 100f) + "%");
         graphics.sliderPref("bloomblur", 2, 1, 16, i -> i + "x");
 
-        graphics.sliderPref("fpscap", 240, 10, 245, 5, s -> {
+        graphics.sliderPref("fpscap", 120, 10, 245, 5, s -> {
             if(ios){
                 Core.graphics.setPreferredFPS(s > 240 ? 0 : s);
             }
@@ -483,7 +483,7 @@ public class SettingsMenuDialog extends BaseDialog{
         });
 
         if(ios){
-            int value = Core.settings.getInt("fpscap", 240);
+            int value = Core.settings.getInt("fpscap", 120);
             Core.graphics.setPreferredFPS(value > 240 ? 0 : value);
         }
 

@@ -64,6 +64,14 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
     @Import Team team;
     @Import boolean dead;
 
+    /** Per-building progression level, 1-100. */
+    public int level = 1;
+
+    /** Upgrading takes time: these transient fields track the in-progress evolution. */
+    public transient boolean evolving = false;
+    public transient int evolveTarget = 1;
+    public transient float evolveTimer = 0f, evolveDuration = 0f;
+
     transient Tile tile;
     transient Block block;
     transient Seq<Building> proximity = new Seq<>(true, 6, Building.class);
@@ -146,6 +154,7 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
 
         health = block.health;
         maxHealth(block.health);
+        applyLevelStats(1f);
         timer(new Interval(block.timers));
 
         if(block.hasItems) items = new ItemModule();
@@ -158,6 +167,51 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
         initialized = true;
 
         return self();
+    }
+
+    /** Sets this building's level, preserving the current health ratio. */
+    public void setLevel(int nextLevel){
+        float ratio = maxHealth <= 0f ? 1f : health / maxHealth;
+        level = BuildingLevels.clamp(nextLevel);
+        applyLevelStats(ratio);
+    }
+
+    /** Starts a timed evolution toward {@code target}; the level is applied when the timer ends. */
+    public void startEvolution(int target, float duration){
+        evolveTarget = BuildingLevels.clamp(target);
+        evolveDuration = Math.max(0.01f, duration);
+        evolveTimer = 0f;
+        evolving = evolveTarget > level;
+    }
+
+    /** @return evolution progress in 0..1, or -1 when not evolving. */
+    public float evolutionProgress(){
+        return evolving ? Mathf.clamp(evolveTimer / evolveDuration) : -1f;
+    }
+
+    /** Advances the evolution timer; called every frame from update(). */
+    void updateEvolution(){
+        if(!evolving) return;
+        evolveTimer += Time.delta;
+        if(evolveTimer >= evolveDuration){
+            setLevel(evolveTarget);
+            evolving = false;
+            evolveTimer = 0f;
+        }
+    }
+
+    /** Reapplies every level-derived stat that lives on the building itself. */
+    public void applyLevelStats(float healthRatio){
+        if(block == null) return;
+
+        float scaledMax = block.health * BuildingLevels.healthMultiplier(level);
+        maxHealth(scaledMax);
+        health = Mathf.clamp(scaledMax * Mathf.clamp(healthRatio), 1f, scaledMax);
+    }
+
+    /** @return this building's liquid capacity after its level bonus. */
+    public float liquidCapacity(){
+        return block == null ? 0f : block.liquidCapacity * BuildingLevels.capacityMultiplier(level);
     }
 
     @Override
@@ -189,7 +243,7 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
         write.f(health);
         write.b(rotation | 0b10000000);
         write.b(team.id);
-        write.b(writeVisibility ? 4 : 3); //version
+        write.b(5); //version: 5 adds a visibility flag and the building level
         write.b(enabled ? 1 : 0);
         //write presence of items/power/liquids/cons, so removing/adding them does not corrupt future saves.
         write.b(moduleBitmask());
@@ -211,15 +265,14 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
         write.b((byte)(Mathf.clamp(efficiency) * 255f));
         write.b((byte)(Mathf.clamp(optionalEfficiency) * 255f));
 
-        //only write visibility when necessary, saving 8 bytes - implies new version
-        if(writeVisibility){
-            write.l(visibleFlags);
-        }
+        //version 5 stores visibility presence explicitly and the building level
+        write.b(writeVisibility ? 1 : 0);
+        if(writeVisibility) write.l(visibleFlags);
+        write.b((byte)level);
     }
 
     public final void readBase(Reads read){
-        //cap health by block health in case of nerfs
-        health = Math.min(read.f(), block.health);
+        float savedHealth = read.f();
         byte rot = read.b();
         team = Team.get(read.b());
 
@@ -269,6 +322,15 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
         if(version == 4){
             visibleFlags = read.l();
         }
+
+        //version 5 has an explicit visibility flag and the building level
+        if(version >= 5){
+            if(read.b() == 1) visibleFlags = read.l();
+            level = BuildingLevels.clamp(read.ub());
+        }
+
+        float baseMaxForLevel = block == null ? 1f : block.health * BuildingLevels.healthMultiplier(level);
+        applyLevelStats(savedHealth / Math.max(1f, baseMaxForLevel));
     }
 
     public int moduleBitmask(){
@@ -406,7 +468,8 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
     /** Called clientside when the client taps a block to config.
      * @return whether the configuration UI should be shown. */
     public boolean configTapped(){
-        return true;
+        //any building below max level gets the shared upgrade panel, even without its own config
+        return block.configurable || level < BuildingLevels.maxLevel;
     }
 
     public float calculateHeat(float[] sideHeat){
@@ -785,7 +848,7 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
     }
 
     public int getMaximumAccepted(Item item){
-        return block.itemCapacity;
+        return block == null ? 0 : Mathf.round(block.itemCapacity * BuildingLevels.capacityMultiplier(level));
     }
 
     /** Remove a stack from this inventory, and return the amount removed. */
@@ -904,10 +967,10 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
             other = other.getLiquidDestination(self(), liquid);
 
             if(other != null && other.block.hasLiquids && canDumpLiquid(other, liquid) && other.liquids != null){
-                float ofract = other.liquids.get(liquid) / other.block.liquidCapacity;
-                float fract = liquids.get(liquid) / block.liquidCapacity;
+                float ofract = other.liquids.get(liquid) / other.liquidCapacity();
+                float fract = liquids.get(liquid) / liquidCapacity();
 
-                if(ofract < fract) transferLiquid(other, (fract - ofract) * block.liquidCapacity / scaling, liquid);
+                if(ofract < fract) transferLiquid(other, (fract - ofract) * liquidCapacity() / scaling, liquid);
             }
         }
     }
@@ -917,7 +980,7 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
     }
 
     public void transferLiquid(Building next, float amount, Liquid liquid){
-        float flow = Math.min(next.block.liquidCapacity - next.liquids.get(liquid), amount);
+        float flow = Math.min(next.liquidCapacity() - next.liquids.get(liquid), amount);
 
         if(next.acceptLiquid(self(), liquid)){
             next.handleLiquid(self(), liquid, flow);
@@ -946,17 +1009,17 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
         next = next.getLiquidDestination(self(), liquid);
 
         if(next.team == team && next.block.hasLiquids && liquids.get(liquid) > 0f){
-            float ofract = next.liquids.get(liquid) / next.block.liquidCapacity;
-            float fract = liquids.get(liquid) / block.liquidCapacity * block.liquidPressure;
-            float flow = Math.min(Mathf.clamp((fract - ofract)) * (block.liquidCapacity), liquids.get(liquid));
-            flow = Math.min(flow, next.block.liquidCapacity - next.liquids.get(liquid));
+            float ofract = next.liquids.get(liquid) / next.liquidCapacity();
+            float fract = liquids.get(liquid) / liquidCapacity() * block.liquidPressure;
+            float flow = Math.min(Mathf.clamp((fract - ofract)) * liquidCapacity(), liquids.get(liquid));
+            flow = Math.min(flow, next.liquidCapacity() - next.liquids.get(liquid));
 
             if(flow > 0f && ofract <= fract && next.acceptLiquid(self(), liquid)){
                 next.handleLiquid(self(), liquid, flow);
                 liquids.remove(liquid, flow);
                 return flow;
                 //handle reactions between different liquid types ▼
-            }else if(!next.block.consumesLiquid(liquid) && next.liquids.currentAmount() / next.block.liquidCapacity > 0.1f && fract > 0.1f){
+            }else if(!next.block.consumesLiquid(liquid) && next.liquids.currentAmount() / next.liquidCapacity() > 0.1f && fract > 0.1f){
                 //TODO !IMPORTANT! uses current(), which is 1) wrong for multi-liquid blocks and 2) causes unwanted reactions, e.g. hydrogen + slag in pump
                 //TODO these are incorrect effect positions
                 float fx = (x + next.x) / 2f, fy = (y + next.y) / 2f;
@@ -1206,11 +1269,11 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
     }
 
     public float getProgressIncrease(float baseTime){
-        return 1f / baseTime * edelta();
+        return 1f / (baseTime / BuildingLevels.speedMultiplier(level)) * edelta();
     }
 
     public float getDisplayEfficiency(){
-        return getProgressIncrease(1f) / edelta();
+        return getProgressIncrease(1f) / edelta() / BuildingLevels.speedMultiplier(level);
     }
 
     /** @return whether this block should play its idle sound.*/
@@ -1461,7 +1524,7 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
 
     /** @return the cap for item amount calculations, used when this block explodes. */
     public int explosionItemCap(){
-        return block.itemCapacity;
+        return block == null ? 0 : Mathf.round(block.itemCapacity * BuildingLevels.capacityMultiplier(level));
     }
 
     public void splashLiquid(Liquid liquid, float amount){
@@ -2115,8 +2178,8 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
             //totalLiquids is inherently bad design, but unfortunately it is useful for conduits/tanks
             case totalLiquids -> liquids == null ? 0 : liquids.currentAmount();
             case totalPower -> power == null || block.consPower == null ? 0 : power.status * (block.consPower.buffered ? block.consPower.capacity : 1f);
-            case itemCapacity -> block.hasItems ? block.itemCapacity : 0;
-            case liquidCapacity -> block.hasLiquids ? block.liquidCapacity : 0;
+            case itemCapacity -> block.hasItems ? Mathf.round(block.itemCapacity * BuildingLevels.capacityMultiplier(level)) : 0;
+            case liquidCapacity -> block.hasLiquids ? liquidCapacity() : 0;
             case powerCapacity -> block.consPower != null ? block.consPower.capacity : 0f;
             case powerNetIn -> power == null ? 0 : power.graph.getLastScaledPowerIn() * 60;
             case powerNetOut -> power == null ? 0 : power.graph.getLastScaledPowerOut() * 60;
@@ -2218,7 +2281,7 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
                 }
             }
         }else if(content instanceof Liquid liquid && liquids != null){
-            float amount = Mathf.clamp((float)value, 0f, block.liquidCapacity);
+            float amount = Mathf.clamp((float)value, 0f, liquidCapacity());
             //decreasing amount is always allowed
             if(amount < liquids.get(liquid) || (acceptLiquid(self(), liquid) && (liquids.current() == liquid || liquids.currentAmount() <= 0.1f || block.consumesLiquid(liquid)))){
                 liquids.set(liquid, amount);
@@ -2273,6 +2336,8 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
         if((timeScaleDuration -= Time.delta) <= 0f){
             timeScale = 1f;
         }
+
+        updateEvolution();
 
         updateConsumption();
 

@@ -126,7 +126,7 @@ public class DrawTurret extends DrawBlock{
 
         if(liquid.found()){
             Liquid toDraw = liquidDraw == null ? build.liquids.current() : liquidDraw;
-            Drawf.liquid(liquid, build.x + build.recoilOffset.x, build.y + build.recoilOffset.y, build.liquids.get(toDraw) / block.liquidCapacity, toDraw.color.write(Tmp.c1).a(1f), build.drawrot());
+            Drawf.liquid(liquid, build.x + build.recoilOffset.x, build.y + build.recoilOffset.y, build.liquids.get(toDraw) / build.liquidCapacity(), toDraw.color.write(Tmp.c1).a(1f), build.drawrot());
         }
 
         if(top.found()){

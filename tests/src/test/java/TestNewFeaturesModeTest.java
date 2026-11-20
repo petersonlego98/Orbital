@@ -4,6 +4,11 @@ import orbital.ui.dialogs.TestFeaturesCatalogDialog;
 import orbital.world.*;
 import org.junit.jupiter.api.*;
 
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+
 import static orbital.Vars.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -18,8 +23,9 @@ public class TestNewFeaturesModeTest{
     @Test
     void modeIsHiddenAndDoesNotShiftExistingOrdinals(){
         assertTrue(Gamemode.testFeatures.hidden);
-        //Gamemode ordinals are serialized in network data; the test mode must stay last.
-        assertEquals(Gamemode.all.length - 1, Gamemode.testFeatures.ordinal());
+        //Gamemode ordinals are serialized in network data; existing modes must keep their slots.
+        assertEquals(5, Gamemode.testFeatures.ordinal());
+        assertEquals(6, Gamemode.battleRoyale.ordinal());
         assertEquals(0, Gamemode.survival.ordinal());
         assertEquals(1, Gamemode.sandbox.ordinal());
         assertEquals(2, Gamemode.attack.ordinal());
@@ -28,15 +34,17 @@ public class TestNewFeaturesModeTest{
     }
 
     @Test
-    void rulesAreFreeButKeepTheUnitCap(){
+    void rulesUseFiniteResourcesAndKeepTheUnitCap(){
         Rules rules = Gamemode.testFeatures.apply(new Rules());
 
         assertEquals(TestNewFeaturesMode.rulesName, rules.modeName);
         assertEquals(Gamemode.testFeatures, rules.mode());
         assertFalse(rules.waves);
         assertFalse(rules.waveTimer);
-        assertEquals(0f, rules.unitCostMultiplier, 0.0001f);
-        assertEquals(0f, rules.buildCostMultiplier, 0.0001f);
+        assertFalse(rules.infiniteResources, "the test loadout must be spent, not refilled for free");
+        assertFalse(rules.isInfiniteResources(Team.sharded));
+        assertEquals(1f, rules.unitCostMultiplier, 0.0001f);
+        assertEquals(1f, rules.buildCostMultiplier, 0.0001f);
         assertFalse(rules.disableUnitCap);
     }
 
@@ -55,6 +63,88 @@ public class TestNewFeaturesModeTest{
             assertTrue(type.flying);
             assertFalse(type.isHidden());
         }
+    }
+
+    @Test
+    void sectorHasFourIsolatedPlayerZones(){
+        assertEquals(256, TestNewFeaturesMode.mapSize,
+            "the test sector must be the purpose-built 4-player size");
+
+        Team[] teams = TestNewFeaturesMode.sectorTeams();
+        arc.math.geom.Point2[] cells = TestNewFeaturesMode.sectorCoreCells();
+        assertEquals(4, teams.length, "one zone per player");
+        assertEquals(4, cells.length);
+
+        //Every player owns a distinct team, so cores and resources cannot be shared.
+        Set<Team> unique = new HashSet<>();
+        for(Team team : teams) unique.add(team);
+        assertEquals(4, unique.size(), "each player must have its own team");
+
+        //The four cores sit at the centers of a 2x2 grid of 128-tile quadrants.
+        int[] expectedX = {64, 192, 64, 192};
+        int[] expectedY = {64, 64, 192, 192};
+        for(int i = 0; i < cells.length; i++){
+            assertEquals(expectedX[i], cells[i].x, "wrong core X for player " + i);
+            assertEquals(expectedY[i], cells[i].y, "wrong core Y for player " + i);
+        }
+    }
+
+    @Test
+    void generatedSectorHasFourCoresWithSeparateTeamsAndOwnedOre(){
+        Tiles tiles = new Tiles(256, 256);
+        world.tiles = tiles;
+        world.beginMapLoad();
+        tiles.fill();
+        TestNewFeaturesMode.generateFourPlayerSector(tiles);
+        world.endMapLoad();
+
+        arc.math.geom.Point2[] cells = TestNewFeaturesMode.sectorCoreCells();
+        Team[] teams = TestNewFeaturesMode.sectorTeams();
+        for(int i = 0; i < cells.length; i++){
+            Tile coreTile = tiles.getn(cells[i].x, cells[i].y);
+            assertEquals(Blocks.coreShard, coreTile.block(), "player " + i + " must own a core");
+            assertEquals(teams[i], coreTile.team(), "core " + i + " must be on its own team");
+        }
+
+        //Each quadrant has its own coal deposit within mining range of its core.
+        for(int i = 0; i < cells.length; i++){
+            int cx = cells[i].x, cy = cells[i].y;
+            boolean hasCoal = false;
+            for(int y = cy - 40; y <= cy + 40 && !hasCoal; y++){
+                for(int x = cx - 40; x <= cx + 40; x++){
+                    if(!tiles.in(x, y)) continue;
+                    Tile t = tiles.getn(x, y);
+                    if(t.drop() == Items.coal){ hasCoal = true; break; }
+                }
+            }
+            assertTrue(hasCoal, "quadrant " + i + " must contain its own mineable coal");
+        }
+
+        //The terrain is natural, not a flat green plane: several distinct floors and liquids.
+        Set<Block> floors = new HashSet<>();
+        boolean hasLiquid = false;
+        for(Tile t : tiles){
+            floors.add(t.floor());
+            if(t.floor().isLiquid) hasLiquid = true;
+        }
+        assertTrue(floors.size() >= 4, "sector must have varied natural biomes, got " + floors.size());
+        assertTrue(hasLiquid, "sector must contain natural water bodies for pumps");
+    }
+
+    @Test
+    void fixedCameraControlStartsCleanAndToggles(){
+        orbital.input.FixedCameraControl.clear();
+        assertFalse(orbital.input.FixedCameraControl.awaitingDestination());
+        assertNull(orbital.input.FixedCameraControl.selected());
+
+        boolean was = orbital.input.FixedCameraControl.enabled();
+        orbital.input.FixedCameraControl.toggle();
+        assertEquals(!was, orbital.input.FixedCameraControl.enabled(),
+            "toggle must flip the persisted fixed-camera preference");
+        //restore
+        orbital.input.FixedCameraControl.toggle();
+        assertEquals(was, orbital.input.FixedCameraControl.enabled());
+        orbital.input.FixedCameraControl.clear();
     }
 
     @Test
@@ -267,6 +357,123 @@ public class TestNewFeaturesModeTest{
         assertTrue(wide[1] <= TestFeaturesCatalogDialog.maxCell + 0.01f, "cells must not grow beyond the readable maximum");
         assertTrue((int)wide[0] * wide[1] <= 1900f - 24f + 0.01f,
             "grown cells must still stay clear of the vertical scrollbar");
+    }
+
+    /**
+     * The rotating ore layer is generated from the local date. The permanent layer must stay
+     * byte-for-byte identical, and the same date must always reproduce the same deposits.
+     */
+    @Test
+    void oreCatalogCoversEveryVisibleGroundAndWallDeposit(){
+        Block[] ores = TestNewFeaturesMode.oreBlocks();
+
+        assertEquals(13, ores.length);
+        for(Block ore : ores){
+            assertTrue(ore.isOverlay(), ore.name + " is not an overlay");
+            assertTrue(ore.inEditor, ore.name + " is not part of the visible world content");
+            assertFalse(ore.synthetic(), ore.name + " is synthetic");
+            assertNotNull(ore.itemDrop, ore.name + " has no item drop");
+        }
+
+        Block[] expected = {
+            Blocks.oreCopper, Blocks.oreLead, Blocks.oreScrap, Blocks.oreCoal,
+            Blocks.oreTitanium, Blocks.oreThorium, Blocks.oreCrystalThorium,
+            Blocks.oreBeryllium, Blocks.oreTungsten,
+            Blocks.wallOreThorium, Blocks.wallOreBeryllium, Blocks.wallOreGraphite, Blocks.wallOreTungsten
+        };
+        for(Block ore : expected){
+            assertTrue(java.util.Arrays.asList(ores).contains(ore), "missing ore " + ore.name);
+        }
+    }
+
+    @Test
+    void dailyOreSeedUsesTheLocalCalendarDate(){
+        Calendar calendar = Calendar.getInstance();
+        int year = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH) + 1;
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+
+        int expected = year * 10000 + month * 100 + day;
+
+        assertEquals(expected, TestNewFeaturesMode.dailyOreSeed());
+        assertEquals(expected, TestNewFeaturesMode.dailyOreSeed(year, month, day));
+        assertNotEquals(expected, year * 10000 + month * 100 + day + 1,
+            "consecutive local dates must have different seeds");
+    }
+
+    @Test
+    void fixedOreLayerIsDeterministic(){
+        Tiles first = createOreTiles(96);
+        Tiles second = createOreTiles(96);
+
+        TestNewFeaturesMode.placeFixedOreLayers(first);
+        TestNewFeaturesMode.placeFixedOreLayers(second);
+
+        assertEquals(oreMap(first), oreMap(second));
+    }
+
+    @Test
+    void dailyOreLayerIsDeterministicAndChangesWithTheDate(){
+        Tiles first = createOreTiles(96);
+        Tiles sameDay = createOreTiles(96);
+        Tiles nextDay = createOreTiles(96);
+
+        int firstSeed = TestNewFeaturesMode.dailyOreSeed(2026, 11, 20);
+        int nextSeed = TestNewFeaturesMode.dailyOreSeed(2026, 11, 21);
+
+        TestNewFeaturesMode.placeDailyOreLayers(first, firstSeed);
+        TestNewFeaturesMode.placeDailyOreLayers(sameDay, firstSeed);
+        TestNewFeaturesMode.placeDailyOreLayers(nextDay, nextSeed);
+
+        assertEquals(oreMap(first), oreMap(sameDay), "the same local date must reproduce the same deposits");
+        assertNotEquals(oreMap(first), oreMap(nextDay), "a new local date must move the daily deposits");
+    }
+
+    @Test
+    void dailyOreLayerDoesNotOverwritePermanentDeposits(){
+        Tiles tiles = createOreTiles(96);
+        TestNewFeaturesMode.placeFixedOreLayers(tiles);
+
+        HashMap<String, Block> fixed = oreMap(tiles);
+        assertFalse(fixed.isEmpty(), "the permanent layer must actually place ores");
+
+        TestNewFeaturesMode.placeDailyOreLayers(tiles, 20261120);
+        HashMap<String, Block> combined = oreMap(tiles);
+
+        for(var entry : fixed.entrySet()){
+            assertEquals(entry.getValue(), combined.get(entry.getKey()),
+                "daily generation changed a permanent deposit at " + entry.getKey());
+        }
+        assertTrue(combined.size() > fixed.size(), "the daily layer must add new deposits");
+    }
+
+    private static Tiles createOreTiles(int size){
+        //world.resize() reuses the Tiles instance when the size is unchanged; each generation
+        //case needs its own map or the comparisons would all read the very same object.
+        Tiles tiles = new Tiles(size, size);
+        world.tiles = tiles;
+        world.beginMapLoad();
+        tiles.fill();
+
+        //every supported ridge type gets exposed wall tiles, so wall ores can be generated too
+        for(Tile tile : tiles){
+            if(tile.x % 3 != 0 || tile.y % 3 != 0) continue;
+            if(tile.x < size / 2){
+                tile.setBlock(tile.y < size / 2 ? Blocks.stoneWall : Blocks.carbonWall);
+            }else{
+                tile.setBlock(tile.y < size / 2 ? Blocks.beryllicStoneWall : Blocks.crystallineStoneWall);
+            }
+        }
+        world.endMapLoad();
+        return tiles;
+    }
+
+    private static HashMap<String, Block> oreMap(Tiles tiles){
+        HashMap<String, Block> result = new HashMap<>();
+        for(Tile tile : tiles){
+            if(tile.overlay() != Blocks.air) result.put(tile.x + "," + tile.y, tile.overlay());
+        }
+        return result;
     }
 
     private static void createFlatMap(int width, int height){

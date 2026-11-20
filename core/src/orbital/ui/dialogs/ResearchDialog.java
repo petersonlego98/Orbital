@@ -136,6 +136,8 @@ public class ResearchDialog extends BaseDialog{
             view.hoverNode = null;
             view.infoTable.remove();
             view.infoTable.clear();
+            //items are ready now: rebuild the list so requirement counts and buttons are accurate
+            view.rebuildAll();
         });
 
         hidden(ui.planet::setup);
@@ -153,50 +155,7 @@ public class ResearchDialog extends BaseDialog{
             ui.database.show();
         }).size(210f, 64f).name("database");
 
-        //scaling/drag input
-        addListener(new InputListener(){
-            @Override
-            public boolean scrolled(InputEvent event, float x, float y, float amountX, float amountY){
-                view.setScale(Mathf.clamp(view.scaleX - amountY / 10f * view.scaleX, 0.25f, 1f));
-                view.setOrigin(Align.center);
-                view.setTransform(true);
-                return true;
-            }
-
-            @Override
-            public boolean mouseMoved(InputEvent event, float x, float y){
-                view.requestScroll();
-                return super.mouseMoved(event, x, y);
-            }
-        });
-
         touchable = Touchable.enabled;
-
-        addCaptureListener(new ElementGestureListener(){
-            @Override
-            public void zoom(InputEvent event, float initialDistance, float distance){
-                if(view.lastZoom < 0){
-                    view.lastZoom = view.scaleX;
-                }
-
-                view.setScale(Mathf.clamp(distance / initialDistance * view.lastZoom, 0.25f, 1f));
-                view.setOrigin(Align.center);
-                view.setTransform(true);
-            }
-
-            @Override
-            public void touchUp(InputEvent event, float x, float y, int pointer, KeyCode button){
-                view.lastZoom = view.scaleX;
-            }
-
-            @Override
-            public void pan(InputEvent event, float x, float y, float deltaX, float deltaY){
-                view.panX += deltaX / view.scaleX;
-                view.panY += deltaY / view.scaleY;
-                view.moved = true;
-                view.clamp();
-            }
-        });
     }
 
     void checkMargin(){
@@ -330,6 +289,8 @@ public class ResearchDialog extends BaseDialog{
     }
 
     void treeLayout(){
+        //No-op: the research menu is now a vertical list, not a positioned node graph.
+        if(true) return;
         float spacing = 20f;
         LayoutNode node = new LayoutNode(root, null);
         LayoutNode[] children = node.children;
@@ -444,8 +405,20 @@ public class ResearchDialog extends BaseDialog{
         public ImageButton hoverNode;
         public Table infoTable = new Table();
 
+        /** Vertical list of research nodes; replaces the old draggable node graph. */
+        private final Table list = new Table();
+        private final ScrollPane listPane = new ScrollPane(list, Styles.smallPane);
+
         {
             rebuildAll();
+        }
+
+        @Override
+        protected void sizeChanged(){
+            super.sizeChanged();
+            //keep the scrollable list filling the dialog area
+            listPane.setSize(getWidth(), getHeight());
+            list.setWidth(Math.max(getWidth() - 20f, 100f));
         }
 
         public void rebuildAll(){
@@ -454,86 +427,113 @@ public class ResearchDialog extends BaseDialog{
             infoTable.clear();
             infoTable.touchable = Touchable.enabled;
 
-            for(TechTreeNode node : nodes){
-                ImageButton button = new ImageButton(node.node.content.uiIcon, Styles.nodei);
-                button.resizeImage(32f);
-                button.getImage().setScaling(Scaling.fit);
-                button.visible(() -> node.visible);
-                if(!net.client()){
-                    button.clicked(() -> {
-                        if(moved) return;
+            //Build a flat, scrollable list of every visible research node in tree order.
+            list.clear();
+            list.top().left();
+            list.defaults().left().padBottom(4f).padLeft(4f).padTop(4f);
 
-                        if(mobile){
-                            hoverNode = button;
-                            rebuild();
-                            float right = infoTable.getRight();
-                            if(right > Core.graphics.getWidth()){
-                                float moveBy = right - Core.graphics.getWidth();
-                                addAction(new RelativeTemporalAction(){
-                                    {
-                                        setDuration(0.1f);
-                                        setInterpolation(Interp.fade);
-                                    }
+            lastNode.each(tech -> {
+                TechTreeNode node = findNode(tech);
+                if(node == null || !node.visible) return;
+                list.add(buildListRow(node)).growX().left().row();
+            });
 
-                                    @Override
-                                    protected void updateRelative(float percentDelta){
-                                        panX -= moveBy * percentDelta;
-                                    }
-                                });
-                            }
-                        }else if(canSpend(node.node) && locked(node.node)){
-                            spend(node.node);
+            listPane.setScrollingDisabled(true, false);
+            listPane.setSize(getWidth(), getHeight());
+            list.setWidth(Math.max(getWidth() - 20f, 100f));
+            addChild(listPane);
+            listPane.invalidateHierarchy();
+        }
+
+        /** @return the wrapper node for a TechNode in the current tree, or null. */
+        private TechTreeNode findNode(TechNode tech){
+            for(TechTreeNode n : nodes){
+                if(n.node == tech) return n;
+            }
+            return null;
+        }
+
+        /** One row in the research list: icon, name, requirements and a Research button. */
+        private Table buildListRow(TechTreeNode node){
+            TechNode tech = node.node;
+            boolean isLocked = locked(tech);
+            boolean canSelect = selectable(tech);
+            boolean canResearch = canSpend(tech) && isLocked && !net.client();
+
+            Table row = new Table();
+            row.background(Tex.button);
+            row.left();
+            row.defaults().left().padRight(8f).padTop(4f).padBottom(4f);
+
+            //icon: lock when not yet available, real icon otherwise
+            Drawable icon = canSelect ? new TextureRegionDrawable(tech.content.uiIcon) : Icon.lock;
+            row.add(new Image(icon)).size(iconMed).padLeft(8f).padRight(10f);
+
+            //name column with requirements underneath
+            Table info = new Table();
+            info.left().defaults().left();
+            info.add(canSelect ? tech.content.localizedName : "[accent]???")
+                .color(canSelect ? Color.white : Pal.gray);
+            info.row();
+
+            if(isLocked && !net.client()){
+                if(tech.requirements.length > 0){
+                    boolean progress = Structs.contains(tech.finishedRequirements, s -> s.amount > 0);
+                    if(progress){
+                        float sum = 0f, used = 0f;
+                        for(int i = 0; i < tech.requirements.length; i++){
+                            sum += tech.requirements[i].item.cost * tech.requirements[i].amount;
+                            used += tech.finishedRequirements[i].item.cost * tech.finishedRequirements[i].amount;
                         }
-                    });
+                        info.add(Core.bundle.format("research.progress", Math.min((int)(used / Math.max(sum, 1f) * 100), 99)))
+                            .color(Color.lightGray).row();
+                    }
+                    for(int i = 0; i < tech.requirements.length; i++){
+                        ItemStack req = tech.requirements[i], done = tech.finishedRequirements[i];
+                        if(req.amount <= done.amount && !debugShowRequirements) continue;
+                        int need = debugShowRequirements ? req.amount : req.amount - done.amount;
+                        Table stack = new Table();
+                        stack.left();
+                        stack.image(req.item.uiIcon).size(24f).padRight(4f);
+                        stack.add(req.item.localizedName).color(Color.lightGray).padRight(6f);
+                        Label label = stack.label(() -> " " +
+                            UI.formatAmount(items == null ? 0 : Math.min(items.get(req.item), need)) + " / " + UI.formatAmount(need)).get();
+                        label.setColor(items != null && items.has(req.item) ? Color.lightGray : Color.scarlet);
+                        stack.add(label);
+                        info.add(stack).fillX().left().row();
+                    }
+                }else if(tech.objectives.size > 0){
+                    for(Objective o : tech.objectives){
+                        if(o.complete()) continue;
+                        info.add("> " + o.display()).color(Color.lightGray).row();
+                    }
                 }
+            }else if(!isLocked){
+                info.add("@completed").color(Color.lightGray);
+            }
+            row.add(info).growX().left().padRight(8f);
 
-                button.hovered(() -> {
-                    if(!mobile && hoverNode != button && node.visible){
-                        hoverNode = button;
-                        rebuild();
-                    }
-                });
-                button.exited(() -> {
-                    if(!mobile && hoverNode == button && !infoTable.hasMouse() && !hoverNode.hasMouse()){
-                        hoverNode = null;
-                        rebuild();
-                    }
-                });
-                button.touchable(() -> !node.visible ? Touchable.disabled : Touchable.enabled);
-                button.userObject = node.node;
-                button.setSize(nodeSize);
-                button.update(() -> {
-                    button.setDisabled(net.client() && !mobile);
-                    float offset = (Core.graphics.getHeight() % 2) / 2f;
-                    button.setPosition(node.x + panX + width / 2f, node.y + panY + height / 2f + offset, Align.center);
-                    button.getStyle().up = !locked(node.node) ? Tex.buttonOver : !selectable(node.node) || (!canSpend(node.node) && !net.client()) ? Tex.buttonRed : Tex.button;
-
-                    ((TextureRegionDrawable)button.getStyle().imageUp).setRegion(node.selectable ? node.node.content.uiIcon : Icon.lock.getRegion());
-                    button.getImage().setColor(!locked(node.node) ? Color.white : node.selectable ? Color.gray : Pal.gray);
-                    button.getImage().layout();
-                });
-                addChild(button);
+            //info button for unlocked content
+            if(canSelect){
+                row.button(Icon.info, Styles.flati, () -> ui.content.show(tech.content))
+                    .size(44f).padRight(6f);
             }
 
-            if(mobile){
-                addListener(new InputListener(){
-                    @Override
-                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
-                        if(pointer == -1) return false;
-                        Element e = Core.scene.hit(Core.input.mouseX(pointer), Core.input.mouseY(pointer), true);
-                        if(e == View.this){
-                            hoverNode = null;
-                            rebuild();
-                        }
-
-                        return false;
-                    }
-                });
+            //Research button on the right
+            if(!net.client()){
+                row.button("@research", Icon.ok, new TextButtonStyle(){{
+                        disabled = Tex.button;
+                        font = Fonts.def;
+                        fontColor = Color.white;
+                        disabledFontColor = Color.gray;
+                        up = buttonOver;
+                        over = buttonDown;
+                    }}, () -> spend(tech))
+                    .disabled(b -> !canSpend(tech) || !locked(tech))
+                    .size(140f, 44f);
             }
 
-            setOrigin(Align.center);
-            setTransform(true);
-            released(() -> moved = false);
+            return row;
         }
 
         void clamp(){
@@ -549,7 +549,7 @@ public class ResearchDialog extends BaseDialog{
         }
 
         boolean canSpend(TechNode node){
-            if(!selectable(node) || net.client()) return false;
+            if(!selectable(node) || net.client() || items == null) return false;
 
             if(node.requirements.length == 0) return true;
 
@@ -625,190 +625,17 @@ public class ResearchDialog extends BaseDialog{
         }
 
         void rebuild(){
-            rebuild(null);
+            rebuildAll();
         }
 
-        //pass an array of stack indexes that should shine here
+        //the shine highlight is no longer shown; just rebuild the list
         void rebuild(@Nullable boolean[] shine){
-            ImageButton button = hoverNode;
-
-            infoTable.remove();
-            infoTable.clear();
-            infoTable.update(null);
-            infoTable.touchable = Touchable.enabled;
-
-            if(button == null) return;
-
-            TechNode node = (TechNode)button.userObject;
-
-            infoTable.addListener(new InputListener(){
-                @Override
-                public void exit(InputEvent event, float x, float y, int pointer, Element fromActor){
-                    Element e = Core.scene.hit(Core.input.mouseX(pointer == -1 ? 0 : pointer), Core.input.mouseY(pointer == -1 ? 0 : pointer), true);
-
-                    if(hoverNode == button && !(e != null && (e == infoTable || e.isDescendantOf(infoTable) || e == hoverNode || e.isDescendantOf(hoverNode))) && (Core.app.isDesktop() || pointer == 0)){
-                        hoverNode = null;
-                        rebuild();
-                    }
-                }
-            });
-
-            infoTable.update(() -> infoTable.setPosition(button.x + button.getWidth(), button.y + button.getHeight(), Align.topLeft));
-
-            infoTable.left();
-            infoTable.background(Tex.button).margin(8f);
-
-            boolean selectable = selectable(node);
-
-            infoTable.table(b -> {
-                b.left();
-                b.margin(0).left().defaults().left();
-
-                if(selectable){
-                    b.button(Icon.info, Styles.flati, () -> ui.content.show(node.content)).growY().width(50f);
-                }
-                b.add().grow();
-                b.table(desc -> {
-                    desc.left().defaults().left();
-                    desc.add(selectable ? node.content.localizedName : "[accent]???");
-                    desc.row();
-                    if(locked(node) || (debugShowRequirements && !net.client())){
-
-                        if(net.client()){
-                            desc.add("@locked").color(Pal.remove);
-                        }else{
-                            desc.table(t -> {
-                                t.left();
-                                if(selectable){
-
-                                    //check if there is any progress, add research progress text
-                                    if(Structs.contains(node.finishedRequirements, s -> s.amount > 0)){
-                                        float sum = 0f, used = 0f;
-                                        boolean shiny = false;
-
-                                        for(int i = 0; i < node.requirements.length; i++){
-                                            sum += node.requirements[i].item.cost * node.requirements[i].amount;
-                                            used += node.finishedRequirements[i].item.cost * node.finishedRequirements[i].amount;
-                                            if(shine != null) shiny |= shine[i];
-                                        }
-
-                                        Label label = t.add(Core.bundle.format("research.progress", Math.min((int)(used / sum * 100), 99))).left().get();
-
-                                        if(shiny){
-                                            label.setColor(Pal.accent);
-                                            label.actions(Actions.color(Color.lightGray, 0.75f, Interp.fade));
-                                        }else{
-                                            label.setColor(Color.lightGray);
-                                        }
-
-                                        t.row();
-                                    }
-
-                                    for(int i = 0; i < node.requirements.length; i++){
-                                        ItemStack req = node.requirements[i];
-                                        ItemStack completed = node.finishedRequirements[i];
-
-                                        //skip finished stacks
-                                        if(req.amount <= completed.amount && !debugShowRequirements) continue;
-                                        boolean shiny = shine != null && shine[i];
-
-                                        t.table(list -> {
-                                            int reqAmount = debugShowRequirements ? req.amount : req.amount - completed.amount;
-
-                                            list.left();
-                                            list.image(req.item.uiIcon).size(8 * 3).padRight(3);
-                                            list.add(req.item.localizedName).color(Color.lightGray);
-                                            Label label = list.label(() -> " " +
-                                            UI.formatAmount(Math.min(items.get(req.item), reqAmount)) + " / "
-                                            + UI.formatAmount(reqAmount)).get();
-
-                                            Color targetColor = items.has(req.item) ? Color.lightGray : Color.scarlet;
-
-                                            if(shiny){
-                                                label.setColor(Pal.accent);
-                                                label.actions(Actions.color(targetColor, 0.75f, Interp.fade));
-                                            }else{
-                                                label.setColor(targetColor);
-                                            }
-
-                                        }).fillX().left();
-                                        t.row();
-                                    }
-                                }else if(node.objectives.size > 0){
-                                    t.table(r -> {
-                                        r.add("@complete").colspan(2).left();
-                                        r.row();
-                                        for(Objective o : node.objectives){
-                                            if(o.complete()) continue;
-
-                                            r.add("> " + o.display()).color(Color.lightGray).left();
-                                            r.image(o.complete() ? Icon.ok : Icon.cancel, o.complete() ? Color.lightGray : Color.scarlet).padLeft(3);
-                                            r.row();
-                                        }
-                                    });
-                                    t.row();
-                                }
-                            });
-                        }
-                    }else{
-                        desc.add("@completed");
-                    }
-                }).pad(9).left().growX();
-
-                if(mobile && locked(node) && !net.client()){
-                    b.row();
-                    b.button("@research", Icon.ok, new TextButtonStyle(){{
-                        disabled = Tex.button;
-                        font = Fonts.def;
-                        fontColor = Color.white;
-                        disabledFontColor = Color.gray;
-                        up = buttonOver;
-                        over = buttonDown;
-                    }}, () -> spend(node)).disabled(i -> !canSpend(node)).growX().height(44f).colspan(3);
-                }
-            }).growX().left();
-
-            infoTable.row();
-            if(node.content.description != null && node.content.inlineDescription && selectable){
-                infoTable.table(t -> t.margin(3f).left().labelWrap(node.content.displayDescription()).color(Color.lightGray)
-                .maxWidth(node.content.displayDescription().length() > 20 ? 270f : 0f).growX()).fillX();
-            }
-
-            addChild(infoTable);
-
-            checkMargin();
-            Core.app.post(() -> checkMargin());
-
-            infoTable.pack();
-            infoTable.act(Core.graphics.getDeltaTime());
+            rebuildAll();
         }
 
         @Override
         public void drawChildren(){
-            clamp();
-            float offsetX = panX + width / 2f, offsetY = panY + height / 2f;
-            Draw.sort(true);
-
-            for(TechTreeNode node : nodes){
-                if(!node.visible) continue;
-                for(TechTreeNode child : node.children){
-                    if(!child.visible) continue;
-                    boolean lock = locked(node.node) || locked(child.node);
-                    Draw.z(lock ? 1f : 2f);
-
-                    Lines.stroke(Scl.scl(4f), lock ? Pal.gray : Pal.accent);
-                    Draw.alpha(parentAlpha);
-                    if(Mathf.equal(Math.abs(node.y - child.y), Math.abs(node.x - child.x), 1f) && Mathf.dstm(node.x, node.y, child.x, child.y) <= node.width*3){
-                        Lines.line(node.x + offsetX, node.y + offsetY, child.x + offsetX, child.y + offsetY);
-                    }else{
-                        Lines.line(node.x + offsetX, node.y + offsetY, child.x + offsetX, node.y + offsetY);
-                        Lines.line(child.x + offsetX, node.y + offsetY, child.x + offsetX, child.y + offsetY);
-                    }
-                }
-            }
-
-            Draw.sort(false);
-            Draw.reset();
+            //the list is drawn by the ScrollPane child; no node graph lines to draw
             super.drawChildren();
         }
     }

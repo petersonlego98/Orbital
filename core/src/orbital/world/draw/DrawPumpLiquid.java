@@ -14,7 +14,7 @@ public class DrawPumpLiquid extends DrawBlock{
     public void draw(Building build){
         if(!(build instanceof PumpBuild pump) || pump.liquidDrop == null) return;
 
-        Drawf.liquid(liquid, build.x, build.y, build.liquids.get(pump.liquidDrop) / build.block.liquidCapacity, pump.liquidDrop.color);
+        Drawf.liquid(liquid, build.x, build.y, build.liquids.get(pump.liquidDrop) / build.liquidCapacity(), pump.liquidDrop.color);
     }
 
     @Override

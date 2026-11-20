@@ -276,6 +276,8 @@ public class Rules{
     public Gamemode mode(){
         if(TestNewFeaturesMode.rulesName.equals(modeName)){
             return Gamemode.testFeatures;
+        }else if(BattleRoyaleMode.rulesName.equals(modeName)){
+            return Gamemode.battleRoyale;
         }else if(pvp){
             return Gamemode.pvp;
         }else if(editor){

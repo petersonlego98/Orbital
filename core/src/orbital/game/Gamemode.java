@@ -41,13 +41,15 @@ public enum Gamemode{
     }),
     //keep last: Gamemode ordinals are written into network/save data, so existing modes must not shift
     testFeatures(true, rules -> {
-        rules.infiniteResources = true;
-        rules.buildCostMultiplier = 0f;
-        rules.unitCostMultiplier = 0f;
+        //the showcase gives a full starting loadout, but it must be spent like a normal colony
+        rules.infiniteResources = false;
+        rules.buildCostMultiplier = 1f;
+        rules.unitCostMultiplier = 1f;
         rules.waves = false;
         rules.waveTimer = false;
         rules.modeName = TestNewFeaturesMode.rulesName;
-    });
+    }),
+    battleRoyale(true, rules -> BattleRoyaleMode.applyRules(rules));
 
     private final Cons<Rules> rules;
     private final Boolf<Map> validator;

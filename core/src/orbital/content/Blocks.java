@@ -109,6 +109,7 @@ public class Blocks{
 
     //defense - erekir
     radar,
+    planetDrill,
     buildTower,
     regenProjector, shockwaveTower,
     //campaign only
@@ -1994,6 +1995,17 @@ public class Blocks{
             researchCost = with(Items.silicon, 70, Items.graphite, 70);
 
             consumePower(0.6f);
+        }};
+
+        planetDrill = new PlanetDrill("planet-drill"){{
+            requirements(Category.production, with(Items.copper, 100, Items.silicon, 120, Items.graphite, 80, Items.thorium, 40));
+            size = 3;
+            outlineColor = Color.valueOf("3a4a6a");
+            fogRadius = 2048;
+            scanTime = 60f * 25f;
+            researchCost = with(Items.silicon, 150, Items.graphite, 120, Items.thorium, 80);
+
+            consumePower(1.5f);
         }};
 
         buildTower = new BuildTurret("build-tower"){{

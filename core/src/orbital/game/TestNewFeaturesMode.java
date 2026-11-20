@@ -18,19 +18,61 @@ import orbital.ui.dialogs.ModuleTestSetupDialog;
 import orbital.world.*;
 import orbital.world.blocks.environment.*;
 
+import java.util.Calendar;
+
 import static orbital.Vars.*;
 
 /** Isolated, fixed-map environment used to validate aerial modules against waves of air units. */
 public final class TestNewFeaturesMode{
     public static final String rulesName = "test-new-features";
-    /** The map editor's maximum size, used so the showcase spans the largest sector the game allows. */
-    public static final int mapSize = 800;
+    /** Purpose-built 4-player sector: 256 tiles, one quadrant (128x128) per player. */
+    public static final int mapSize = 256;
     /** Fixed seed for the showcase terrain, so every visit shows the same planet. */
     private static final int showcaseSeed = 20261113;
+    /** Ground ores shared by the permanent and rotating layers, in generation order. */
+    private static final Block[] groundOres = {
+        Blocks.oreCopper, Blocks.oreLead, Blocks.oreScrap, Blocks.oreCoal,
+        Blocks.oreTitanium, Blocks.oreThorium, Blocks.oreCrystalThorium,
+        Blocks.oreBeryllium, Blocks.oreTungsten
+    };
+    /** Wall ores shared by the permanent and rotating layers, in generation order. */
+    private static final Block[] wallOres = {
+        Blocks.wallOreThorium, Blocks.wallOreBeryllium, Blocks.wallOreGraphite, Blocks.wallOreTungsten
+    };
+
+    /** One quadrant per player: its core team and the ores it owns in its own 128x128 territory. */
+    private record PlayerZone(Team team, Block[] ores){}
+
+    /** Four isolated players, each with a separate team and its own starter deposits. */
+    private static final PlayerZone[] zones = {
+        new PlayerZone(Team.sharded, new Block[]{Blocks.oreCopper, Blocks.oreLead, Blocks.oreCoal, Blocks.oreTitanium, Blocks.oreThorium}),
+        new PlayerZone(Team.crux, new Block[]{Blocks.oreCopper, Blocks.oreLead, Blocks.oreCoal, Blocks.oreTitanium, Blocks.oreThorium}),
+        new PlayerZone(Team.malis, new Block[]{Blocks.oreCopper, Blocks.oreLead, Blocks.oreCoal, Blocks.oreTitanium, Blocks.oreThorium}),
+        new PlayerZone(Team.green, new Block[]{Blocks.oreCopper, Blocks.oreLead, Blocks.oreCoal, Blocks.oreTitanium, Blocks.oreThorium})
+    };
     /** Delay written to the wave clock, in ticks. Waves are manual, so this is only a safety gap. */
     public static final float waveSpacing = 45f * 60f;
     /** Difficulty used to build the base air-only wave progression. */
     public static final float waveDifficulty = 0.55f;
+
+    /** @return the team of each player's core in the 4-player test sector, in quadrant order. */
+    public static Team[] sectorTeams(){
+        Team[] result = new Team[zones.length];
+        for(int i = 0; i < zones.length; i++) result[i] = zones[i].team();
+        return result;
+    }
+
+    /** @return the tile position of each player's core in the 4-player test sector. */
+    public static arc.math.geom.Point2[] sectorCoreCells(){
+        int quarter = mapSize / 2;
+        arc.math.geom.Point2[] result = new arc.math.geom.Point2[zones.length];
+        for(int i = 0; i < zones.length; i++){
+            int cx = (i % 2 == 0) ? quarter / 2 : quarter + quarter / 2;
+            int cy = (i < 2) ? quarter / 2 : quarter + quarter / 2;
+            result[i] = new arc.math.geom.Point2(cx, cy);
+        }
+        return result;
+    }
 
     private static Map testMap;
     private static boolean initializeMono;
@@ -52,14 +94,51 @@ public final class TestNewFeaturesMode{
     public static boolean enemyRemoving;
     /** Block armed by the player-building tool; null means nothing is selected. */
     public static @Nullable Block playerBlock;
-    /** Last factory type chosen by the player; the unit picks the site, not the cursor. */
-    public static @Nullable Block lastFactory;
+    /** Last structure type chosen for the player's unit; the unit picks the site, not the cursor. */
+    public static @Nullable Block lastPlayerBlock;
 
     private TestNewFeaturesMode(){
     }
 
     public static boolean active(){
         return state != null && state.rules != null && rulesName.equals(state.rules.modeName);
+    }
+
+    /** @return every ore overlay represented in the test map, in stable generation order. */
+    public static Block[] oreBlocks(){
+        Block[] result = new Block[groundOres.length + wallOres.length];
+        System.arraycopy(groundOres, 0, result, 0, groundOres.length);
+        System.arraycopy(wallOres, 0, result, groundOres.length, wallOres.length);
+        return result;
+    }
+
+    /**
+     * @return the local calendar date encoded as {@code yyyyMMdd}. The rotating layer is derived
+     * from this number, so the same day always produces the same deposits on the same machine.
+     */
+    public static int dailyOreSeed(){
+        Calendar calendar = Calendar.getInstance();
+        return dailyOreSeed(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1,
+            calendar.get(Calendar.DAY_OF_MONTH));
+    }
+
+    /** @return the local calendar date encoded as {@code yyyyMMdd}. */
+    public static int dailyOreSeed(int year, int month, int day){
+        return year * 10000 + month * 100 + day;
+    }
+
+    /** Paints only the permanent ore layer; kept separate so its stability can be verified. */
+    public static void placeFixedOreLayers(Tiles tiles){
+        Rand rand = new Rand(showcaseSeed);
+        placeOreFields(tiles, rand);
+        placeWallOutcrops(tiles, rand);
+        scatterWallOres(tiles, rand);
+    }
+
+    /** Paints only the rotating ore layer for one local-date seed. */
+    public static void placeDailyOreLayers(Tiles tiles, int seed){
+        placeDailyOreFields(tiles, seed);
+        scatterDailyWallOres(tiles, seed);
     }
 
     /**
@@ -87,24 +166,16 @@ public final class TestNewFeaturesMode{
                 state.map = testMap;
                 world.loadGenerator(mapSize, mapSize, tiles -> {
                     tiles.fill();
-                    generateShowcase(tiles);
-
-                    //Air waves need somewhere to enter. Four edge markers keep the whole border
-                    //in use instead of piling every wave on one side of the map.
-                    int center = mapSize / 2;
-                    int edge = 3;
-                    tiles.getn(center, edge).setOverlay(Blocks.spawn);
-                    tiles.getn(center, mapSize - edge - 1).setOverlay(Blocks.spawn);
-                    tiles.getn(edge, center).setOverlay(Blocks.spawn);
-                    tiles.getn(mapSize - edge - 1, center).setOverlay(Blocks.spawn);
-
-                    tiles.getn(center, center).setBlock(Blocks.coreShard, Team.sharded);
+                    generateFourPlayerSector(tiles);
                 });
             });
         }
 
         if(!listenerInstalled){
-            Events.run(Trigger.newGame, TestNewFeaturesMode::spawnInitialMono);
+            Events.run(Trigger.newGame, () -> {
+                orbital.engine.world.SectorResources.invalidate();
+                spawnInitialMono();
+            });
             listenerInstalled = true;
         }
 
@@ -120,7 +191,7 @@ public final class TestNewFeaturesMode{
         setupOpen = true;
         wavesStarted = false;
         playerBlock = null;
-        lastFactory = null;
+        lastPlayerBlock = null;
         enemyBlock = null;
         enemyRemoving = false;
         //a stress battle from a previous session must never leak into a fresh one
@@ -130,13 +201,116 @@ public final class TestNewFeaturesMode{
         //fresh visit so a player testing a different combination sees the explanations again
         if(ui != null && ui.hints != null) ui.hints.resetModuleHints();
 
-        //every test session starts with engine evidence in the log: the parallel kernels against
-        //their sequential reference, and how the engine scales on this machine
-        arc.util.Log.info(orbital.engine.validation.EngineValidation.run().summary());
+        //Engine evidence (parallel kernels vs sequential reference and scaling) is generated in a
+        //background thread. It is a multi-second, CPU-heavy benchmark and running it synchronously
+        //here froze the game on entry in the test mode. Only the log write returns to main thread.
+        runEngineValidationInBackground();
 
         initializeMono = true;
         //createSave = false: this is a disposable test session, it must never touch the save list
         control.playMap(testMap, rules, false, false);
+    }
+
+    /** Runs the heavy engine self-test off the render thread; logs the report when it completes. */
+    private static void runEngineValidationInBackground(){
+        arc.util.Threads.daemon(() -> {
+            try{
+                String summary = orbital.engine.validation.EngineValidation.run().summary();
+                Core.app.post(() -> arc.util.Log.info("[engine-validation]\n@\n", summary));
+            }catch(Throwable t){
+                Core.app.post(() -> arc.util.Log.err("Engine validation failed: @", t));
+            }
+        });
+    }
+
+    /**
+     * Regenerates the test sector as four isolated player territories in a 2x2 layout. Each player
+     * owns exactly one core (on its own team) and its own ore deposits inside its 128x128 quadrant.
+     * Nothing is shared: the automatic builder only mines ore inside its team's territory and only
+     * pulls items from that team's core.
+     */
+    public static void generateFourPlayerSector(Tiles tiles){
+        int size = tiles.width;
+        arc.math.geom.Point2[] cells = sectorCoreCells();
+        Rand rand = new Rand(showcaseSeed);
+
+        //Natural base terrain: the same noise-blended biomes as the showcase, so grass gives way
+        //to dirt, stone, forest and desert with soft, organic borders instead of flat green.
+        paintBiomes(tiles);
+
+        //Lakes and rivers cut through the terrain with wobbly, noise-shaped shores.
+        placeLiquidBodies(tiles, rand);
+
+        //For each player, carve a clear home area and lay its own starter deposits in organic
+        //clusters. Deposits stay inside the territory but no longer look like perfect circles.
+        for(int i = 0; i < zones.length; i++){
+            PlayerZone zone = zones[i];
+            int cx = cells[i].x, cy = cells[i].y;
+
+            //A guaranteed flat, buildable clearing around the core and its first chains.
+            for(int x = cx - 30; x <= cx + 30; x++){
+                for(int y = cy - 30; y <= cy + 30; y++){
+                    if(!tiles.in(x, y) || !Mathf.within(x, y, cx, cy, 28f)) continue;
+                    Tile tile = tiles.getn(x, y);
+                    tile.setBlock(Blocks.air);
+                    tile.setOverlay(Blocks.air);
+                    if(tile.floor().isLiquid) tile.setFloor(Blocks.grass.asFloor());
+                }
+            }
+
+            //Each player gets the same starter palette, as irregular deposits near the core.
+            placeOwnedDeposit(tiles, rand, zone.ores[0], cx - 20, cy + 10, 11);
+            placeOwnedDeposit(tiles, rand, zone.ores[1], cx + 21, cy + 9, 11);
+            placeOwnedDeposit(tiles, rand, zone.ores[2], cx + 19, cy - 19, 10);
+            placeOwnedDeposit(tiles, rand, zone.ores[3], cx - 19, cy - 18, 9);
+            placeOwnedDeposit(tiles, rand, zone.ores[4], cx, cy - 27, 9);
+
+            //A small lake near each core, shaped by the same organic blob routine, so pumps and
+            //liquid chains can be tested locally without a square pool.
+            paintFloorBlob(tiles, cx + 26, cy - 27, 7,
+                (Floor)Blocks.water, (Floor)Blocks.water, showcaseSeed + 300 + i);
+
+            //One core per player, on that player's team.
+            tiles.getn(cx, cy).setBlock(Blocks.coreShard, zone.team);
+        }
+
+        //Props disabled while profiling GPU cost on integrated graphics.
+
+        //Air-wave entry markers on the map edges (kept for the wave tools).
+        int center = size / 2;
+        int edge = 3;
+        tiles.getn(center, edge).setOverlay(Blocks.spawn);
+        tiles.getn(center, size - edge - 1).setOverlay(Blocks.spawn);
+        tiles.getn(edge, center).setOverlay(Blocks.spawn);
+        tiles.getn(size - edge - 1, center).setOverlay(Blocks.spawn);
+
+        //The ore layout just changed; drop any cached sector inventory.
+        orbital.engine.world.SectorResources.invalidate();
+        arc.util.Log.info("[test-sector] 4-player natural sector @x@ generated: 4 cores on teams @",
+            size, size, java.util.Arrays.toString(sectorTeams()));
+    }
+
+    /** Paints one organic deposit of {@code ore} owned by a single player's territory. */
+    private static void placeOwnedDeposit(Tiles tiles, Rand rand, Block ore, int cx, int cy, int radius){
+        //Owned deposits may sit near the core clearing, so they intentionally ignore isProtected.
+        int cap = radius + 5;
+        for(int x = cx - cap; x <= cx + cap; x++){
+            for(int y = cy - cap; y <= cy + cap; y++){
+                if(!tiles.in(x, y)) continue;
+
+                float dx = x - cx, dy = y - cy;
+                float dist = Mathf.sqrt(dx * dx + dy * dy);
+                float wobble = 1f + 0.26f * (float)Simplex.noise2d(
+                    showcaseSeed + 500 + ore.id * 17 + cx + cy, 2, 0.5, 1f / 7f, x, y);
+                if(dist > radius * wobble) continue;
+
+                Tile tile = tiles.getn(x, y);
+                if(tile.block() != Blocks.air || tile.floor().isLiquid || !tile.floor().hasSurface()) continue;
+
+                float density = 0.94f - 0.5f * (dist / (radius * wobble));
+                if(rand.chance(density)) tile.setOverlay(ore);
+            }
+        }
     }
 
     //region showcase planet
@@ -154,6 +328,8 @@ public final class TestNewFeaturesMode{
         placeOreFields(tiles, rand);
         placeWallOutcrops(tiles, rand);
         scatterWallOres(tiles, rand);
+        //the rotating layer uses its own RNG so the permanent showcase layout is untouched
+        placeDailyOreLayers(tiles, dailyOreSeed());
         decorate(tiles, rand);
         placeVents(tiles, rand);
         clearProtectedAreas(tiles);
@@ -256,19 +432,14 @@ public final class TestNewFeaturesMode{
         return Blocks.arkyicStone.asFloor();
     }
 
-    /** Scatters every liquid pool the game knows: water, tainted water, oil, slag, cryofluid and arkycite. */
+    /**
+     * A few small water pools only. Animated liquid floors run a shader per tile every frame and
+     * were the main GPU cost on integrated graphics (the test sector used to have 44 large lakes of
+     * water, oil, slag, cryofluid and arkycite). Small shallow-water pockets still let the player
+     * test pumps, at a fraction of the render cost.
+     */
     private static void placeLiquidBodies(Tiles tiles, Rand rand){
-        //Serpulo water, in shallow, deep and spore-tainted forms
-        for(int i = 0; i < 14; i++) placeLake(tiles, rand, Blocks.deepwater.asFloor(), Blocks.water.asFloor(), rand.random(20, 46));
-        for(int i = 0; i < 6; i++) placeLake(tiles, rand, Blocks.water.asFloor(), Blocks.sandWater.asFloor(), rand.random(12, 28));
-        for(int i = 0; i < 5; i++) placeLake(tiles, rand, Blocks.deepTaintedWater.asFloor(), Blocks.taintedWater.asFloor(), rand.random(14, 32));
-        for(int i = 0; i < 4; i++) placeLake(tiles, rand, Blocks.darksandWater.asFloor(), Blocks.darksandTaintedWater.asFloor(), rand.random(10, 24));
-
-        //fluids from both planets: oil, slag, cryofluid and arkycite
-        for(int i = 0; i < 4; i++) placeLake(tiles, rand, Blocks.tar.asFloor(), Blocks.tar.asFloor(), rand.random(8, 20));
-        for(int i = 0; i < 3; i++) placeLake(tiles, rand, Blocks.slag.asFloor(), Blocks.slag.asFloor(), rand.random(7, 16));
-        for(int i = 0; i < 4; i++) placeLake(tiles, rand, Blocks.cryofluid.asFloor(), Blocks.cryofluid.asFloor(), rand.random(7, 18));
-        for(int i = 0; i < 4; i++) placeLake(tiles, rand, Blocks.arkyciteFloor.asFloor(), Blocks.arkyciteFloor.asFloor(), rand.random(9, 22));
+        for(int i = 0; i < 4; i++) placeLake(tiles, rand, Blocks.water.asFloor(), Blocks.water.asFloor(), rand.random(6, 10));
     }
 
     private static void placeLake(Tiles tiles, Rand rand, Floor center, Floor edge, int radius){
@@ -334,25 +505,32 @@ public final class TestNewFeaturesMode{
         }
     }
 
-    /** Places an organic cluster of every ore block from both planets. */
+    /** Places an organic cluster of every permanent ground ore from both planets. */
     private static void placeOreFields(Tiles tiles, Rand rand){
-        Block[] ores = {
-            Blocks.oreCopper, Blocks.oreLead, Blocks.oreScrap, Blocks.oreCoal,
-            Blocks.oreTitanium, Blocks.oreThorium, Blocks.oreCrystalThorium,
-            Blocks.oreBeryllium, Blocks.oreTungsten
-        };
-
-        for(int i = 0; i < ores.length; i++){
+        for(int i = 0; i < groundOres.length; i++){
             for(int cluster = 0; cluster < 6; cluster++){
                 int cx = rand.random(0, tiles.width - 1), cy = rand.random(0, tiles.height - 1);
                 int radius = rand.random(8, 22);
                 if(isProtected(cx, cy, radius)) continue;
-                paintOreBlob(tiles, rand, cx, cy, radius, ores[i], showcaseSeed + 200 + i * 31 + cluster);
+                paintOreBlob(tiles, rand, cx, cy, radius, groundOres[i], showcaseSeed + 200 + i * 31 + cluster, true);
             }
         }
     }
 
-    private static void paintOreBlob(Tiles tiles, Rand rand, int cx, int cy, int radius, Block ore, int seed){
+    /** Adds smaller ground deposits whose centers and density change with the local date. */
+    private static void placeDailyOreFields(Tiles tiles, int seed){
+        for(int i = 0; i < groundOres.length; i++){
+            Rand rand = new Rand(seed + 1000 + i * 31);
+            for(int cluster = 0; cluster < 5; cluster++){
+                int cx = rand.random(0, tiles.width - 1), cy = rand.random(0, tiles.height - 1);
+                int radius = rand.random(7, 17);
+                if(isProtected(cx, cy, radius)) continue;
+                paintOreBlob(tiles, rand, cx, cy, radius, groundOres[i], seed + 200 + i * 31 + cluster, false);
+            }
+        }
+    }
+
+    private static void paintOreBlob(Tiles tiles, Rand rand, int cx, int cy, int radius, Block ore, int seed, boolean overwrite){
         int cap = radius + 5;
         for(int x = cx - cap; x <= cx + cap; x++){
             for(int y = cy - cap; y <= cy + cap; y++){
@@ -365,6 +543,7 @@ public final class TestNewFeaturesMode{
 
                 Tile tile = tiles.getn(x, y);
                 if(tile.block() != Blocks.air || tile.floor().isLiquid || !tile.floor().hasSurface() || isProtected(x, y, 0f)) continue;
+                if(!overwrite && tile.overlay() != Blocks.air) continue;
 
                 //ores are denser at the core of the deposit and fade towards its edge
                 float density = 0.94f - 0.5f * (dist / (radius * wobble));
@@ -382,7 +561,8 @@ public final class TestNewFeaturesMode{
             if(wall == null) continue;
 
             double cluster = Simplex.noise2d(showcaseSeed + 5, 3, 0.5, 1f / 30f, tile.x, tile.y);
-            if(cluster > 0.54 && rand.chance(0.9f)){
+            //Thin the rocky ridges: fewer solid walls means fewer sprites and less occlusion work.
+            if(cluster > 0.64 && rand.chance(0.5f)){
                 if(wall == Blocks.carbonWall && rand.chance(0.2f)) wall = Blocks.graphiticWall;
                 tile.setBlock(wall);
             }
@@ -415,25 +595,34 @@ public final class TestNewFeaturesMode{
     /** Seeds wall ores on exposed ridges: thorium, beryllium, graphite and tungsten. */
     private static void scatterWallOres(Tiles tiles, Rand rand){
         for(Tile tile : tiles){
-            Block wall = tile.block();
-            Block ore;
-
-            if(wall == Blocks.stoneWall || wall == Blocks.daciteWall || wall == Blocks.rhyoliteWall || wall == Blocks.iceWall){
-                ore = Blocks.wallOreThorium;
-            }else if(wall == Blocks.beryllicStoneWall){
-                ore = Blocks.wallOreBeryllium;
-            }else if(wall == Blocks.carbonWall || wall == Blocks.graphiticWall){
-                ore = Blocks.wallOreGraphite;
-            }else if(wall == Blocks.redStoneWall || wall == Blocks.crystallineStoneWall){
-                ore = Blocks.wallOreTungsten;
-            }else{
-                continue;
-            }
-
-            if(exposed(tiles, tile) && rand.chance(0.16f)){
+            Block ore = wallOreFor(tile.block());
+            if(ore != null && exposed(tiles, tile) && rand.chance(0.16f)){
                 tile.setOverlay(ore);
             }
         }
+    }
+
+    /** Adds wall ores to exposed ridges that the permanent layer left empty. */
+    private static void scatterDailyWallOres(Tiles tiles, int seed){
+        Rand rand = new Rand(seed + 500);
+        for(Tile tile : tiles){
+            if(tile.overlay() != Blocks.air) continue;
+
+            Block ore = wallOreFor(tile.block());
+            if(ore != null && exposed(tiles, tile) && rand.chance(0.10f)){
+                tile.setOverlay(ore);
+            }
+        }
+    }
+
+    private static @Nullable Block wallOreFor(Block wall){
+        if(wall == Blocks.stoneWall || wall == Blocks.daciteWall || wall == Blocks.rhyoliteWall || wall == Blocks.iceWall){
+            return Blocks.wallOreThorium;
+        }
+        if(wall == Blocks.beryllicStoneWall) return Blocks.wallOreBeryllium;
+        if(wall == Blocks.carbonWall || wall == Blocks.graphiticWall) return Blocks.wallOreGraphite;
+        if(wall == Blocks.redStoneWall || wall == Blocks.crystallineStoneWall) return Blocks.wallOreTungsten;
+        return null;
     }
 
     private static boolean exposed(Tiles tiles, Tile tile){
@@ -445,6 +634,14 @@ public final class TestNewFeaturesMode{
         }
         return false;
     }
+
+    /**
+     * Density multiplier for decorative props. The test sector is rendered on modest integrated
+     * GPUs; thousands of static tree/rock/crystal sprites plus animated liquid floors drop the FPS
+     * heavily. Keeping the biome floors but thinning the props preserves the natural look at a
+     * fraction of the draw cost.
+     */
+    private static final float propDensity = 0.25f;
 
     /** Scatters every tree, boulder, crystal, seaweed and vent over its matching floor. */
     private static void decorate(Tiles tiles, Rand rand){
@@ -467,35 +664,35 @@ public final class TestNewFeaturesMode{
             Block prop = null;
 
             if(floor == Blocks.grass || floor == Blocks.dirt){
-                if(forest > 0.12f && rand.chance(0.055f)){
+                if(forest > 0.12f && rand.chance(0.055f * propDensity)){
                     prop = rand.chance(0.7f) ? Blocks.pine : (rand.chance(0.55f) ? Blocks.whiteTree : Blocks.whiteTreeDead);
-                }else if(rand.chance(0.015f)){
+                }else if(rand.chance(0.015f * propDensity)){
                     prop = Blocks.shrubs;
                 }
             }else if(floor == Blocks.moss || floor == Blocks.sporeMoss){
-                if(forest > 0.05f && rand.chance(0.065f)){
+                if(forest > 0.05f && rand.chance(0.065f * propDensity)){
                     prop = Blocks.sporePine;
-                }else if(rand.chance(0.02f)){
+                }else if(rand.chance(0.02f * propDensity)){
                     prop = Blocks.sporeCluster;
                 }
             }else if(floor == Blocks.snow || floor == Blocks.ice || floor == Blocks.iceSnow){
-                if(forest > 0.08f && rand.chance(0.05f)){
+                if(forest > 0.08f && rand.chance(0.05f * propDensity)){
                     prop = rand.chance(0.6f) ? Blocks.snowPine : (rand.chance(0.5f) ? Blocks.whiteTree : Blocks.whiteTreeDead);
                 }
             }else if(floor == Blocks.redStone || floor == Blocks.denseRedStone){
-                if(forest > 0.2f && rand.chance(0.035f)) prop = Blocks.redDiamondWall;
+                if(forest > 0.2f && rand.chance(0.035f * propDensity)) prop = Blocks.redDiamondWall;
             }else if(floor == Blocks.crystallineStone || floor == Blocks.crystalFloor){
-                if(rand.chance(0.035f)){
+                if(rand.chance(0.035f * propDensity)){
                     int pick = rand.nextInt(4);
                     prop = pick == 0 ? Blocks.crystalCluster : pick == 1 ? Blocks.vibrantCrystalCluster : pick == 2 ? Blocks.crystalBlocks : Blocks.crystalOrbs;
                 }
             }else if(floor == Blocks.redmat){
-                if(rand.chance(0.05f)) prop = Blocks.redweed;
+                if(rand.chance(0.05f * propDensity)) prop = Blocks.redweed;
             }else if(floor == Blocks.bluemat){
-                if(rand.chance(0.05f)) prop = Blocks.purbush;
+                if(rand.chance(0.05f * propDensity)) prop = Blocks.purbush;
             }else{
                 Block boulder = boulderFor(floor);
-                if(boulder != null && rand.chance(0.012f)) prop = boulder;
+                if(boulder != null && rand.chance(0.012f * propDensity)) prop = boulder;
             }
 
             if(prop != null) tile.setBlock(prop);
@@ -574,15 +771,18 @@ public final class TestNewFeaturesMode{
         }
     }
 
-    /** @return whether this position belongs to the core or one of the four air-wave spawn pads. */
+    /** @return whether this position belongs to one of the four cores or an air-wave spawn pad. */
     private static boolean isProtected(float x, float y, float padding){
-        float centerX = world.width() / 2f, centerY = world.height() / 2f;
+        arc.math.geom.Point2[] cells = sectorCoreCells();
+        for(arc.math.geom.Point2 cell : cells){
+            if(Mathf.within(x, y, cell.x, cell.y, 30f + padding)) return true;
+        }
         float edge = 3f;
-        return Mathf.within(x, y, centerX, centerY, 16f + padding)
-            || Mathf.within(x, y, centerX, edge, 7f + padding)
-            || Mathf.within(x, y, centerX, world.height() - edge - 1, 7f + padding)
-            || Mathf.within(x, y, edge, centerY, 7f + padding)
-            || Mathf.within(x, y, world.width() - edge - 1, centerY, 7f + padding);
+        float cx = world.width() / 2f, cy = world.height() / 2f;
+        return Mathf.within(x, y, cx, edge, 7f + padding)
+            || Mathf.within(x, y, cx, world.height() - edge - 1, 7f + padding)
+            || Mathf.within(x, y, edge, cy, 7f + padding)
+            || Mathf.within(x, y, world.width() - edge - 1, cy, 7f + padding);
     }
 
     //endregion
@@ -592,7 +792,11 @@ public final class TestNewFeaturesMode{
         initializeMono = false;
 
         player.team(Team.sharded);
-        Unit mono = UnitTypes.mono.spawn(Team.sharded, world.unitWidth() / 2f, world.unitHeight() / 2f);
+        //The player owns the top-left quadrant; spawn on its core, not on the boundary between
+        //the four territories.
+        int quarter = mapSize / 2;
+        float sx = (quarter / 2f) * tilesize, sy = (quarter / 2f) * tilesize;
+        Unit mono = UnitTypes.mono.spawn(Team.sharded, sx, sy);
         player.unit(mono);
         player.set(mono);
         Core.camera.position.set(mono);
@@ -825,11 +1029,12 @@ public final class TestNewFeaturesMode{
     }
 
     /**
-     * Chooses a factory type for the unit to build. The unit picks the site and enqueues the whole
-     * production chain; the player never positions anything on the map.
+     * Chooses any catalog structure for the unit to build. The unit picks a legal site; for a
+     * production crafter it also enqueues the whole supply chain. The player never positions
+     * anything on the map.
      */
     public static void armPlayerBlock(Block block){
-        lastFactory = block;
+        lastPlayerBlock = block;
         playerBlock = null;
         enemyBlock = null;
         enemyRemoving = false;
@@ -846,7 +1051,7 @@ public final class TestNewFeaturesMode{
                 unit.addBuild(plan, true);
             }
         }else{
-            //a non-builder pilot must still get the chain built: hand it to the team builders
+            //a non-builder pilot must still get the structure built: hand it to the team builders
             for(BuildPlan plan : plans){
                 player.team().data().plans.add(new Teams.BlockPlan(
                     plan.x, plan.y, (short)plan.rotation, plan.block, plan.config));
@@ -859,7 +1064,7 @@ public final class TestNewFeaturesMode{
     /** Disarms every structure tool of the test panel. */
     public static void disarmStructureTools(){
         playerBlock = null;
-        lastFactory = null;
+        lastPlayerBlock = null;
         enemyBlock = null;
         enemyRemoving = false;
     }
