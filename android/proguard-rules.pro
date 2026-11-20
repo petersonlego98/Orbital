@@ -20,3 +20,5 @@
 -keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
 
 -dontwarn javax.naming.**
+# CpuMonitor reaches ManagementFactory reflectively and handles its absence at runtime.
+-dontwarn java.lang.management.**
