@@ -50,6 +50,16 @@ class SimdUnitsTest{
     }
 
     @Test
+    void prepareMakesTheNativePathReachable(){
+        assumeTrue(SimdNative.loaded(), "this test needs the native SoA kernel");
+        SimdSoaBuffer soa = new SimdSoaBuffer();
+        assertFalse(soa.usable(), "a fresh buffer has no direct memory yet");
+        assertTrue(soa.prepare(1024), "prepare must allocate before the native branch is tested");
+        assertTrue(soa.usable());
+        assertTrue(soa.capacity() >= 1024);
+    }
+
+    @Test
     void directBufferSingleCallMatchesScalar(){
         int count = 1000;
         float[][] initial = create(count, 555L);

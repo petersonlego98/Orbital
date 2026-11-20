@@ -47,6 +47,8 @@ public final class UnitMovementTick{
     public static final int parallelThreshold = 2048;
     /** Rows per native SIMD call inside a worker's chunk. */
     public static final int simdBatch = 256;
+    /** A/B switch for profiling: -Dorbital.forcescalar keeps the Java kernel even when SIMD is ready. */
+    private static final boolean forceScalar = System.getProperty("orbital.forcescalar") != null;
 
     /** Diagnostics evidence: whether the most recent tick actually ran the parallel integration. */
     public static volatile boolean lastEngaged;
@@ -128,37 +130,30 @@ public final class UnitMovementTick{
     private void run(){
         int total = Groups.unit.size();
 
-        //first pass: count the units the engine may integrate, without touching any buffer
-        int eligible = 0;
-        for(Unit unit : Groups.unit){
-            if(Vars.net.client() && !unit.isLocal()) continue; //same gate as VelComp.update
-            if(!capturable(unit)) continue; //ground, water and elevation units move with collisions
-            eligible++;
-        }
-        lastEligibleUnits = eligible;
-        if(eligible < threshold()) return;
-
-        SimulationPipeline pipeline = OrbitalEngine.shared().pipeline();
-
-        //capture: copy the authoritative fields the phase needs into SoA, keeping entity order
-        staging.clear();
+        //Counting and capturing share one traversal. The old version walked Groups.unit twice on
+        //every engaged frame, which doubled the AoS scan on the very frames the engine is meant
+        //to accelerate.
         if(refs.length < total){
             refs = new Unit[total];
             drag = new float[total];
             flagged = new Unit[total];
         }
+        staging.clear();
 
         int count = 0;
         for(Unit unit : Groups.unit){
-            if(Vars.net.client() && !unit.isLocal()) continue;
-            if(!capturable(unit)) continue;
+            if(Vars.net.client() && !unit.isLocal()) continue; //same gate as VelComp.update
+            if(!capturable(unit)) continue; //ground, water and elevation units move with collisions
 
             refs[count] = unit;
             drag[count] = unit.drag();
             staging.add(unit.id(), unit.x(), unit.y(), unit.vel().x, unit.vel().y, 0f, 0f, 0);
             count++;
         }
-        if(count == 0) return;
+        lastEligibleUnits = count;
+        if(count < threshold()) return;
+
+        SimulationPipeline pipeline = OrbitalEngine.shared().pipeline();
 
         //per-unit drag rides in a frame-scoped scratch buffer; UnitData carries position and velocity
         float[] dragBuffer = pipeline.buffers().floatScratch(count);
@@ -168,7 +163,9 @@ public final class UnitMovementTick{
         pipeline.capture(snapshot, capturedFrames++, staging, emptyProjectiles);
 
         float delta = Time.delta;
-        if(count >= simdBatch && SimdOperations.capabilities().nativeLoaded() && simd.usable()){
+        //prepare() actually allocates the direct buffer; usable() alone was always false because
+        //the allocation only happened inside upload(), after this condition.
+        if(!forceScalar && count >= simdBatch && SimdOperations.capabilities().nativeLoaded() && simd.prepare(count)){
             UnitData units = snapshot.units();
             simd.upload(units.x, units.y, units.velocityX, units.velocityY, dragBuffer, count);
             pipeline.simulateRanges(snapshot, "simulation.units.simd", count, simdBatch,

@@ -56,6 +56,7 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
         loader = new LoadRenderer();
         Events.fire(new ClientCreateEvent());
 
+        orbital.diagnostics.CpuProfiler.maybeStart();
         loadFileLogger();
         platform = this;
         maxTextureSize = Gl.getInt(Gl.maxTextureSize);
@@ -307,7 +308,39 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
                 app.post(() -> app.post(() -> app.post(() -> app.post(() -> {
                     super.resize(graphics.getWidth(), graphics.getHeight());
 
-                    //diagnostic hook: auto-enter a mode to profile GPU/CPU usage headlessly
+                    //Diagnostic flag: auto-enter a mode after load so headless profiling can measure
+                    //a real game instead of the menu. -Dorbital.autostart=test|battle
+                    String autostart = System.getProperty("orbital.autostart");
+                    if(autostart != null){
+                        Log.info("[cpuprofile] auto-entering mode: @", autostart);
+                        if("battle".equals(autostart)){
+                            orbital.game.BattleRoyaleMode.start();
+                        }else{
+                            orbital.game.TestNewFeaturesMode.start();
+                        }
+
+                        //profiling knobs: lower the engagement threshold so a small stress battle
+                        //still exercises the parallel kernel on a weak machine
+                        String threshold = System.getProperty("orbital.testthreshold");
+                        if(threshold != null){
+                            int units = Integer.parseInt(threshold);
+                            orbital.engine.units.UnitMovementTick.overrideThreshold(units);
+                            orbital.engine.combat.ProjectileTick.overrideThreshold(units);
+                        }
+                        String stress = System.getProperty("orbital.stressbattle");
+                        if(stress != null){
+                            //the parallel phases are opt-in; turn them on for the A/B measurement
+                            Core.settings.put(orbital.engine.units.UnitMovementTick.key, true);
+                            Core.settings.put(orbital.engine.combat.ProjectileTick.key, true);
+                            final int units = Integer.parseInt(stress);
+                            //playMap() switches world asynchronously; give it a couple of seconds
+                            arc.util.Time.run(2f, () -> {
+                                boolean started = orbital.game.TestEnginePhase.start(units);
+                                Log.info("[cpuprofile] stress battle requested=@ units, started=@", units, started);
+                            });
+                        }
+                    }
+
                     //mark initialization as complete
                     finishLaunch();
                 }))));

@@ -143,18 +143,22 @@ public final class FogRenderer{
         int ww = world.width(), wh = world.height();
 
         var data = fogControl.getDiscovered(player.team());
-        int len = world.width() * world.height();
         if(data != null){
-            for(int i = 0; i < len; i++){
-                if(data.get(i)){
-                    //TODO slow, could do scanlines instead at the very least.
-                    int x = i % ww, y = i / ww;
-
-                    //manually clip with 1 pixel of padding so the borders are never fully revealed
-                    if(x > 0 && y > 0 && x < ww - 1 && y < wh - 1){
-                        Fill.rect(x + 0.5f, y + 0.5f, 1f, 1f);
+            //Scanline runs replace one Fill.rect per discovered tile (up to 65k calls on a 256x256
+            //sector). Each horizontal run produces the same pixels in a handful of draw calls,
+            //which removes a multi-second freeze when switching team in the test sector.
+            for(int y = 1; y < wh - 1; y++){
+                int row = y * ww;
+                int start = -1;
+                for(int x = 1; x < ww - 1; x++){
+                    boolean visible = data.get(row + x);
+                    if(visible && start < 0) start = x;
+                    if(!visible && start >= 0){
+                        Fill.rect(start + 0.5f, y + 0.5f, x - start, 1f);
+                        start = -1;
                     }
                 }
+                if(start >= 0) Fill.rect(start + 0.5f, y + 0.5f, (ww - 1) - start, 1f);
             }
         }
 

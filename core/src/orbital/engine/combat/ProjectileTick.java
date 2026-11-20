@@ -34,6 +34,8 @@ public final class ProjectileTick{
     public static final int parallelThreshold = 1024;
     /** Rows per native SIMD call inside a worker's chunk. */
     public static final int simdBatch = 256;
+    /** A/B switch for profiling: -Dorbital.forcescalar keeps the Java kernel even when SIMD is ready. */
+    private static final boolean forceScalar = System.getProperty("orbital.forcescalar") != null;
 
     /** Diagnostics evidence: whether the most recent tick actually ran the parallel integration. */
     public static volatile boolean lastEngaged;
@@ -97,25 +99,18 @@ public final class ProjectileTick{
     private void run(){
         int total = Groups.bullet.size();
 
-        //first pass: bullets still at the muzzle this frame are not integrated
-        int eligible = 0;
-        for(Bullet bullet : Groups.bullet){
-            if(!bullet.justSpawned()) eligible++;
-        }
-        lastEligibleBullets = eligible;
-        if(eligible < threshold()) return;
-
-        SimulationPipeline pipeline = OrbitalEngine.shared().pipeline();
-
-        staging.clear();
+        //One traversal does both the eligibility check and the capture; the old code scanned
+        //Groups.bullet twice on every engaged frame.
         if(refs.length < total){
             refs = new Bullet[total];
             drag = new float[total];
             flagged = new Bullet[total];
         }
+        staging.clear();
 
         int count = 0;
         for(Bullet bullet : Groups.bullet){
+            //bullets still at the muzzle this frame are deliberately left where vanilla put them
             if(bullet.justSpawned()) continue;
 
             refs[count] = bullet;
@@ -125,7 +120,10 @@ public final class ProjectileTick{
                 bullet.vel().x, bullet.vel().y, 0f, 0f, 0, 0);
             count++;
         }
-        if(count == 0) return;
+        lastEligibleBullets = count;
+        if(count < threshold()) return;
+
+        SimulationPipeline pipeline = OrbitalEngine.shared().pipeline();
 
         float[] dragBuffer = pipeline.buffers().floatScratch(count);
         System.arraycopy(drag, 0, dragBuffer, 0, count);
@@ -134,7 +132,8 @@ public final class ProjectileTick{
         pipeline.capture(snapshot, capturedFrames++, emptyUnits, staging);
 
         float delta = Time.delta;
-        if(count >= simdBatch && SimdOperations.capabilities().nativeLoaded() && simd.usable()){
+        //prepare() allocates the direct buffer; usable() alone was always false before upload().
+        if(!forceScalar && count >= simdBatch && SimdOperations.capabilities().nativeLoaded() && simd.prepare(count)){
             ProjectileData bullets = snapshot.projectiles();
             simd.upload(bullets.x, bullets.y, bullets.velocityX, bullets.velocityY, dragBuffer, count);
             pipeline.simulateRanges(snapshot, "simulation.projectiles.simd", count, simdBatch,

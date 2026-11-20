@@ -73,17 +73,21 @@ public class MinimapRenderer{
         if((updateCounter += Time.delta) >= updateInterval){
             updateCounter %= updateInterval;
 
+            //Pixmaps.drawPixel issues a glTexSubImage2D call per changed tile. On integrated GPUs
+            //dozens of 1x1 uploads per batch cost far more than re-uploading the whole (small) map
+            //texture once. Keep the per-pixel path only for isolated single-tile changes.
+            boolean bulk = updates.size > 16;
             updates.each(pos -> {
                 Tile tile = world.tile(pos);
                 if(tile == null) return;
 
                 int color = colorFor(tile);
-                pixmap.set(tile.x, pixmap.height - 1 - tile.y, color);
-
-                //yes, this calls glTexSubImage2D every time, with a 1x1 region
-                Pixmaps.drawPixel(texture, tile.x, pixmap.height - 1 - tile.y, color);
+                int py = pixmap.height - 1 - tile.y;
+                pixmap.set(tile.x, py, color);
+                if(!bulk) Pixmaps.drawPixel(texture, tile.x, py, color);
             });
 
+            if(bulk) texture.draw(pixmap);
             updates.clear();
         }
     }

@@ -94,9 +94,13 @@ public final class TestEnginePhase{
     private static final int intelUnitCap = 256;
 
     public static boolean start(int count){
-        if(!TestNewFeaturesMode.active() || count <= 0) return false;
+        //the profiling hook runs while playMap() is still switching worlds, so allow a controlled
+        //bypass there; normal callers still require the test mode
+        if(count <= 0 || (!TestNewFeaturesMode.active() && System.getProperty("orbital.profileunits") == null)) return false;
 
-        if(orbital.graphics.IntelGpuCheck.wasIntel() && count > intelUnitCap){
+        //-Dorbital.profileunits=1 lifts the cap for a controlled A/B measurement only
+        if(orbital.graphics.IntelGpuCheck.wasIntel() && count > intelUnitCap
+            && System.getProperty("orbital.profileunits") == null){
             count = intelUnitCap;
             arc.util.Log.info("[Fase 1] Intel GPU detected: limiting stress battle to @ units", count);
         }
