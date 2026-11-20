@@ -43,6 +43,32 @@ public class DesktopLauncher extends ClientLauncher{
     boolean useDiscord = !OS.hasProp("nodiscord"), loadError = false;
     Throwable steamError;
 
+    /**
+     * The software-renderer .bat temporarily copies Mesa's opengl32.dll next to Orbital.exe and
+     * removes it when the game exits. If the process is killed, the DLL stays and the next normal
+     * launch silently switches to llvmpipe (slow from loading all the way to exit). Move any such
+     * leftover aside before SDL loads OpenGL, unless a software-rendering flag is active.
+     */
+    private static void clearStaleSoftwareGL(){
+        try{
+            if(System.getProperty("orbital.softwaregl") != null
+                || System.getenv("ORBITAL_SOFTWAREGL") != null
+                || System.getenv("LIBGL_ALWAYS_SOFTWARE") != null) return;
+
+            String command = ProcessHandle.current().info().command().orElse(null);
+            if(command == null) return;
+            java.nio.file.Path dll = java.nio.file.Path.of(command).getParent().resolve("opengl32.dll");
+            if(java.nio.file.Files.exists(dll)){
+                java.nio.file.Files.move(dll, dll.resolveSibling("opengl32.dll.stale"),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Log.warn("[GL] Removed a leftover Mesa opengl32.dll from the application folder; "
+                    + "using the GPU driver again.");
+                Log.info("[GL] If you need software rendering, start Orbital-Software.bat.");
+            }
+        }catch(Throwable ignored){
+        }
+    }
+
     public static void main(String[] arg){
         try{
             Version.init();
@@ -51,6 +77,7 @@ public class DesktopLauncher extends ClientLauncher{
 
             check32Bit();
             checkJavaVersion();
+            clearStaleSoftwareGL();
 
             // DPI awareness has to be enabled before SDL creates the window. The provider is also
             // used by the core to choose a consistent default UI scale on high-DPI displays.

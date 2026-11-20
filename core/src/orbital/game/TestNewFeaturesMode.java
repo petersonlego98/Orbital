@@ -201,10 +201,11 @@ public final class TestNewFeaturesMode{
         //fresh visit so a player testing a different combination sees the explanations again
         if(ui != null && ui.hints != null) ui.hints.resetModuleHints();
 
-        //Engine evidence (parallel kernels vs sequential reference and scaling) is generated in a
-        //background thread. It is a multi-second, CPU-heavy benchmark and running it synchronously
-        //here froze the game on entry in the test mode. Only the log write returns to main thread.
-        runEngineValidationInBackground();
+        //The engine self-test is a multi-second benchmark that drives all 7 workers at once. Even
+        //off the render thread it starves the game and feels like a freeze on entry, so it is now
+        //opt-in: -Dorbital.enginevalidation=1. Tests call EngineValidation directly and are
+        //unaffected.
+        if(System.getProperty("orbital.enginevalidation") != null) runEngineValidationInBackground();
 
         initializeMono = true;
         //createSave = false: this is a disposable test session, it must never touch the save list
