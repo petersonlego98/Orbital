@@ -283,9 +283,9 @@ public class ResearchDialog extends BaseDialog{
                 if(onlyUnlocked && !block.unlockedHost()) continue;
                 TechNode node = block.techNode;
                 if(onlyResearchable && (node == null || !canSpendNode(node) || !locked(node))) continue;
-                //wide and short: fit the name, resources and button in a single compact band
-                grid.add(moduleCard(block, node)).size(mobile ? 180f : 220f, mobile ? 76f : 88f).pad(4f);
-                if(++col % (mobile ? 4 : 6) == 0) grid.row();
+                //wider cards so the armour icons and long translated names always fit
+                grid.add(moduleCard(block, node)).size(mobile ? 220f : 300f, mobile ? 76f : 88f).pad(4f);
+                if(++col % (mobile ? 3 : 5) == 0) grid.row();
             }
             moduleGroup.add(grid).growX().row();
         }
@@ -313,7 +313,7 @@ public class ResearchDialog extends BaseDialog{
 
         //icon + short name on one line; ellipsis keeps long translated names inside the card
         card.table(head -> {
-            head.image(block.uiIcon).size(24f).padRight(4f);
+            head.image(block.uiIcon).size(28f).padRight(6f).minWidth(28f);
             Label name = head.add(block.localizedName).color(Color.lightGray).ellipsis(true).get();
             name.setFontScale(0.85f);
             if(block.unlockedHost()) head.add("✓").color(Color.lightGray);
