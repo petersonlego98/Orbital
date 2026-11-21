@@ -1125,8 +1125,11 @@ public class SettingsMenuDialog extends BaseDialog{
 
                 Label value = new Label("", Styles.outlineLabel);
                 Table content = new Table();
-                content.add(title, Styles.outlineLabel).left().growX().wrap();
-                content.add(value).padLeft(10f).right();
+                //Title and value used to share one row: a long translated title wrapped onto two
+                //lines and the value was painted on top of the second line. Give the title its own
+                //row and the value its own right-aligned row below it.
+                content.add(title, Styles.outlineLabel).left().growX().wrap().row();
+                content.add(value).right().padLeft(10f);
                 content.margin(3f, 33f, 3f, 33f);
                 content.touchable = Touchable.disabled;
 
@@ -1138,7 +1141,15 @@ public class SettingsMenuDialog extends BaseDialog{
 
                 slider.change();
 
-                addDesc(table.stack(slider, content).width(Math.min(Core.graphics.getWidth() / 1.2f / Scl.scl(1f), 500f)).left().padTop(4f).get());
+                //A stack draws both children over the same rect, so the value label and the slider
+                //knob fought for the same pixels. Give each its own row: title/value above, the
+                //slider track below. The label table stays non-touchable so dragging the slider
+                //still works through it.
+                Table row = new Table();
+                float rowWidth = Math.min(Core.graphics.getWidth() / 1.2f / Scl.scl(1f), 500f);
+                row.add(content).growX().row();
+                row.add(slider).growX().padTop(2f);
+                addDesc(table.add(row).width(rowWidth).left().padTop(4f).get());
                 table.row();
             }
         }

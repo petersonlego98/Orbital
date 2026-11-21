@@ -201,8 +201,12 @@ public class UnitCommandTablet extends Table{
 
         Label title = header.add("@tablet.title").style(Styles.techLabel).color(accent).get();
         title.setFontScale(1.05f);
+        //The title and the live status used to share the same header row. On a narrow tablet the
+        //two labels overlapped ("COMAND" + "COMANDO UNIDADES"). The spacer absorbs the free width
+        //and the title is ellipsized so it can never run into the status.
+        title.setEllipsis(true);
 
-        header.add().growX();
+        header.add().growX().minWidth(8f);
 
         status.setColor(Color.lightGray);
         status.setFontScale(0.72f);

@@ -288,7 +288,9 @@ public class MenuFragment{
         //same as buildMobile: keep the content in units so it tracks the pane's viewport
         container.setSize(Core.graphics.getWidth() / Scl.scl(1f), Core.graphics.getHeight() / Scl.scl(1f));
 
-        float width = 230f;
+        //"Configurações" used to wrap into "Configu-rações" at 230f. A little extra width keeps
+        //every translated menu label on a single line without changing the button layout.
+        float width = 252f;
         Drawable background = OrbitalTheme.panel();
 
         container.left();
