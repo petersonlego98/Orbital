@@ -367,6 +367,32 @@ public class HudFragment{
             t.name = "minimap/position";
             t.visible(() -> (Core.settings.getBool("minimap") || state.isCampaign()) && shown());
 
+            //research and fixed-camera controls live beside the minimap, on its left
+            t.table(tools -> {
+                tools.top().right();
+                float iconSize = 44f;
+                tools.button(Icon.tree, Styles.clearNonei, iconSize, () -> ui.research.show())
+                    .name("research-pinned")
+                    .tooltip("@research")
+                    .padRight(6f);
+
+                tools.button(Icon.lockOpen, Styles.clearNoneTogglei, iconSize,
+                    orbital.input.FixedCameraControl::toggle)
+                    .name("fixed-camera-toggle")
+                    .tooltip("@fixedcamera.toggle")
+                    .update(b -> b.setChecked(orbital.input.FixedCameraControl.enabled()))
+                    .padRight(6f);
+
+                tools.button(Icon.move, Styles.clearNonei, iconSize,
+                    orbital.input.FixedCameraControl::armMove)
+                    .name("fixed-camera-move")
+                    .tooltip("@fixedcamera.move")
+                    .visible(() -> orbital.input.FixedCameraControl.enabled()
+                        && orbital.input.FixedCameraControl.selected() != null)
+                    .update(b -> b.setColor(orbital.input.FixedCameraControl.awaitingDestination()
+                        ? Pal.accent : Color.white));
+            }).top().right().padRight(6f);
+
             //minimap + coordinates
             t.table(m -> {
                 m.top().right();
@@ -484,30 +510,7 @@ public class HudFragment{
                 cont.row();
             }
 
-            //top controls: research menu (always pinned) + fixed-camera controls
-            cont.table(fixed -> {
-                fixed.left();
-                fixed.button(Icon.tree, Styles.clearNonei, 30f, () -> ui.research.show())
-                    .name("research-pinned")
-                    .tooltip("@research")
-                    .padRight(4f);
-
-                fixed.button(Icon.lockOpen, Styles.clearNoneTogglei, 30f,
-                    orbital.input.FixedCameraControl::toggle)
-                    .name("fixed-camera-toggle")
-                    .tooltip("@fixedcamera.toggle")
-                    .update(b -> b.setChecked(orbital.input.FixedCameraControl.enabled()))
-                    .padRight(4f);
-
-                fixed.button(Icon.move, Styles.clearNonei, 30f,
-                    orbital.input.FixedCameraControl::armMove)
-                    .name("fixed-camera-move")
-                    .tooltip("@fixedcamera.move")
-                    .visible(() -> orbital.input.FixedCameraControl.enabled()
-                        && orbital.input.FixedCameraControl.selected() != null)
-                    .update(b -> b.setColor(orbital.input.FixedCameraControl.awaitingDestination()
-                        ? Pal.accent : Color.white));
-            }).left().padLeft(4f).row();
+            //research and fixed-camera controls were moved next to the minimap (see above)
 
             cont.update(() -> {
                 //right click / escape cancels a pending fixed-camera move destination
