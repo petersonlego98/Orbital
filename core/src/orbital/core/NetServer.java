@@ -1309,6 +1309,13 @@ public class NetServer implements ApplicationListener{
 
     void sync(){
         try{
+            //Authoritative mode: replace per-tick full-state snapshots with the append-only event
+            //stream. Clients apply only what changed, in commit order, at a fraction of the bytes.
+            if(orbital.net.online.AuthoritativeMode.enabled() && orbital.net.online.OnlineHolder.replicator() != null){
+                orbital.net.online.OnlineHolder.replicator().flush();
+                return;
+            }
+
             int interval = Config.snapshotInterval.num();
             Groups.player.each(p -> !p.isLocal(), player -> {
                 if(player.con == null || !player.con.isConnected()){

@@ -37,9 +37,23 @@ Enable the server-side log with `-Dorbital.eventlog=1 -Dorbital.eventlog.dir=<fo
   Objects, so true multiplayer relay on the free plan requires a different design — e.g. polling
   `/events?after=SEQ` at 5 Hz from each client, which still stays in kbps).
 
+## Authoritative mode (implemented)
+
+Enable on the server with `-Dorbital.authoritative=1` (optionally `-Dorbital.tickrate=60`). When
+on:
+
+- `Logic.update()` advances `state.tick` with `FixedStep` — whole, equal ticks instead of the
+  variable `delta * 60f`. Given the same elapsed time, every run produces the same tick sequence.
+- `NetServer.sync()` stops sending full-state snapshots and flushes the event log instead, via
+  `EventReplicator` (one batched, reliable binary frame per tick).
+- The server must also start the log with `-Dorbital.eventlog=1`.
+
+Both flags are opt-in: without them the legacy variable-step loop and ArcNet snapshots are
+byte-for-byte unchanged. The clients still need the matching apply side (keyframe + event replay)
+before an end-to-end match can run — that is the next step.
+
 ## Not implemented yet
 
-- Fixed-timestep authoritative re-simulation on the server (the engine currently uses variable
-  delta and a global RNG — see `docs/PLANO_ETAPAS_INFRA_SERVIDOR.md`).
-- Keyframe generation/replay (`SaveIO` + `NetworkIO` can be reused).
-- Replacing the legacy ArcNet `sync()` (`NetServer.java:1310-1423`).
+- Keyframe generation/replay on the client (`SaveIO` + `NetworkIO` can be reused).
+- RNG per tick instead of the global `GlobalVars.rand`.
+- Full re-simulation of player input on the server (validation today is the legacy `strict` check).

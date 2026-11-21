@@ -81,8 +81,11 @@ public class ServerLauncher implements ApplicationListener{
                     "orbital.eventlog.dir", Core.files.local("events").absolutePath()));
                 orbital.net.events.EventStore store = new orbital.net.events.EventStore(dir);
                 store.open();
-                new orbital.net.events.EventRecorder(store).install();
-                arc.util.Log.info("[eventstore] enabled at @", dir);
+                orbital.net.events.EventRecorder recorder = new orbital.net.events.EventRecorder(store);
+                recorder.install();
+                orbital.net.online.OnlineHolder.install(store, recorder);
+                arc.util.Log.info("[eventstore] enabled at @ (authoritative=@)", dir,
+                    orbital.net.online.AuthoritativeMode.enabled());
             }catch(Exception e){
                 err("Could not start the event log: @", e.getMessage());
             }

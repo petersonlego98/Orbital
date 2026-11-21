@@ -537,7 +537,18 @@ public class Logic implements ApplicationListener{
                 Events.fire(Trigger.beforeGameUpdate);
 
                 float delta = Core.graphics.getDeltaTime();
-                state.tick += Float.isNaN(delta) || Float.isInfinite(delta) ? 0f : delta * 60f;
+                //Authoritative fixed-step mode: advance only in whole ticks, so the server and
+                //replaying clients see exactly the same tick sequence regardless of frame rate.
+                //Off by default until the online relay is selected; the legacy variable-step path
+                //stays byte-for-byte identical for normal play.
+                if(orbital.net.online.AuthoritativeMode.enabled()){
+                    int steps = orbital.net.online.AuthoritativeMode.clock().advance(
+                        (long)(delta * 1_000_000_000L));
+                    state.tick += orbital.net.online.FixedStep.toLogicalTick(steps,
+                        orbital.net.online.AuthoritativeMode.hz());
+                }else{
+                    state.tick += Float.isNaN(delta) || Float.isInfinite(delta) ? 0f : delta * 60f;
+                }
                 state.updateId ++;
                 state.teams.updateTeamStats();
                 MapPreviewLoader.checkPreviews();
