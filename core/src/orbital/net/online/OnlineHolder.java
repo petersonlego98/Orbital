@@ -10,6 +10,7 @@ public final class OnlineHolder{
     private static @Nullable EventRecorder recorder;
     private static @Nullable EventReplicator replicator;
     private static @Nullable KeyframeManager keyframes;
+    private static @Nullable InputReplicator inputs;
 
     private OnlineHolder(){
     }
@@ -19,6 +20,12 @@ public final class OnlineHolder{
         OnlineHolder.recorder = recorder;
         OnlineHolder.replicator = new EventReplicator(store);
         OnlineHolder.keyframes = new KeyframeManager(store.directory().resolveSibling("keyframes"));
+        OnlineHolder.inputs = new InputReplicator();
+        if(AuthoritativeMode.enabled()) OnlineHolder.inputs.install();
+    }
+
+    public static @Nullable InputReplicator inputs(){
+        return inputs;
     }
 
     public static @Nullable KeyframeManager keyframes(){

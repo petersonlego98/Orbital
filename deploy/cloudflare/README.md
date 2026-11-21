@@ -83,7 +83,18 @@ before an end-to-end match can run — that is the next step.
   `SuppressionFieldAbility` no longer use identity `hashCode()` as a seed (stable `team.id`/`unit.id`).
 - 25 online tests pass (codec, store, fixed step, mode, applier, keyframes, tick RNG).
 
+## Server-side input authority (implemented)
+
+- `InputCommand` carries only intentions (aim, movement vector, shoot/boost/build flags), ~10-16
+  bytes per tick, never the resulting position.
+- `InputSender` samples the local player each tick and sends via the binary channel.
+- `InputReplicator` buffers commands by tick on the server; `InputSimulator` derives the unit's
+  state from the command and the unit's own physics. A modified client can no longer teleport or
+  set an impossible velocity — the legacy `strict` distance check is no longer the only authority.
+- `Logic` applies buffered inputs at the start of each authoritative tick, after `TickRng`.
+- 29 online tests pass (adds input round-trip and buffer dedupe/fallback).
+
 ## Not implemented yet
 
-- Full re-simulation of player input on the server (validation today is the legacy `strict` check).
 - End-to-end match test across the Cloudflare relay (needs a deployed Worker and D1).
+- Real client UI toggle for authoritative mode (today it is activated by `-Dorbital.authoritative=1`).

@@ -546,6 +546,10 @@ public class Logic implements ApplicationListener{
                     for(int i = 0; i < steps; i++){
                         state.tick += 1;
                         orbital.net.online.TickRng.beginTick((long)state.tick);
+                        //Apply buffered player inputs first: the server derives state from these
+                        //intentions rather than trusting the client's reported position.
+                        var inputs = orbital.net.online.OnlineHolder.inputs();
+                        if(inputs != null) inputs.applyTick((long)state.tick);
                         simulateTick(1f / orbital.net.online.AuthoritativeMode.hz());
                     }
                 }else{

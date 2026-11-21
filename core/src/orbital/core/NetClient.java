@@ -672,6 +672,8 @@ public class NetClient implements ApplicationListener{
                 onlineSession = new orbital.net.online.OnlineSession(null);
                 onlineSession.install();
             }
+            //Send this tick's input intentions to the authoritative server.
+            onlineSession.tick();
             return;
         }
 

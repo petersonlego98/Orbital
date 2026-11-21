@@ -17,11 +17,17 @@ import static orbital.Vars.*;
 public final class OnlineSession{
     private final EventApplier applier;
     private final WorldEventApplier world;
+    private final InputSender inputSender = new InputSender();
     private boolean installed;
 
     public OnlineSession(@Nullable EventStore store){
         world = new WorldEventApplier(store);
         applier = new EventApplier(world::apply);
+    }
+
+    /** Called once per client tick to send this player's input intentions. */
+    public void tick(){
+        inputSender.send();
     }
 
     /** Registers the handler once. Must be called after the client exists. */
