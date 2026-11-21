@@ -1,0 +1,20 @@
+name = "orbital-online"
+main = "worker.js"
+compatibility_date = "2026-11-21"
+
+# Free tier: 100k requests/day, Worker + WebSocketPair, D1 and cron triggers are included.
+[[d1_databases]]
+binding = "DB"
+database_name = "orbital-events"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+[[durable_objects.bindings]]
+name = "ORBITAL_ROOM"
+class_name = "OrbitalRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["OrbitalRoom"]
+
+[triggers]
+crons = ["0 * * * *"]   # hourly cleanup of old events

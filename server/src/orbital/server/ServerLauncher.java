@@ -72,6 +72,22 @@ public class ServerLauncher implements ApplicationListener{
 
         bases.load();
 
+        //Optional authoritative event log. Off by default: the legacy snapshot protocol stays the
+        //default until the WebSocket transport is selected. Enable with -Dorbital.eventlog=1 and
+        //optionally set the directory with -Dorbital.eventlog.dir=... .
+        if(System.getProperty("orbital.eventlog") != null){
+            try{
+                java.nio.file.Path dir = java.nio.file.Path.of(System.getProperty(
+                    "orbital.eventlog.dir", Core.files.local("events").absolutePath()));
+                orbital.net.events.EventStore store = new orbital.net.events.EventStore(dir);
+                store.open();
+                new orbital.net.events.EventRecorder(store).install();
+                arc.util.Log.info("[eventstore] enabled at @", dir);
+            }catch(Exception e){
+                err("Could not start the event log: @", e.getMessage());
+            }
+        }
+
         Core.app.addListener(new ApplicationListener(){public void update(){ asyncCore.begin(); }});
         Core.app.addListener(logic = new Logic());
         Core.app.addListener(netServer = new NetServer());
