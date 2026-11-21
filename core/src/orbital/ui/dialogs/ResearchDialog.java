@@ -617,15 +617,26 @@ public class ResearchDialog extends BaseDialog{
             infoTable.clear();
             infoTable.touchable = Touchable.enabled;
 
-            //Build a flat, scrollable list of every visible research node in tree order.
+            //Grid of compact research cards: several per row so nothing is stretched thin.
             list.clear();
             list.top().left();
             list.defaults().left().padBottom(4f).padLeft(4f).padTop(4f);
 
+            float cardWidth = mobile ? 200f : 240f;
+            //The View may still report its old (small) width during the first rebuild, so size the
+            //row count from the actual window width on desktop - otherwise only 3 cards fit and the
+            //rest of the full-screen dialog is left empty.
+            float available = mobile
+                ? Math.max(getWidth(), 400f)
+                : Core.graphics.getWidth() / Scl.scl(1f) - 60f;
+            int perRow = Math.max(1, (int)Math.floor(available / (cardWidth + 8f)));
+
+            int[] col = {0};
             lastNode.each(tech -> {
                 TechTreeNode node = findNode(tech);
                 if(node == null || !node.visible) return;
-                list.add(buildListRow(node)).growX().left().row();
+                list.add(buildListRow(node)).size(cardWidth, mobile ? 120f : 140f).pad(4f);
+                if(++col[0] % perRow == 0) list.row();
             });
 
             listPane.setScrollingDisabled(true, false);
@@ -643,87 +654,78 @@ public class ResearchDialog extends BaseDialog{
             return null;
         }
 
-        /** One row in the research list: icon, name, requirements and a Research button. */
+        /** One compact research card, sized to sit in a grid beside its peers. */
         private Table buildListRow(TechTreeNode node){
             TechNode tech = node.node;
             boolean isLocked = locked(tech);
             boolean canSelect = selectable(tech);
-            boolean canResearch = canSpend(tech) && isLocked && !net.client();
 
-            Table row = new Table();
-            row.background(Tex.button);
-            row.left();
-            row.defaults().left().padRight(8f).padTop(4f).padBottom(4f);
+            Table card = new Table(Tex.button);
+            card.left();
+            card.top();
+            card.margin(4f);
 
-            //icon: lock when not yet available, real icon otherwise
-            Drawable icon = canSelect ? new TextureRegionDrawable(tech.content.uiIcon) : Icon.lock;
-            row.add(new Image(icon)).size(iconMed).padLeft(8f).padRight(10f);
-
-            //name column with requirements underneath
-            Table info = new Table();
-            info.left().defaults().left();
-            info.add(canSelect ? tech.content.localizedName : "[accent]???")
-                .color(canSelect ? Color.white : Pal.gray);
-            info.row();
+            //icon + ellipsized name on the same line
+            card.table(head -> {
+                Drawable icon = canSelect ? new TextureRegionDrawable(tech.content.uiIcon) : Icon.lock;
+                head.image(icon).size(24f).padRight(4f);
+                Label name = head.add(canSelect ? tech.content.localizedName : "[accent]???")
+                    .color(canSelect ? Color.white : Pal.gray).ellipsis(true).get();
+                name.setFontScale(0.9f);
+                if(!isLocked) head.add("@completed").color(Color.lightGray);
+            }).growX().row();
 
             if(isLocked && !net.client()){
-                if(tech.requirements.length > 0){
-                    boolean progress = Structs.contains(tech.finishedRequirements, s -> s.amount > 0);
-                    if(progress){
-                        float sum = 0f, used = 0f;
+                //real resources: icon + have/need, kept compact and aligned
+                card.table(reqs -> {
+                    reqs.left();
+                    boolean any = false;
+                    if(tech.requirements.length > 0){
                         for(int i = 0; i < tech.requirements.length; i++){
-                            sum += tech.requirements[i].item.cost * tech.requirements[i].amount;
-                            used += tech.finishedRequirements[i].item.cost * tech.finishedRequirements[i].amount;
+                            ItemStack req = tech.requirements[i], done = tech.finishedRequirements[i];
+                            if(req.amount <= done.amount && !debugShowRequirements) continue;
+                            any = true;
+                            int need = debugShowRequirements ? req.amount : req.amount - done.amount;
+                            reqs.image(req.item.uiIcon).size(18f).padRight(2f);
+                            Label amount = reqs.add(UI.formatAmount(Math.min(items == null ? 0 : items.get(req.item), need))
+                                + "/" + UI.formatAmount(need)).color(Color.lightGray).padRight(6f).get();
+                            amount.setFontScale(0.78f);
                         }
-                        info.add(Core.bundle.format("research.progress", Math.min((int)(used / Math.max(sum, 1f) * 100), 99)))
-                            .color(Color.lightGray).row();
+                    }else{
+                        for(Objective o : tech.objectives){
+                            if(o.complete()) continue;
+                            any = true;
+                            Label obj = reqs.add("> " + o.display()).color(Color.lightGray).get();
+                            obj.setFontScale(0.78f);
+                            break;
+                        }
                     }
-                    for(int i = 0; i < tech.requirements.length; i++){
-                        ItemStack req = tech.requirements[i], done = tech.finishedRequirements[i];
-                        if(req.amount <= done.amount && !debugShowRequirements) continue;
-                        int need = debugShowRequirements ? req.amount : req.amount - done.amount;
-                        Table stack = new Table();
-                        stack.left();
-                        stack.image(req.item.uiIcon).size(24f).padRight(4f);
-                        stack.add(req.item.localizedName).color(Color.lightGray).padRight(6f);
-                        Label label = stack.label(() -> " " +
-                            UI.formatAmount(items == null ? 0 : Math.min(items.get(req.item), need)) + " / " + UI.formatAmount(need)).get();
-                        label.setColor(items != null && items.has(req.item) ? Color.lightGray : Color.scarlet);
-                        stack.add(label);
-                        info.add(stack).fillX().left().row();
-                    }
-                }else if(tech.objectives.size > 0){
-                    for(Objective o : tech.objectives){
-                        if(o.complete()) continue;
-                        info.add("> " + o.display()).color(Color.lightGray).row();
-                    }
+                    if(!any) reqs.add("@completed").color(Color.lightGray);
+                }).growX().row();
+            }
+
+            //actions: info + a large research button, aligned side by side
+            card.table(actions -> {
+                actions.left();
+                if(canSelect){
+                    actions.button(Icon.info, Styles.flati, () -> ui.content.show(tech.content))
+                        .size(mobile ? 40f : 52f).padRight(6f);
                 }
-            }else if(!isLocked){
-                info.add("@completed").color(Color.lightGray);
-            }
-            row.add(info).growX().left().padRight(8f);
+                if(!net.client()){
+                    actions.button("@research", Icon.ok, new TextButtonStyle(){{
+                            disabled = Tex.button;
+                            font = Fonts.def;
+                            fontColor = Color.white;
+                            disabledFontColor = Color.gray;
+                            up = buttonOver;
+                            over = buttonDown;
+                        }}, () -> spend(tech))
+                        .disabled(b -> !canSpend(tech) || !locked(tech))
+                        .size(mobile ? 110f : 150f, mobile ? 40f : 50f);
+                }
+            }).growX().padTop(4f);
 
-            //info button for unlocked content
-            if(canSelect){
-                row.button(Icon.info, Styles.flati, () -> ui.content.show(tech.content))
-                    .size(mobile ? 44f : 56f).padRight(6f);
-            }
-
-            //Research button on the right
-            if(!net.client()){
-                row.button("@research", Icon.ok, new TextButtonStyle(){{
-                        disabled = Tex.button;
-                        font = Fonts.def;
-                        fontColor = Color.white;
-                        disabledFontColor = Color.gray;
-                        up = buttonOver;
-                        over = buttonDown;
-                    }}, () -> spend(tech))
-                    .disabled(b -> !canSpend(tech) || !locked(tech))
-                    .size(mobile ? 140f : 180f, mobile ? 44f : 56f);
-            }
-
-            return row;
+            return card;
         }
 
         void clamp(){
