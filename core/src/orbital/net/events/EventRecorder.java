@@ -31,11 +31,18 @@ public final class EventRecorder{
         if(installed) return;
         installed = true;
 
-        Events.on(TileChangeEvent.class, e -> record(EventTypeIds.TILE_CHANGE, varint(e.tile.pos())));
-        Events.on(TileFloorChangeEvent.class, e -> record(EventTypeIds.TILE_FLOOR_CHANGE,
-            varint(e.tile.pos()), varint(e.previous.id)));
-        Events.on(TileOverlayChangeEvent.class, e -> record(EventTypeIds.TILE_OVERLAY_CHANGE,
-            varint(e.tile.pos()), varint(e.previous.id)));
+        Events.on(TileChangeEvent.class, e -> {
+            if(e.tile != null) record(EventTypeIds.TILE_CHANGE,
+                varint(e.tile.pos()), varint(e.tile.block().id), varint(e.tile.build == null ? -1 : e.tile.build.team.id));
+        });
+        Events.on(TileFloorChangeEvent.class, e -> {
+            if(e.tile != null) record(EventTypeIds.TILE_FLOOR_CHANGE,
+                varint(e.tile.pos()), varint(e.floor.id));
+        });
+        Events.on(TileOverlayChangeEvent.class, e -> {
+            if(e.tile != null) record(EventTypeIds.TILE_OVERLAY_CHANGE,
+                varint(e.tile.pos()), varint(e.overlay.id));
+        });
 
         Events.on(BlockBuildBeginEvent.class, e -> record(EventTypeIds.BUILD_BEGIN,
             varint(e.tile.pos()), varint(e.team.id), bool(e.breaking)));

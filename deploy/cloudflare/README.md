@@ -52,6 +52,16 @@ Both flags are opt-in: without them the legacy variable-step loop and ArcNet sna
 byte-for-byte unchanged. The clients still need the matching apply side (keyframe + event replay)
 before an end-to-end match can run — that is the next step.
 
+## Client apply side (implemented)
+
+- `EventApplier` receives batches, drops duplicates from reconnects, applies in commit order and
+  flags gaps that need a resync.
+- `WorldEventApplier` maps event ids to real world changes (tile/build/unit/config/wave/game over).
+- `OnlineSession` installs the binary handler on the client, applies events and acknowledges the
+  cursor; `NetClient.update()` uses it instead of the legacy UDP snapshot path when authoritative
+  mode is on.
+- 18 online tests pass (codec, store, fixed step, mode, applier).
+
 ## Not implemented yet
 
 - Keyframe generation/replay on the client (`SaveIO` + `NetworkIO` can be reused).

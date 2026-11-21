@@ -654,9 +654,21 @@ public class NetClient implements ApplicationListener{
         }
     }
 
+    private @Nullable orbital.net.online.OnlineSession onlineSession;
+
     @Override
     public void update(){
         if(!net.client()) return;
+
+        //Authoritative mode: install the event channel once and skip the legacy UDP snapshot path
+        //(the server no longer sends entity snapshots in this mode, so the timeout would fire).
+        if(orbital.net.online.AuthoritativeMode.enabled()){
+            if(onlineSession == null){
+                onlineSession = new orbital.net.online.OnlineSession(null);
+                onlineSession.install();
+            }
+            return;
+        }
 
         if(state.isGame()){
             if(!connecting){
