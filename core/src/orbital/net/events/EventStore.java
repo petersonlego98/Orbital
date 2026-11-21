@@ -162,6 +162,10 @@ public final class EventStore implements AutoCloseable{
         return result[0];
     }
 
+    public Path directory(){
+        return directory;
+    }
+
     public synchronized long nextSeq(){
         return nextSeq;
     }

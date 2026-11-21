@@ -9,6 +9,7 @@ public final class OnlineHolder{
     private static @Nullable EventStore store;
     private static @Nullable EventRecorder recorder;
     private static @Nullable EventReplicator replicator;
+    private static @Nullable KeyframeManager keyframes;
 
     private OnlineHolder(){
     }
@@ -17,6 +18,11 @@ public final class OnlineHolder{
         OnlineHolder.store = store;
         OnlineHolder.recorder = recorder;
         OnlineHolder.replicator = new EventReplicator(store);
+        OnlineHolder.keyframes = new KeyframeManager(store.directory().resolveSibling("keyframes"));
+    }
+
+    public static @Nullable KeyframeManager keyframes(){
+        return keyframes;
     }
 
     public static @Nullable EventStore store(){

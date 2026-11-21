@@ -137,6 +137,28 @@ public class NetServer implements ApplicationListener{
 
     public NetServer(){
 
+        //Authoritative recovery: a client asks for a keyframe after its cursor; send back the
+        //newest keyframe at or before that seq. Registered only in authoritative mode.
+        if(orbital.net.online.AuthoritativeMode.enabled()){
+            addLogicDataHandler("orbital.keyframe.request", (player, value) -> {
+                orbital.net.online.KeyframeManager manager = orbital.net.online.OnlineHolder.keyframes();
+                if(manager == null) return;
+                long cursor = value instanceof Number n ? n.longValue() : -1;
+                var keyframe = manager.forClient(cursor);
+                if(keyframe == null){
+                    Log.warn("[online] no keyframe for cursor @", cursor);
+                    return;
+                }
+                try{
+                    byte[] world = java.nio.file.Files.readAllBytes(keyframe.file());
+                    Call.clientLogicDataReliable("orbital.keyframe.response", String.valueOf(keyframe.seq()));
+                    Call.clientBinaryPacketReliable("orbital.keyframe.world", world);
+                }catch(java.io.IOException e){
+                    Log.err("[online] could not send keyframe: @", e.getMessage());
+                }
+            });
+        }
+
         net.handleServer(Connect.class, (con, connect) -> {
             Events.fire(new ConnectionEvent(con));
 

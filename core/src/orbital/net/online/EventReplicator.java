@@ -78,6 +78,17 @@ public final class EventReplicator{
             //target connection. Reliable: an event must never be lost or the client diverges.
             Call.clientBinaryPacketReliable(con, CHANNEL, batch);
         }
+
+        //Periodic full-state keyframe so clients can catch up after a long disconnect.
+        KeyframeManager keyframes = OnlineHolder.keyframes();
+        if(keyframes != null){
+            for(NetConnection con : net.getConnections()){
+                if(con.isConnected() && con.player != null){
+                    keyframes.onEvents(count[0], lastSentSeq, con.player);
+                    break;
+                }
+            }
+        }
     }
 
     /** Client-side: feeds a received batch into the supplied consumer. */

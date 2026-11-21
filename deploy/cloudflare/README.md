@@ -62,8 +62,17 @@ before an end-to-end match can run — that is the next step.
   mode is on.
 - 18 online tests pass (codec, store, fixed step, mode, applier).
 
+## Keyframe / recovery (implemented)
+
+- `KeyframeStore` writes the full world (via `NetworkIO.writeWorld`) as numbered `.kf` files,
+  named by the event seq they correspond to, and prunes old ones.
+- `KeyframeManager` writes one at session start and every 500 events, using any connected player
+  as the world source.
+- A client that asks for recovery (`orbital.keyframe.request`) receives the newest keyframe at or
+  before its cursor plus the world payload; `OnlineSession` loads it and resumes replay from there.
+- 20 online tests pass (codec, store, fixed step, mode, applier, keyframes).
+
 ## Not implemented yet
 
-- Keyframe generation/replay on the client (`SaveIO` + `NetworkIO` can be reused).
 - RNG per tick instead of the global `GlobalVars.rand`.
 - Full re-simulation of player input on the server (validation today is the legacy `strict` check).
