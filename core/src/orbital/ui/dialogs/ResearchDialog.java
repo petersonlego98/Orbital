@@ -283,8 +283,9 @@ public class ResearchDialog extends BaseDialog{
                 if(onlyUnlocked && !block.unlockedHost()) continue;
                 TechNode node = block.techNode;
                 if(onlyResearchable && (node == null || !canSpendNode(node) || !locked(node))) continue;
-                grid.add(moduleCard(block, node)).size(mobile ? 128f : 156f, mobile ? 108f : 140f).pad(4f);
-                if(++col % (mobile ? 5 : 8) == 0) grid.row();
+                //wide and short: fit the name, resources and button in a single compact band
+                grid.add(moduleCard(block, node)).size(mobile ? 180f : 220f, mobile ? 76f : 88f).pad(4f);
+                if(++col % (mobile ? 4 : 6) == 0) grid.row();
             }
             moduleGroup.add(grid).growX().row();
         }
@@ -318,9 +319,11 @@ public class ResearchDialog extends BaseDialog{
             if(block.unlockedHost()) head.add("✓").color(Color.lightGray);
         }).growX().row();
 
-        if(node != null){
-            //real resources: icon + needed amount on one wrapped line that stays inside the card
-            card.table(reqs -> {
+        //bottom band: real resources on the left, research button on the right, both on one line
+        card.table(bottom -> {
+            bottom.left();
+            if(node != null){
+                Table reqs = new Table();
                 reqs.left();
                 int shown = 0;
                 for(int i = 0; i < node.requirements.length && shown < 3; i++){
@@ -332,17 +335,17 @@ public class ResearchDialog extends BaseDialog{
                     Label amount = reqs.add(UI.formatAmount(need)).color(need == 0 ? Color.lightGray : Color.scarlet).padRight(4f).get();
                     amount.setFontScale(0.8f);
                 }
-            }).growX().row();
-        }
-
-        if(!net.client() && node != null){
-            //icon-only button with a tooltip: a label inside a card this size gets clipped into
-            //"Pesq/uisar", and the hit area stays comfortably larger than the mouse pointer
-            card.button(Icon.ok, Styles.clearNonei, () -> { view.spend(node); rebuildModules(); })
-                .disabled(b -> !canSpendNode(node) || !locked(node))
-                .tooltip("@research")
-                .size(mobile ? 60f : 84f, mobile ? 36f : 48f).padTop(2f);
-        }
+                bottom.add(reqs).left();
+            }
+            bottom.add().growX();
+            if(!net.client() && node != null){
+                //icon-only button with a tooltip, comfortably larger than the mouse pointer
+                bottom.button(Icon.ok, Styles.clearNonei, () -> { view.spend(node); rebuildModules(); })
+                    .disabled(b -> !canSpendNode(node) || !locked(node))
+                    .tooltip("@research")
+                    .size(mobile ? 54f : 64f, mobile ? 34f : 40f);
+            }
+        }).growX().padTop(2f);
         return outer;
     }
 
