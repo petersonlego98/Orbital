@@ -18,6 +18,7 @@ import arc.util.*;
 import orbital.content.*;
 import orbital.content.TechTree.*;
 import orbital.core.*;
+import orbital.game.*;
 import orbital.game.EventType.*;
 import orbital.game.Objectives.*;
 import orbital.gen.*;
@@ -27,6 +28,7 @@ import orbital.type.*;
 import orbital.ui.*;
 import orbital.ui.layout.*;
 import orbital.ui.layout.TreeLayout.*;
+import orbital.world.*;
 
 import java.util.*;
 
@@ -49,6 +51,11 @@ public class ResearchDialog extends BaseDialog{
     private final Seq<Planet> rootPlanets = new Seq<>(false, 4);
     private boolean showTechSelect;
     private boolean needsRebuild;
+
+    //Layout filters (adapted from the reference): only show unlocked content, and only show
+    //entries that still have something to research. Both default to off, matching the old list.
+    private boolean onlyUnlocked = false;
+    private boolean onlyResearchable = false;
 
     public ResearchDialog(){
         super("");
@@ -108,10 +115,8 @@ public class ResearchDialog extends BaseDialog{
         }).visible(() -> showTechSelect = TechTree.roots.count(node -> !(node.requiresUnlock && !node.content.unlockedHost())) > 1).minWidth(300f);
 
         margin(0f).marginBottom(8);
-        cont.stack(titleTable, view = new View(), itemDisplay = new ItemsDisplay()).grow();
-        itemDisplay.visible(() -> !net.client());
-
-        titleTable.toFront();
+        cont.clear();
+        buildLayout();
 
         shouldPause = true;
 
@@ -138,6 +143,7 @@ public class ResearchDialog extends BaseDialog{
             view.infoTable.clear();
             //items are ready now: rebuild the list so requirement counts and buttons are accurate
             view.rebuildAll();
+            rebuildModules();
         });
 
         hidden(ui.planet::setup);
@@ -156,6 +162,190 @@ public class ResearchDialog extends BaseDialog{
         }).size(210f, 64f).name("database");
 
         touchable = Touchable.enabled;
+    }
+
+    /**
+     * Research menu laid out like the module catalogue: a header, a live "evolutions in progress"
+     * strip, two filter switches, then two scrollable groups - the research tree and the real
+     * dorsal modules. All data comes from existing game state; no synthetic values are introduced.
+     */
+    private void buildLayout(){
+        //An opaque background is essential here: the old research list was drawn over the map,
+        //but this layout stacks cards and bars that become unreadable over terrain.
+        cont.background(Styles.black9);
+        //The dialog fills the stage; make the content fill it too so the groups use the whole
+        //window on Windows instead of hugging their preferred height.
+        cont.setFillParent(true);
+        cont.top().left();
+        cont.defaults().left();
+
+        //header
+        cont.table(head -> {
+            head.add("@research.modules.title").style(Styles.outlineLabel).fontScale(1.4f).color(Pal.accent);
+            head.add().growX();
+        }).growX().pad(6f, 14f, 2f, 14f).row();
+
+        //evolutions actually running on the map
+        cont.table(evo -> buildEvolutions(evo)).growX().pad(0f, 14f, 4f, 14f).row();
+
+        //filters
+        cont.table(filters -> {
+            filters.defaults().left().padBottom(6f);
+            //larger hit area than the mouse cursor on desktop
+            filters.check("@research.modules.onlyunlocked", onlyUnlocked, v -> { onlyUnlocked = v; view.rebuildAll(); })
+                .padTop(4f).padBottom(4f).row();
+            filters.check("@research.modules.onlyresearchable", onlyResearchable, v -> { onlyResearchable = v; view.rebuildAll(); })
+                .padTop(4f).padBottom(4f).row();
+        }).growX().pad(0f, 14f, 6f, 14f).row();
+
+        //both groups scroll inside a bounded height so the dialog never outgrows the screen
+        //Use the full height available on desktop; leave a small reserve for the header,
+        //upgrades, filters and the bottom buttons.
+        float groupHeight = mobile
+            ? Math.max(130f, Math.min(260f, Core.graphics.getHeight() / Scl.scl(1f) * 0.25f))
+            : Math.max(240f, Core.graphics.getHeight() / Scl.scl(1f) * 0.38f);
+
+        //group 1: research, reusing the existing list logic
+        cont.table(g -> {
+            g.add("@research.modules.research").color(Pal.accent).row();
+            view = new View();
+            g.add(new ScrollPane(view, Styles.smallPane)).growX().height(groupHeight);
+        }).growX().pad(4f, 14f, 4f, 14f).row();
+
+        //group 2: real dorsal modules, grouped by type, each card backed by its block's tech node
+        cont.table(g -> {
+            g.add("@research.modules.modules").color(Pal.accent).row();
+            moduleGroup = new Table();
+            moduleGroup.top().left();
+            g.add(new ScrollPane(moduleGroup, Styles.smallPane)).growX().height(groupHeight);
+        }).growX().pad(4f, 14f, 4f, 14f).row();
+
+        //item counts, kept in the hierarchy so the existing rebuild calls still work
+        cont.add(itemDisplay = new ItemsDisplay()).growX().pad(4f, 14f, 10f, 14f).row();
+        itemDisplay.visible(() -> !net.client());
+        rebuildModules();
+    }
+
+    /** Lists buildings on the current map that are evolving to a higher level, with a live bar. */
+    private void buildEvolutions(Table table){
+        table.top().left();
+        table.add("@research.modules.evolving").color(Pal.accent).row();
+
+        boolean any = false;
+        if(state != null && state.isGame()){
+            for(Building build : Groups.build){
+                if(!build.evolving) continue;
+                any = true;
+                final Building b = build;
+                Table row = new Table();
+                row.left();
+                row.add(b.block.localizedName).color(Color.lightGray).padRight(8f);
+                row.add(new Bar(() -> Core.bundle.format("research.modules.evolving.to", b.evolveTarget),
+                    () -> Pal.accent, () -> Math.max(0f, b.evolutionProgress()))).growX().height(18f).padRight(8f);
+                table.add(row).growX().padBottom(3f).row();
+            }
+        }
+        if(!any) table.add("@research.modules.evolving.none").color(Color.gray).row();
+    }
+
+    /** Cards are built on show/rebuild because they depend on live unlock and item state. */
+    private @Nullable Table moduleGroup;
+
+    /** Rebuilds the module cards from real moduleOnly blocks, grouped by type. */
+    private void rebuildModules(){
+        if(moduleGroup == null) return;
+        moduleGroup.clearChildren();
+        moduleGroup.top().left();
+
+        //type -> blocks, only blocks that are real dorsal modules
+        ObjectMap<String, Seq<Block>> byType = new ObjectMap<>();
+        Seq<String> order = new Seq<>();
+        for(Block block : content.blocks()){
+            if(block == null || !block.moduleOnly) continue;
+            String type = moduleType(block);
+            Seq<Block> list = byType.get(type);
+            if(list == null){ list = new Seq<>(); byType.put(type, list); order.add(type); }
+            list.add(block);
+        }
+
+        for(String type : order){
+            Seq<Block> blocks = byType.get(type);
+            Table section = new Table();
+            section.background(Tex.button);
+            section.add(type).color(Pal.accent).padRight(8f);
+            section.add(blocks.size + "/" + blocks.size).color(Color.lightGray);
+            moduleGroup.add(section).growX().padBottom(4f).row();
+
+            Table grid = new Table();
+            grid.left();
+            int col = 0;
+            for(Block block : blocks){
+                if(onlyUnlocked && !block.unlockedHost()) continue;
+                TechNode node = block.techNode;
+                if(onlyResearchable && (node == null || !canSpendNode(node) || !locked(node))) continue;
+                grid.add(moduleCard(block, node)).size(mobile ? 128f : 156f, mobile ? 96f : 120f).pad(4f);
+                if(++col % (mobile ? 5 : 8) == 0) grid.row();
+            }
+            moduleGroup.add(grid).growX().row();
+        }
+    }
+
+    /** @return the localized group name of a real module block. */
+    private String moduleType(Block block){
+        SupportModuleCategory support = SupportModuleCategory.of(block);
+        if(support != null) return Core.bundle.get("support.category." + support.name(), support.name());
+        if(block instanceof orbital.world.blocks.defense.turrets.Turret) return Core.bundle.get("research.modules.turrets");
+        return Core.bundle.get("research.modules.armor");
+    }
+
+    /** One module card: icon, name and the real resource icons/amounts of its tech node. */
+    private Table moduleCard(Block block, @Nullable TechNode node){
+        Table card = new Table(Tex.button);
+        card.left();
+        card.top();
+        card.margin(4f);
+
+        //icon + short name on one line; the name is ellipsized so long names never spill over
+        card.table(head -> {
+            head.image(block.uiIcon).size(24f).padRight(4f);
+            Label name = head.add(block.localizedName).color(Color.lightGray).ellipsis(true).get();
+            name.setFontScale(0.85f);
+            if(block.unlockedHost()) head.add("✓").color(Color.lightGray);
+        }).growX().row();
+
+        if(node != null){
+            //real resources: icon + needed amount (remaining when partially researched)
+            card.table(reqs -> {
+                reqs.left();
+                for(int i = 0; i < node.requirements.length; i++){
+                    ItemStack req = node.requirements[i];
+                    int need = Math.max(0, req.amount - node.finishedRequirements[i].amount);
+                    if(onlyResearchable && need == 0) continue;
+                    reqs.image(req.item.uiIcon).size(14f).padRight(2f);
+                    Label amount = reqs.add(UI.formatAmount(need)).color(need == 0 ? Color.lightGray : Color.scarlet).padRight(4f).get();
+                    amount.setFontScale(0.8f);
+                }
+            }).growX().row();
+        }
+
+        if(!net.client() && node != null){
+            //icon-only button with a tooltip: a label inside a card this size gets clipped into
+            //"Pesq/uisar", and the hit area stays comfortably larger than the mouse pointer
+            card.button(Icon.ok, Styles.clearNonei, () -> { view.spend(node); rebuildModules(); })
+                .disabled(b -> !canSpendNode(node) || !locked(node))
+                .tooltip("@research")
+                .size(mobile ? 60f : 84f, mobile ? 36f : 48f).padTop(2f);
+        }
+        return card;
+    }
+
+    private boolean canSpendNode(TechNode node){
+        if(items == null || !selectable(node)) return false;
+        if(node.requirements.length == 0) return true;
+        for(int i = 0; i < node.requirements.length; i++){
+            if(node.finishedRequirements[i].amount < node.requirements[i].amount && items.has(node.requirements[i].item)) return true;
+        }
+        return node.content.locked();
     }
 
     void checkMargin(){
@@ -516,7 +706,7 @@ public class ResearchDialog extends BaseDialog{
             //info button for unlocked content
             if(canSelect){
                 row.button(Icon.info, Styles.flati, () -> ui.content.show(tech.content))
-                    .size(44f).padRight(6f);
+                    .size(mobile ? 44f : 56f).padRight(6f);
             }
 
             //Research button on the right
@@ -530,7 +720,7 @@ public class ResearchDialog extends BaseDialog{
                         over = buttonDown;
                     }}, () -> spend(tech))
                     .disabled(b -> !canSpend(tech) || !locked(tech))
-                    .size(140f, 44f);
+                    .size(mobile ? 140f : 180f, mobile ? 44f : 56f);
             }
 
             return row;
