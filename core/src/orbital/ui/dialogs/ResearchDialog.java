@@ -283,7 +283,7 @@ public class ResearchDialog extends BaseDialog{
                 if(onlyUnlocked && !block.unlockedHost()) continue;
                 TechNode node = block.techNode;
                 if(onlyResearchable && (node == null || !canSpendNode(node) || !locked(node))) continue;
-                grid.add(moduleCard(block, node)).size(mobile ? 128f : 156f, mobile ? 96f : 120f).pad(4f);
+                grid.add(moduleCard(block, node)).size(mobile ? 128f : 156f, mobile ? 108f : 140f).pad(4f);
                 if(++col % (mobile ? 5 : 8) == 0) grid.row();
             }
             moduleGroup.add(grid).growX().row();
@@ -300,12 +300,17 @@ public class ResearchDialog extends BaseDialog{
 
     /** One module card: icon, name and the real resource icons/amounts of its tech node. */
     private Table moduleCard(Block block, @Nullable TechNode node){
+        //A fixed outer table clips its children, so no label or icon can paint past the border.
+        //Its own background keeps the frame intact when the inner card is shorter than the cell.
+        Table outer = new Table(Tex.button);
+        outer.setClip(true);
         Table card = new Table(Tex.button);
         card.left();
         card.top();
         card.margin(4f);
+        outer.add(card).grow();
 
-        //icon + short name on one line; the name is ellipsized so long names never spill over
+        //icon + short name on one line; ellipsis keeps long translated names inside the card
         card.table(head -> {
             head.image(block.uiIcon).size(24f).padRight(4f);
             Label name = head.add(block.localizedName).color(Color.lightGray).ellipsis(true).get();
@@ -314,13 +319,15 @@ public class ResearchDialog extends BaseDialog{
         }).growX().row();
 
         if(node != null){
-            //real resources: icon + needed amount (remaining when partially researched)
+            //real resources: icon + needed amount on one wrapped line that stays inside the card
             card.table(reqs -> {
                 reqs.left();
-                for(int i = 0; i < node.requirements.length; i++){
+                int shown = 0;
+                for(int i = 0; i < node.requirements.length && shown < 3; i++){
                     ItemStack req = node.requirements[i];
                     int need = Math.max(0, req.amount - node.finishedRequirements[i].amount);
                     if(onlyResearchable && need == 0) continue;
+                    shown++;
                     reqs.image(req.item.uiIcon).size(14f).padRight(2f);
                     Label amount = reqs.add(UI.formatAmount(need)).color(need == 0 ? Color.lightGray : Color.scarlet).padRight(4f).get();
                     amount.setFontScale(0.8f);
@@ -336,7 +343,7 @@ public class ResearchDialog extends BaseDialog{
                 .tooltip("@research")
                 .size(mobile ? 60f : 84f, mobile ? 36f : 48f).padTop(2f);
         }
-        return card;
+        return outer;
     }
 
     private boolean canSpendNode(TechNode node){
