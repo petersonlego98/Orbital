@@ -627,10 +627,15 @@ public class NetClient implements ApplicationListener{
             }
             state.serverTps = tps & 0xff;
 
-            //note that this is far from a guarantee that random state is synced - tiny changes in delta and ping can throw everything off again.
-            //syncing will only make much of a difference when rand() is called infrequently
-            GlobalVars.rand.seed0 = rand0;
-            GlobalVars.rand.seed1 = rand1;
+            //Legacy mode only: reseeding here mid-tick is exactly why the old code warned that
+            //random state was not guaranteed to stay in sync. Authoritative mode uses TickRng,
+            //seeded once from the keyframe/handshake, so it must not be overwritten here.
+            if(!orbital.net.online.AuthoritativeMode.enabled()){
+                GlobalVars.rand.seed0 = rand0;
+                GlobalVars.rand.seed1 = rand1;
+            }else if(!orbital.net.online.TickRng.installed()){
+                orbital.net.online.TickRng.install(rand0, rand1);
+            }
 
             universe.updateNetSeconds(timeData);
 

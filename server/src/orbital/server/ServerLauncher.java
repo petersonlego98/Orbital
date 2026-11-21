@@ -84,6 +84,10 @@ public class ServerLauncher implements ApplicationListener{
                 orbital.net.events.EventRecorder recorder = new orbital.net.events.EventRecorder(store);
                 recorder.install();
                 orbital.net.online.OnlineHolder.install(store, recorder);
+                if(orbital.net.online.AuthoritativeMode.enabled()){
+                    orbital.net.online.TickRng.install(
+                        orbital.logic.GlobalVars.rand.seed0, orbital.logic.GlobalVars.rand.seed1);
+                }
                 arc.util.Log.info("[eventstore] enabled at @ (authoritative=@)", dir,
                     orbital.net.online.AuthoritativeMode.enabled());
             }catch(Exception e){

@@ -537,18 +537,35 @@ public class Logic implements ApplicationListener{
                 Events.fire(Trigger.beforeGameUpdate);
 
                 float delta = Core.graphics.getDeltaTime();
-                //Authoritative fixed-step mode: advance only in whole ticks, so the server and
-                //replaying clients see exactly the same tick sequence regardless of frame rate.
-                //Off by default until the online relay is selected; the legacy variable-step path
-                //stays byte-for-byte identical for normal play.
+                //Authoritative fixed-step mode: run the full simulation once per whole tick. The
+                //old code advanced state.tick by `steps` but simulated once, so a 30fps client and
+                //a 60fps client saw different tick sequences. The legacy path is unchanged.
                 if(orbital.net.online.AuthoritativeMode.enabled()){
                     int steps = orbital.net.online.AuthoritativeMode.clock().advance(
                         (long)(delta * 1_000_000_000L));
-                    state.tick += orbital.net.online.FixedStep.toLogicalTick(steps,
-                        orbital.net.online.AuthoritativeMode.hz());
+                    for(int i = 0; i < steps; i++){
+                        state.tick += 1;
+                        orbital.net.online.TickRng.beginTick((long)state.tick);
+                        simulateTick(1f / orbital.net.online.AuthoritativeMode.hz());
+                    }
                 }else{
                     state.tick += Float.isNaN(delta) || Float.isInfinite(delta) ? 0f : delta * 60f;
+                    simulateTick(delta);
                 }
+            }
+
+            if(runStateCheck){
+                checkGameState();
+            }
+        }else if(netServer.isWaitingForPlayers() && runStateCheck){
+            checkGameState();
+        }
+
+        PerfCounter.stateUpdate.end(PerfCounter.entityUpdate.latestValueNs());
+    }
+
+    /** One complete simulation step. Called once per frame in legacy mode, once per tick in authoritative mode. */
+    private void simulateTick(float delta){
                 state.updateId ++;
                 state.teams.updateTeamStats();
                 MapPreviewLoader.checkPreviews();
@@ -631,16 +648,6 @@ public class Logic implements ApplicationListener{
                 updateEntities();
 
                 Events.fire(Trigger.afterGameUpdate);
-            }
-
-            if(runStateCheck){
-                checkGameState();
-            }
-        }else if(netServer.isWaitingForPlayers() && runStateCheck){
-            checkGameState();
-        }
-
-        PerfCounter.stateUpdate.end(PerfCounter.entityUpdate.latestValueNs());
     }
 
     /** @return whether the wave timer is paused due to enemies */

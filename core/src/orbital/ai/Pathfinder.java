@@ -554,7 +554,9 @@ public class Pathfinder implements Runnable{
         @Override
         protected void getPositions(IntSeq out){
             if(state.rules.randomWaveAI && team == state.rules.waveTeam){
-                rand.setSeed(state.rules.waves ? state.wave : (int)(state.tick / (5400)) + hashCode());
+                //Object hashCode() is identity-based and differs between processes; use the stable
+                //team id so AI target selection is reproducible in authoritative mode.
+                rand.setSeed(state.rules.waves ? state.wave : (int)(state.tick / (5400)) + team.id);
 
                 //maximum amount of different target flag types they will attack
                 int max = 1;

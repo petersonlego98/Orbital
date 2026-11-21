@@ -72,7 +72,18 @@ before an end-to-end match can run — that is the next step.
   before its cursor plus the world payload; `OnlineSession` loads it and resumes replay from there.
 - 20 online tests pass (codec, store, fixed step, mode, applier, keyframes).
 
+## Deterministic RNG (implemented)
+
+- `TickRng` re-seeds both global RNGs (`GlobalVars.rand` and `Mathf.rand`) from
+  `hash(seed0, seed1, tick)` at the start of every tick — covers ~330 call sites without rewriting
+  them. Opt-in via authoritative mode; single-player is unchanged.
+- `Logic.update()` now runs the full simulation **once per fixed tick** (the previous code advanced
+  the tick by N but simulated once, which diverged between 30fps and 60fps clients).
+- `NetClient` no longer overwrites the seed mid-tick in authoritative mode; `Team`/`Pathfinder`/
+  `SuppressionFieldAbility` no longer use identity `hashCode()` as a seed (stable `team.id`/`unit.id`).
+- 25 online tests pass (codec, store, fixed step, mode, applier, keyframes, tick RNG).
+
 ## Not implemented yet
 
-- RNG per tick instead of the global `GlobalVars.rand`.
 - Full re-simulation of player input on the server (validation today is the legacy `strict` check).
+- End-to-end match test across the Cloudflare relay (needs a deployed Worker and D1).
