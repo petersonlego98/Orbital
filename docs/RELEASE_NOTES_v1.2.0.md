@@ -4,7 +4,7 @@ Build `84087f5ef8`. O instalador continua **sem exigir administrador**: instala 
 `%LOCALAPPDATA%\Programs\Orbital`, cria atalhos na Área de Trabalho e no Menu Iniciar e
 registra a desinstalação em `HKCU`. O JRE 21 vai embutido — não é preciso ter Java instalado.
 
-**Sistemas operacionais:** Windows 10/11 64 bits; Android 5.0 (API 21) ou superior.
+**Sistemas operacionais:** Windows 10/11 64 bits; Android 7.0 (API 24) ou superior.
 
 ### Windows
 

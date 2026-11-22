@@ -50,7 +50,7 @@ android{
 
     defaultConfig{
         applicationId "com.orbital.peterson"
-        minSdkVersion 21          // Android 5.0 Lollipop
+        minSdkVersion 24          // Android 7.0 Nougat (mínimo exigido pela Proteção Automática do Play)
         targetSdkVersion 36
         //Same release number as the Windows build (v1.2.0, see README and
         //docs/RELEASE_NOTES_v1.2.0.md). versionCode is the numeric encoding
