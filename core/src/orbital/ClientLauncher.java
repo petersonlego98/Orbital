@@ -48,6 +48,11 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
     private String lastLoadingAsset = "";
     private long loadingAssetStart, lastLoadProgressLog;
 
+    /** Default frame cap. Android overrides this with the device's screen refresh rate. */
+    protected int defaultFpsCap(){
+        return 120;
+    }
+
     @Override
     public void setup(){
         String dataDir = System.getProperty("orbital.data.dir", OS.env("ORBITAL_DATA_DIR"));
@@ -101,7 +106,7 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
         //loading loop to 60 fps makes the bar crawl near 100% on slow integrated GPUs. vsync and
         //the cap are switched on in applyGameplayFrameSettings() once loading finishes.
         settings.defaults("vsync", true);
-        settings.defaults("fpscap", 120);
+        settings.defaults("fpscap", defaultFpsCap());
         //Bloom is enabled by default on every profile again. It was previously disabled for
         //weak/software GPUs to avoid a ~1s stall at the end of the load, but the visual effect is
         //restored per request; players can still turn it off under Settings > Graphics.

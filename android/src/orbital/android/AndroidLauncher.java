@@ -8,6 +8,7 @@ import android.net.*;
 import android.os.*;
 import android.os.Build.*;
 import android.telephony.*;
+import android.view.*;
 import arc.*;
 import arc.backend.android.*;
 import arc.files.*;
@@ -53,6 +54,23 @@ public class AndroidLauncher extends AndroidApplication{
         }
 
         initialize(new ClientLauncher(){
+
+            /** Match the game's frame cap to the device screen refresh rate by default. */
+            @Override
+            protected int defaultFpsCap(){
+                try{
+                    Display display = ((WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
+                    float refresh = display.getRefreshRate();
+                    if(refresh >= 30f && refresh <= 240f){
+                        int cap = Math.round(refresh);
+                        Log.info("[Android] screen refresh @ Hz, default fps cap set to @", refresh, cap);
+                        return cap;
+                    }
+                }catch(Throwable e){
+                    Log.warn("[Android] could not read screen refresh rate: @", e.getMessage());
+                }
+                return 60;
+            }
 
             @Override
             public void hide(){
