@@ -45,6 +45,20 @@ class BattleRoyaleModeTest{
     }
 
     @Test
+    void multiplayerRulesGiveEightHumanTeams(){
+        Rules rules = Gamemode.battleRoyale.apply(new Rules());
+        BattleRoyaleMode.applyRules(rules, false);
+
+        //pvp makes Team.isAI() false for all eight teams; attackMode still handles victory.
+        assertTrue(rules.pvp, "multiplayer must disable AI-controlled teams");
+        assertTrue(rules.attackMode, "last-team-standing victory must stay enabled");
+        for(Team team : BattleRoyaleMode.teams()){
+            assertFalse(rules.teams.get(team).rtsAi, team + " must be human-controlled");
+            assertFalse(rules.teams.get(team).infiniteResources, team + " must not get free resources");
+        }
+    }
+
+    @Test
     void rulesConfigureAttackModeAndRtsAi(){
         Rules rules = Gamemode.battleRoyale.apply(new Rules());
 

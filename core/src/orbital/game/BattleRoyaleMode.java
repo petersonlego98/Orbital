@@ -56,8 +56,16 @@ public final class BattleRoyaleMode{
         return battleTeams;
     }
 
-    /** Rules preset applied by the Gamemode entry. */
+    /**
+     * Rules for the local 1-player + 7-AI showcase. Multiplayer matches pass {@code false} so all
+     * eight teams are controlled by humans and no team gets free resources or RTS AI.
+     */
     public static void applyRules(Rules rules){
+        applyRules(rules, true); //local showcase: 1 human + 7 RTS AIs
+    }
+
+    /** @param aiTeams whether the seven non-player teams should be driven by RTS AI. */
+    public static void applyRules(Rules rules, boolean aiTeams){
         rules.modeName = rulesName;
         //attackMode makes Team.isAI() true for non-default teams and enables last-team-standing
         //victory in Logic.checkGameState; pvp stays false so the RTS AI still controls them.
@@ -71,7 +79,21 @@ public final class BattleRoyaleMode{
         rules.unitCostMultiplier = 1f;
         rules.disableUnitCap = false;
 
-        //RTS AI for the seven opposing teams, configured before playMap so Logic picks it up.
+        //In multiplayer every team is human: no RTS AI and no free resources for anyone.
+        //pvp=true makes Team.isAI() false for all eight teams (attackMode alone would mark the
+        //seven non-default teams as AI), while attackMode still drives last-team-standing victory.
+        if(!aiTeams){
+            rules.pvp = true;
+            for(Team team : battleTeams){
+                TeamRule rule = rules.teams.get(team);
+                rule.rtsAi = false;
+                rule.infiniteResources = false;
+                rule.aiCoreSpawn = false;
+            }
+            return;
+        }
+
+        //Local showcase: RTS AI for the seven opposing teams.
         for(int i = 1; i < battleTeams.length; i++){
             TeamRule rule = rules.teams.get(battleTeams[i]);
             rule.rtsAi = true;
@@ -81,8 +103,8 @@ public final class BattleRoyaleMode{
         rules.teams.get(Team.sharded).rtsAi = false;
     }
 
-    /** Starts a fresh battle-royale match from the menu. */
-    public static void start(){
+    /** @return the shared 8x8 map, registering its generator once. Used by the menu and the server. */
+    public static Map map(){
         if(battleMap == null){
             battleMap = new Map(StringMap.of(
                 "name", Core.bundle.get("mode.battleRoyale.map", "Battle Royale 8x8"),
@@ -98,14 +120,24 @@ public final class BattleRoyaleMode{
                 });
             });
         }
+        return battleMap;
+    }
 
+    /** Installs the spawn-on-own-core listener; called by the menu and by joining clients. */
+    public static void installListener(){
         if(!listenerInstalled){
             Events.run(Trigger.newGame, BattleRoyaleMode::onNewGame);
             listenerInstalled = true;
         }
+    }
+
+    /** Starts a fresh battle-royale match from the menu. */
+    public static void start(){
+        Map map = map();
+        installListener();
 
         Rules rules = Gamemode.battleRoyale.apply(new Rules());
-        control.playMap(battleMap, rules, false, false);
+        control.playMap(map, rules, false, false);
     }
 
     private static void onNewGame(){

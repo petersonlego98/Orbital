@@ -509,6 +509,28 @@ public class ServerControl implements ApplicationListener{
             info("Stopped server.");
         });
 
+        handler.register("host-br", "Host an 8-player Battle Royale match (waits for all 8 players).", arg -> {
+            if(state.isGame()){
+                err("Already hosting. Type 'stop' to stop hosting first.");
+                return;
+            }
+            cancelPlayTask();
+            orbital.net.online.BattleRoyaleTeamAssigner.reset();
+
+            Map map = BattleRoyaleMode.map();
+            Rules rules = Gamemode.battleRoyale.apply(new Rules());
+            //No RTS AI and no free resources: every one of the eight teams is human.
+            BattleRoyaleMode.applyRules(rules, false);
+
+            logic.reset();
+            world.loadMap(map, rules);
+            state.rules = rules;
+            Events.fire(new RulesLoadEvent(state.rules));
+            logic.play();
+            netServer.openServer();
+            info("Battle Royale hosted. Waiting for 8 players...");
+        });
+
         handler.register("squad", "<squadId>", "Generate/load the unique persistent sector for a squad of up to 4 players.", arg -> {
             var registry = orbital.net.online.OnlineHolder.squads();
             if(registry == null){

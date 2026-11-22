@@ -336,13 +336,24 @@ public class NetServer implements ApplicationListener{
 
             con.player = player;
 
-            //Authoritative squads: assign a persistent 4-player squad and its team slot. Two
-            //different squads get two different persisted sector seeds.
-            Team squadTeam = orbital.net.online.SquadAssigner.assign(player);
+            //Battle Royale uses one of eight persistent human teams; the campaign keeps the
+            //4-player squad model. A ninth BR player is rejected because there is no free team.
+            Team matchTeam = null;
+            if(orbital.game.BattleRoyaleMode.rulesName.equals(state.rules.modeName)){
+                matchTeam = orbital.net.online.BattleRoyaleTeamAssigner.assign(player);
+                if(matchTeam == null){
+                    con.kick("Battle Royale is full (8 players).");
+                    return;
+                }
+            }else{
+                //Authoritative squads: assign a persistent 4-player squad and its team slot. Two
+                //different squads get two different persisted sector seeds.
+                matchTeam = orbital.net.online.SquadAssigner.assign(player);
+            }
 
             //playing in pvp mode automatically assigns players to teams
-            if(squadTeam == null) player.team(assignTeam(player));
-            else player.team(squadTeam);
+            if(matchTeam == null) player.team(assignTeam(player));
+            else player.team(matchTeam);
 
             sendWorldAndAssets(player);
 
@@ -1056,6 +1067,10 @@ public class NetServer implements ApplicationListener{
 
     public boolean isWaitingForPlayers(){
         if(state.is(State.menu)) return false;
+        //A battle royale match starts only when all eight human teams are occupied.
+        if(orbital.game.BattleRoyaleMode.rulesName.equals(state.rules.modeName) && !state.gameOver){
+            return orbital.net.online.BattleRoyaleTeamAssigner.count() < orbital.game.BattleRoyaleMode.teams;
+        }
         if(state.rules.pvp && !state.gameOver){
             int used = 0;
             for(TeamData t : state.teams.getActive()){
@@ -1081,7 +1096,8 @@ public class NetServer implements ApplicationListener{
         }
 
         if(state.isGame() && net.server()){
-            if(state.rules.pvp && state.rules.pvpAutoPause){
+            boolean brMatch = orbital.game.BattleRoyaleMode.rulesName.equals(state.rules.modeName);
+            if((state.rules.pvp && state.rules.pvpAutoPause) || brMatch){
                 boolean waiting = isWaitingForPlayers(), paused = state.isPaused();
                 if(waiting != paused){
                     if(waiting){

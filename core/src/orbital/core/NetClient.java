@@ -447,6 +447,10 @@ public class NetClient implements ApplicationListener{
     @Remote(variants = Variant.both)
     public static void setRules(Rules rules){
         state.rules = rules;
+        //Joining a hosted battle royale needs the same spawn listener the local menu installs.
+        if(orbital.game.BattleRoyaleMode.rulesName.equals(rules.modeName)){
+            orbital.game.BattleRoyaleMode.installListener();
+        }
     }
 
     @Remote(variants = Variant.both)
