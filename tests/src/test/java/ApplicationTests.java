@@ -10,6 +10,7 @@ import orbital.content.*;
 import orbital.core.*;
 import orbital.core.GameState.*;
 import orbital.ctype.*;
+import orbital.entities.*;
 import orbital.entities.units.*;
 import orbital.game.MapObjectives.*;
 import orbital.game.*;
@@ -872,6 +873,28 @@ public class ApplicationTests{
         checkPayloads();
     }
 
+    @Test
+    void squadSectorHasFourQuadrantCores(){
+        Sector sector = Planets.qatia.sectors.get(7);
+        sector.squadSeed = 12345L;
+        logic.reset();
+        int size = orbital.maps.generators.QuatiaSectorGenerator.size;
+
+        world.loadGenerator(size, size, tiles ->
+            new orbital.maps.generators.QuatiaSectorGenerator(sector).generate(tiles, new WorldParams()));
+
+        //CoreBlock is a 3x3 multiblock, so the same building appears on 9 tiles: dedupe by identity.
+        ObjectSet<Building> cores = new ObjectSet<>();
+        for(Tile tile : world.tiles){
+            if(tile.block() instanceof orbital.world.blocks.storage.CoreBlock && tile.build != null) cores.add(tile.build);
+        }
+        assertEquals(4, cores.size, "a squad sector must have one core per player");
+        ObjectSet<Team> coreTeams = new ObjectSet<>();
+        for(Building build : cores) coreTeams.add(build.team);
+        assertEquals(4, coreTeams.size, "each quadrant must use a different team");
+        sector.squadSeed = -1;
+    }
+
     @TestFactory
     DynamicTest[] testSectorValidity(){
         Seq<DynamicTest> out = new Seq<>();
@@ -886,7 +909,8 @@ public class ApplicationTests{
                 //pathfinder pollutes queue with garbage, causing OOM
                 Reflect.<TaskQueue>get(HeadlessApplication.class, Core.app, "runnables").clear();
                 state.rules.sector = sector.sector;
-                world.loadGenerator(sector.generator.map.width, sector.generator.map.height, tiles -> sector.generator.generate(tiles, new WorldParams()));
+                int mapSize = orbital.maps.generators.QuatiaSectorGenerator.size;
+                world.loadGenerator(mapSize, mapSize, tiles -> sector.generator.generate(tiles, new WorldParams()));
                 sector.rules.get(state.rules);
                 ObjectSet<Item> resources = new ObjectSet<>();
                 boolean hasSpawnPoint = false;

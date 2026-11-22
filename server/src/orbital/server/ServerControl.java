@@ -523,7 +523,7 @@ public class ServerControl implements ApplicationListener{
             }
             try{
                 orbital.net.online.SquadSectorSession.generateAndSave(squad.id);
-                info("Sector for @ generated with seed @ (saved).", squad.id, squad.seed);
+                info("Planet sector @ generated for @ with seed @ (saved).", registry.sectorIdFor(squad.id), squad.id, squad.seed);
             }catch(Throwable t){
                 err("Could not generate squad sector: @", t.getMessage());
             }

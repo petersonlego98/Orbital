@@ -77,27 +77,28 @@ public class Planets{
             totalRadius = radius;
             orbitTime = Mathf.pow(orbitRadius, 1.5f) * 1000f;
 
-            //soft look: blue-green ocean + light continents and a thin atmosphere
+            //Amazon-like rainforest: two shades of green with a thin blue sky.
             meshLoader = () -> new NoiseMesh(
             this, 3, 4, 1.1f, 5, 0.55f, 9f, 0.14f,
-            Color.valueOf("2b5f86"),
-            Color.valueOf("4c9a5f"),
+            Color.valueOf("2f6b38"),
+            Color.valueOf("4f9a4a"),
             5, 0.55f, 7.5f, 0.12f
             );
             cloudMeshLoader = () -> new HexSkyMesh(
             this, 2, 0.12f, 0.14f, 4, Color.valueOf("e8f4ff").a(0.55f), 5, 0.5f, 6.5f, 0.42f
             );
 
-            atmosphereColor = Color.valueOf("4ba3e0");
+            atmosphereColor = Color.valueOf("8fd0e8");
             atmosphereRadIn = 0.02f;
             atmosphereRadOut = 0.3f;
             hasAtmosphere = true;
-            iconColor = Color.valueOf("4f9bd6");
+            iconColor = Color.valueOf("4f9a4a");
             icon = "planet";
             bloom = false;
             updateLighting = true;
             defaultEnv = Env.terrestrial;
-            allowLaunchToNumbered = false;
+            //Every one of the 272 sectors is habitable.
+            allowLaunchToNumbered = true;
             ruleSetter = rules -> {
                 rules.waveTeam = Team.crux;
                 rules.waves = false;

@@ -1,99 +1,39 @@
 package orbital.maps.generators;
 
-import arc.math.*;
+import arc.graphics.*;
+import arc.math.geom.*;
 import orbital.content.*;
-import orbital.ctype.*;
 import orbital.game.*;
 import orbital.type.*;
 import orbital.world.*;
 
-import static orbital.Vars.*;
-
 /**
- * Generates Orbital's first production colony: one peaceful map with nearby copper, lead, coal
- * and sand deposits. The existing Mindustry buildings provide the initial mining and crafting loop.
+ * Planet-level generator for Quatia. Sector terrain is produced by
+ * {@link QuatiaSectorGenerator}; this class supplies the sector size, landing
+ * rules and the green rainforest colours used by the planet mesh.
  */
 public class QuatiaPlanetGenerator extends BlankPlanetGenerator{
-    private static final int mapSize = 160;
-    private static final int depositRadius = 9;
 
     @Override
     public int getSectorSize(Sector sector){
-        // The first colony is a single gridless sector; do not use the planet-scale default size.
-        return mapSize;
+        return QuatiaSectorGenerator.size;
+    }
+
+    /** Every sector of Quatia is habitable, numbered ones included. */
+    @Override
+    public boolean allowLanding(Sector sector){
+        return true;
     }
 
     @Override
-    protected void generate(){
-        int centerX = width / 2;
-        int centerY = height / 2;
-
-        for(Tile tile : tiles){
-            tile.setFloor(Blocks.grass.asFloor());
-        }
-
-        placeOre(Blocks.oreCopper, centerX - 28, centerY + 10);
-        placeOre(Blocks.oreLead, centerX + 28, centerY + 10);
-        placeOre(Blocks.oreCoal, centerX + 24, centerY - 26);
-        placeSand(centerX - 25, centerY - 25);
-
-        unlockStarterContent();
-        Schematics.placeLoadout(Loadouts.basicShard, centerX, centerY);
-
-        var core = world.tile(centerX, centerY).build;
-        if(core == null){
-            throw new IllegalStateException("Quatia's starter loadout did not place a core.");
-        }
-
-        //Enough material to establish the first drills and power chain; local deposits remain the
-        //source for continued production.
-        core.items.add(Items.copper, 350);
-        core.items.add(Items.lead, 250);
-        core.items.add(Items.coal, 100);
+    public void generate(Tiles tiles, Sector sector, WorldParams params){
+        new QuatiaSectorGenerator(sector).generate(tiles, params);
     }
 
-    private void unlockStarterContent(){
-        for(UnlockableContent content : new UnlockableContent[]{
-            Blocks.conveyor,
-            Blocks.router,
-            Blocks.mechanicalDrill,
-            Blocks.combustionGenerator,
-            Blocks.powerNode,
-            Blocks.siliconSmelter,
-            Items.lead,
-            Items.coal,
-            Items.silicon
-        }){
-            content.quietUnlock();
-        }
-    }
-
-    private void placeOre(Block ore, int centerX, int centerY){
-        float radiusSquared = depositRadius * depositRadius;
-        for(int x = centerX - depositRadius; x <= centerX + depositRadius; x++){
-            for(int y = centerY - depositRadius; y <= centerY + depositRadius; y++){
-                int dx = x - centerX, dy = y - centerY;
-                float distanceSquared = dx * dx + dy * dy;
-                if(distanceSquared <= radiusSquared){
-                    float density = 0.82f + 0.17f * (1f - distanceSquared / radiusSquared);
-                    if(rand.chance(density)){
-                        tiles.getn(x, y).setOverlay(ore);
-                    }
-                }
-            }
-        }
-    }
-
-    private void placeSand(int centerX, int centerY){
-        int radius = depositRadius + 2;
-        int radiusSquared = radius * radius;
-        for(int x = centerX - radius; x <= centerX + radius; x++){
-            for(int y = centerY - radius; y <= centerY + radius; y++){
-                int dx = x - centerX, dy = y - centerY;
-                if(dx * dx + dy * dy <= radiusSquared && rand.chance(0.9f)){
-                    tiles.getn(x, y).setFloor(Blocks.sand.asFloor());
-                }
-            }
-        }
+    /** Two rainforest greens for the planet's noise mesh. */
+    @Override
+    public void getColor(Vec3 position, Color out){
+        float n = noise(position.x * 0.7f, position.y * 0.7f, 3, 0.55, 1.6, 1f);
+        out.set(n > 0f ? 0x4f9a4aff : 0x2f6b38ff);
     }
 }

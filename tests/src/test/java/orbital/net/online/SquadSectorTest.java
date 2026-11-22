@@ -27,4 +27,13 @@ class SquadSectorTest{
         double n2 = arc.util.noise.Simplex.noise2d(222, 4, 0.55, 1.0 / 180.0, 40, 60);
         assertNotEquals(n1, n2, "different squad seeds must produce different terrain");
     }
+
+    @Test void seedMapsToPlanetSector(){
+        int a = SquadSectorRegistry.sectorIdForSeed(11);
+        int b = SquadSectorRegistry.sectorIdForSeed(300);
+        assertTrue(a >= 0 && a < 272);
+        assertTrue(b >= 0 && b < 272);
+        assertNotEquals(a, b, "distinct seeds should map to distinct planet sectors");
+        assertEquals(11, SquadSectorRegistry.sectorIdForSeed(11 + 272));
+    }
 }

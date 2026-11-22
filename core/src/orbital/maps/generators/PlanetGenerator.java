@@ -61,7 +61,7 @@ public abstract class PlanetGenerator extends BasicGenerator implements HexMeshe
             if(tmpItems == null) tmpItems = new ItemSeq();
             tmpItems.clear();
 
-            var rules = destination.preset.generator.map.rules();
+            var rules = new Rules(); //procedural Quatia sectors use the standard loadout
             for(var stack : rules.loadout){
                 if(stack.item.isOnPlanet(destination.planet)){
                     tmpItems.add(stack.item, stack.amount);

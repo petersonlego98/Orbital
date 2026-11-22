@@ -69,7 +69,7 @@ public class LaunchLoadoutDialog extends BaseDialog{
             if(!destination.allowLaunchLoadout()){
                 resources.clear();
                 if(destination.preset != null){
-                    var rules = destination.preset.generator.map.rules();
+                    var rules = new Rules(); //procedural Quatia sectors use the standard loadout
                     for(var stack : rules.loadout){
                         if(stack.item.isOnPlanet(sector.planet)){
                             resources.add(stack.item, stack.amount);

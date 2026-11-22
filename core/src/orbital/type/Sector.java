@@ -35,6 +35,9 @@ public class Sector{
     public @Nullable Sector shieldTarget;
     public SectorInfo info = new SectorInfo();
 
+    /** Seed of the squad that owns this sector, or -1 for a normal campaign sector. */
+    public long squadSeed = -1;
+
     /** Number 0-1 indicating the difficulty based on nearby bases. */
     public float threat;
     public boolean generateEnemyBase;

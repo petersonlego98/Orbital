@@ -96,9 +96,8 @@ public class SectorInfo{
 
     /** @return whether the sector was last saved with the same preset. if false, this means the preset changed, and thus the spawn/plan data should be discarded. */
     public boolean sectorDataMatches(Sector sector){
-        if(sector.preset != null && (sector.preset.generator.map.width != lastWidth || sector.preset.generator.map.height != lastHeight)){
-            return false;
-        }
+        //Quatia sectors are procedural and share one fixed size, so the map dimensions can no
+        //longer change between presets; the preset name is the only identity check needed.
         return Structs.eq(sector.preset == null ? null : sector.preset.name, lastPresetName);
     }
 

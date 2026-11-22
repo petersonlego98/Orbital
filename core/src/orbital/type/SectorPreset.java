@@ -14,7 +14,7 @@ import orbital.maps.generators.*;
 import orbital.mod.Mods.*;
 
 public class SectorPreset extends UnlockableContent{
-    public FileMapGenerator generator;
+    public WorldGenerator generator;
     public Planet planet;
     public Sector sector;
 
@@ -80,9 +80,6 @@ public class SectorPreset extends UnlockableContent{
 
     public void initialize(Planet planet, int sector, boolean override){
         this.planet = planet;
-        if(generator == null){
-            this.generator = new FileMapGenerator(fileName == null ? this.name : fileName, this);
-        }
         this.originalPosition = sector;
         if(!override){
             //auto remap based on data
@@ -93,6 +90,11 @@ public class SectorPreset extends UnlockableContent{
         }
         sector %= planet.sectors.size;
         this.sector = planet.sectors.get(sector == -1 ? 0 : sector);
+        if(generator == null){
+            //All Quatia sectors are procedural; the historical campaign .msav maps are no
+            //longer used. The sector keeps each preset's terrain stable and distinct.
+            this.generator = new orbital.maps.generators.QuatiaSectorGenerator(this.sector);
+        }
 
         if(sector != -1){
             planet.preset(sector, this);

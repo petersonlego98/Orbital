@@ -1,6 +1,7 @@
 package orbital.net.online;
 
 import arc.*;
+import arc.math.*;
 import arc.struct.*;
 import arc.util.*;
 import orbital.io.*;
@@ -22,22 +23,30 @@ public final class SquadSectorRegistry{
     public static class Squad{
         public String id;
         public long seed;
+        /** Which of Quatia's 272 sectors belongs to this squad. */
+        public int sectorId = -1;
         public Seq<String> uuids = new Seq<>();
         public long createdAt;
 
         public Squad(){
         }
 
-        public Squad(String id, long seed){
+        public Squad(String id, long seed, int sectorId){
             this.id = id;
             this.seed = seed;
+            this.sectorId = sectorId;
             this.createdAt = Time.millis();
         }
     }
 
+    /** Number of sectors on Quatia's full grid. */
+    private static final int sectorCount = 272;
+
     private final ObjectMap<String, Squad> squads = new ObjectMap<>();
     /** Seed -> group id, to guarantee uniqueness across groups. */
     private final ObjectMap<Long, String> usedSeeds = new ObjectMap<>();
+    /** Sector id -> group id, so two squads never share a planet sector. */
+    private final ObjectMap<Integer, String> usedSectors = new ObjectMap<>();
 
     public SquadSectorRegistry(){
         load();
@@ -59,13 +68,15 @@ public final class SquadSectorRegistry{
             }
         }
 
-        //Create a new squad with a fresh unique seed.
+        //Create a new squad with a fresh unique seed and its own planet sector.
         String id = newSquadId();
         long seed = freshSeed(id);
-        Squad squad = new Squad(id, seed);
+        int sectorId = freshSector(seed);
+        Squad squad = new Squad(id, seed, sectorId);
         squad.uuids.add(uuid);
         squads.put(id, squad);
         usedSeeds.put(seed, id);
+        usedSectors.put(sectorId, id);
         save();
         return squad;
     }
@@ -93,6 +104,31 @@ public final class SquadSectorRegistry{
     public long seedFor(String id){
         Squad squad = squads.get(id);
         return squad == null ? -1 : squad.seed;
+    }
+
+    /** @return the planet sector id assigned to a squad, or -1 when unknown. */
+    public int sectorIdFor(String id){
+        Squad squad = squads.get(id);
+        return squad == null ? -1 : squad.sectorId;
+    }
+
+    /** @return the squad that owns a planet sector, or null when unassigned. */
+    public @Nullable Squad bySector(int sectorId){
+        String id = usedSectors.get(sectorId);
+        return id == null ? null : squads.get(id);
+    }
+
+    /** @return the planet sector index a squad seed maps to (before collision resolution). */
+    public static int sectorIdForSeed(long seed){
+        return (int)Mathf.mod(seed, sectorCount);
+    }
+
+    private int freshSector(long seed){
+        int candidate = sectorIdForSeed(seed);
+        while(usedSectors.containsKey(candidate)){
+            candidate = (candidate + 1) % sectorCount;
+        }
+        return candidate;
     }
 
     private String newSquadId(){
@@ -127,8 +163,13 @@ public final class SquadSectorRegistry{
                 for(var entry : stored.entries()){
                     if(entry.value == null || entry.value.seed == 0 && entry.value.uuids == null) continue;
                     if(entry.value.uuids == null) entry.value.uuids = new Seq<>();
+                    //Older registries had no sector assignment; derive a free one from the seed.
+                    if(entry.value.sectorId < 0 || entry.value.sectorId >= sectorCount || usedSectors.containsKey(entry.value.sectorId)){
+                        entry.value.sectorId = freshSector(entry.value.seed);
+                    }
                     squads.put(entry.key, entry.value);
                     usedSeeds.put(entry.value.seed, entry.key);
+                    usedSectors.put(entry.value.sectorId, entry.key);
                 }
             }
         }catch(Throwable e){

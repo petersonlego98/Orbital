@@ -39,7 +39,8 @@ public class MapFixer{
 
                 boolean isHidden = f.path().contains("/hidden/");
 
-                SectorPreset preset = content.sectors().find(s -> s.generator.map.file.absolutePath().equals(f.absolutePath()));
+                //Quatia presets are procedural now; match the historical map file by name.
+                SectorPreset preset = content.sectors().find(s -> s.name.equals(f.nameWithoutExtension()));
                 if(preset == null) return;
 
                 //uniquely broken (TODO: remove and fix 263)

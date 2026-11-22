@@ -1,6 +1,8 @@
 package orbital.net.online;
 
 import arc.math.Mathf;
+import orbital.core.*;
+import orbital.entities.*;
 import orbital.gen.*;
 
 import static orbital.Vars.*;
@@ -50,5 +52,35 @@ public final class InputSimulator{
         }else{
             unit.move(mx * speed, my * speed);
         }
+
+        confineToQuadrant(unit);
+    }
+
+    /** Keeps a squad player inside the 80x80-tile quadrant assigned to its team slot. */
+    private static void confineToQuadrant(Unit unit){
+        //Only squad-owned sectors use the four-quadrant layout.
+        if(state.rules.sector == null || state.rules.sector.squadSeed < 0) return;
+
+        Player player = unit.getPlayer();
+        if(player == null || player.con == null) return;
+
+        String squadId = SquadAssigner.squadOf(player.con.uuid);
+        if(squadId == null) return;
+
+        SquadSectorRegistry registry = OnlineHolder.squads();
+        if(registry == null) return;
+        int slot = registry.slot(squadId, player.con.uuid);
+        if(slot < 0 || slot > 3) return;
+
+        int half = orbital.maps.generators.QuatiaSectorGenerator.size / 2;
+        int minX = (slot % 2 == 0) ? 0 : half;
+        int maxX = (slot % 2 == 0) ? half : orbital.maps.generators.QuatiaSectorGenerator.size;
+        int minY = (slot < 2) ? 0 : half;
+        int maxY = (slot < 2) ? half : orbital.maps.generators.QuatiaSectorGenerator.size;
+
+        //Two-tile margin so the unit never sits on the exact division line.
+        float margin = World.conv(2f);
+        unit.x = Mathf.clamp(unit.x, World.conv(minX) + margin, World.conv(maxX) - margin);
+        unit.y = Mathf.clamp(unit.y, World.conv(minY) + margin, World.conv(maxY) - margin);
     }
 }
