@@ -35,6 +35,8 @@ public class SoundControl{
     protected Interval timer = new Interval(4);
     protected long lastPlayed;
     protected @Nullable Music current;
+    /** Track that was requested while it was still being decoded. */
+    protected @Nullable Music pendingOnce;
     protected float fade;
     protected boolean silenced, keepSilent;
 
@@ -120,6 +122,13 @@ public class SoundControl{
         boolean paused = state.isGame() && Core.scene.hasDialog();
         boolean playing = state.isGame();
 
+        //a track that was asked for while it was still decoding starts as soon as it is ready
+        if(pendingOnce != null && MusicRegistry.isReady(pendingOnce)){
+            Music pending = pendingOnce;
+            pendingOnce = null;
+            playOnce(pending);
+        }
+
         //check if current track is finished
         if(current != null && !current.isPlaying()){
             current = null;
@@ -195,6 +204,11 @@ public class SoundControl{
         if(interrupt && current != null){
             current.stop();
             current = null;
+        }
+        //the track may still be decoding in the background
+        if(music != null && !MusicRegistry.request(music)){
+            pendingOnce = music;
+            return;
         }
         playOnce(music);
         if(current == music){
@@ -283,6 +297,10 @@ public class SoundControl{
         }
 
         if(current == null && music != null){
+            //the track may still be decoding in the background: ask for it and start it on one of
+            //the next frames, when the decode is done
+            if(!MusicRegistry.request(music)) return;
+
             //begin playing in a new track
             current = music;
             current.setLooping(true);
@@ -316,6 +334,12 @@ public class SoundControl{
     /** Plays a music track once and only once. If something is already playing, does nothing.*/
     protected void playOnce(Music music){
         if(current != null || music == null || !shouldPlay()) return; //do not interrupt already-playing tracks
+
+        //the track may still be decoding: remember it and play it as soon as it is ready
+        if(!MusicRegistry.request(music)){
+            pendingOnce = music;
+            return;
+        }
 
         //save last random track played to prevent duplicates
         lastRandomPlayed = music;
