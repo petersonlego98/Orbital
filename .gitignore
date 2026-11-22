@@ -32,6 +32,13 @@ saves/
 core/assets/saves/
 /core/assets/saves/
 steam_appid.txt
+# Assinatura de release (nunca commitar)
+keystore.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+android/keystores/
 /test_files/
 /android/assets/orbital-maps/
 /android/assets/orbital-saves/
