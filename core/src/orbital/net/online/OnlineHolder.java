@@ -11,6 +11,7 @@ public final class OnlineHolder{
     private static @Nullable EventReplicator replicator;
     private static @Nullable KeyframeManager keyframes;
     private static @Nullable InputReplicator inputs;
+    private static @Nullable SquadSectorRegistry squads;
 
     private OnlineHolder(){
     }
@@ -22,6 +23,16 @@ public final class OnlineHolder{
         OnlineHolder.keyframes = new KeyframeManager(store.directory().resolveSibling("keyframes"));
         OnlineHolder.inputs = new InputReplicator();
         if(AuthoritativeMode.enabled()) OnlineHolder.inputs.install();
+        installSquads();
+    }
+
+    /** Installs only the persistent squad registry (works without the full event log). */
+    public static void installSquads(){
+        if(squads == null) squads = new SquadSectorRegistry();
+    }
+
+    public static @Nullable SquadSectorRegistry squads(){
+        return squads;
     }
 
     public static @Nullable InputReplicator inputs(){

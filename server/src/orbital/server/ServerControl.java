@@ -509,6 +509,33 @@ public class ServerControl implements ApplicationListener{
             info("Stopped server.");
         });
 
+        handler.register("squad", "<squadId>", "Generate/load the unique persistent sector for a squad of up to 4 players.", arg -> {
+            var registry = orbital.net.online.OnlineHolder.squads();
+            if(registry == null){
+                err("Squad sectors are not enabled (start with -Dorbital.eventlog=1).");
+                return;
+            }
+            var squad = registry.byId(arg[0]);
+            if(squad == null){
+                err("No squad with id '@'. Known squads:", arg[0]);
+                registry.all().forEach(s -> info("  @ (seed @, @ players)", s.id, s.seed, s.uuids.size));
+                return;
+            }
+            try{
+                orbital.net.online.SquadSectorSession.generateAndSave(squad.id);
+                info("Sector for @ generated with seed @ (saved).", squad.id, squad.seed);
+            }catch(Throwable t){
+                err("Could not generate squad sector: @", t.getMessage());
+            }
+        });
+
+        handler.register("squads", "List persistent squads and their sector seeds.", arg -> {
+            var registry = orbital.net.online.OnlineHolder.squads();
+            if(registry == null){ err("Squad sectors are not enabled."); return; }
+            if(registry.size() == 0){ info("No squads yet."); return; }
+            registry.all().forEach(s -> info("@ -> seed @ (@ players)", s.id, s.seed, s.uuids.size));
+        });
+
         handler.register("host", "[mapname] [mode]", "Open the server. Will default to survival and a random map if not specified.", arg -> {
             if(state.isGame()){
                 err("Already hosting. Type 'stop' to stop hosting first.");

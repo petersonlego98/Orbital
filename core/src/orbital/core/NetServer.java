@@ -336,8 +336,13 @@ public class NetServer implements ApplicationListener{
 
             con.player = player;
 
+            //Authoritative squads: assign a persistent 4-player squad and its team slot. Two
+            //different squads get two different persisted sector seeds.
+            Team squadTeam = orbital.net.online.SquadAssigner.assign(player);
+
             //playing in pvp mode automatically assigns players to teams
-            player.team(assignTeam(player));
+            if(squadTeam == null) player.team(assignTeam(player));
+            else player.team(squadTeam);
 
             sendWorldAndAssets(player);
 

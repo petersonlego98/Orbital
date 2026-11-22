@@ -72,6 +72,10 @@ public class ServerLauncher implements ApplicationListener{
 
         bases.load();
 
+        //Persistent squad registry: each group of up to 4 players gets a unique sector seed.
+        //Available even without the authoritative event log.
+        orbital.net.online.OnlineHolder.installSquads();
+
         //Optional authoritative event log. Off by default: the legacy snapshot protocol stays the
         //default until the WebSocket transport is selected. Enable with -Dorbital.eventlog=1 and
         //optionally set the directory with -Dorbital.eventlog.dir=... .

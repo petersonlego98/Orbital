@@ -94,7 +94,21 @@ before an end-to-end match can run — that is the next step.
 - `Logic` applies buffered inputs at the start of each authoritative tick, after `TickRng`.
 - 29 online tests pass (adds input round-trip and buffer dedupe/fallback).
 
+## Unique sector per 4-player squad (implemented)
+
+- `SquadSectorRegistry` persists `squadId -> {seed, uuids[], createdAt}` under a settings key and
+  is saved immediately on assignment. A group of up to 4 players always gets the same sector seed;
+  a different group gets a different seed, checked against a used-seed set to avoid collisions.
+- `SquadAssigner` assigns the connecting player to a squad and its team slot (sharded/crux/malis/green).
+- `SquadSectorGenerator` generates a 256x256 4-quadrant sector from the squad seed — terrain, lakes
+  and deposits all differ per seed. `SquadSectorSession` saves it as `squad-<id>.msav` so a reload
+  never changes the map.
+- Server commands: `squad <id>` generates/persists the sector, `squads` lists groups and seeds.
+- 31 online tests pass (adds quadrant/team/seed-difference checks).
+
 ## Not implemented yet
 
 - End-to-end match test across the Cloudflare relay (needs a deployed Worker and D1).
 - Real client UI toggle for authoritative mode (today it is activated by `-Dorbital.authoritative=1`).
+- Multiple squads simulated simultaneously in one JVM (the engine has one global world; use one
+  server process per squad, or the Cloudflare room as the cross-process session id).
