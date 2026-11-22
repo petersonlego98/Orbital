@@ -84,6 +84,7 @@ export default{
       let send;
       let closed = false;
 
+      let timer;
       const stream = new ReadableStream({
         start(controller){
           send = (frame) =>{
@@ -97,25 +98,31 @@ export default{
           room.clients.add(send);
           //Tell the client which seq the current world corresponds to.
           send([OP_KEYFRAME, ...varintBytes(room.seq)]);
-        },
-        async pull(controller){
-          if(closed){
-            controller.close();
-            return;
-          }
-          for(const event of room.events){
-            if(event.seq > cursor){
-              send(eventFrame(event));
-              cursor = event.seq;
+
+          //setInterval (not an async pull loop) keeps the Worker responsive: each tick is a
+          //separate callback and awaiting network time is free on the Workers free plan.
+          timer = setInterval(() =>{
+            if(closed) return;
+            for(const event of room.events){
+              if(event.seq > cursor){
+                send(eventFrame(event));
+                cursor = event.seq;
+              }
             }
-          }
-          //Yield so the Worker does not burn CPU; awaiting is free wall-clock time.
-          await new Promise(resolve => setTimeout(resolve, POLL_MS));
+          }, POLL_MS);
         },
         cancel(){
           closed = true;
+          if(timer) clearInterval(timer);
           if(send) room.clients.delete(send);
         }
+      });
+
+      //Cloudflare cancels the request when the client disconnects; release the timer then too.
+      request.signal.addEventListener('abort', () =>{
+        closed = true;
+        if(timer) clearInterval(timer);
+        if(send) room.clients.delete(send);
       });
 
       return new Response(stream, {
