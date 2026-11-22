@@ -64,6 +64,9 @@ public class ContentLoader{
         Liquids.load();
         Bullets.load();
         UnitTypes.load();
+        //Every non-enemy unit shares the starter unit's mining laser and can mine every ore.
+        //Must run before Content.init(), which builds the per-unit mine command list.
+        applyUniversalMining();
         TurretLoadouts.load();
         Blocks.load();
         //overdrive support modules reuse the blocks' real speedBoost values as timed unit statuses
@@ -73,6 +76,19 @@ public class ContentLoader{
         Planets.load();
         SectorPresets.load();
         UniversalTechTree.load();
+    }
+
+    /** Gives every non-enemy unit the starter unit's mining speed and access to all ores. */
+    private void applyUniversalMining(){
+        for(UnitType unit : content.units()){
+            //Missiles/projectiles are not enemy units but are not playable; skip them too.
+            if(unit.isEnemy || !unit.playerControllable) continue;
+            unit.mineTier = 5;            //hardest ore (tungsten)
+            unit.mineSpeed = 6.5f;        //same as the starter alpha unit
+            unit.mineFloor = true;        //floor deposits
+            unit.mineWalls = true;        //wall veins (tungsten, beryllium, graphite)
+            unit.mineItems = Items.universalItems; //AI considers every resource
+        }
     }
 
     /** Creates mod content, if applicable. */
