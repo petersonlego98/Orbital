@@ -55,21 +55,42 @@ public class AndroidLauncher extends AndroidApplication{
 
         initialize(new ClientLauncher(){
 
-            /** Match the game's frame cap to the device screen refresh rate by default. */
+            /** Match the game's frame cap to the MAXIMUM refresh rate the screen supports. */
             @Override
             protected int defaultFpsCap(){
                 try{
                     Display display = ((WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
-                    float refresh = display.getRefreshRate();
+                    float refresh = 0f;
+                    if(VERSION.SDK_INT >= VERSION_CODES.R){
+                        //getRefreshRate() returns the current mode (often 60Hz to save battery);
+                        //getSupportedRefreshRates() lists every mode the panel actually supports.
+                        for(float rate : display.getSupportedRefreshRates()){
+                            if(rate > refresh) refresh = rate;
+                        }
+                    }
+                    if(refresh == 0f) refresh = display.getRefreshRate();
                     if(refresh >= 30f && refresh <= 240f){
                         int cap = Math.round(refresh);
-                        Log.info("[Android] screen refresh @ Hz, default fps cap set to @", refresh, cap);
+                        Log.info("[Android] max screen refresh @ Hz, fps cap set to @", refresh, cap);
                         return cap;
                     }
                 }catch(Throwable e){
-                    Log.warn("[Android] could not read screen refresh rate: @", e.getMessage());
+                    Log.warn("[Android] could not read screen refresh rates: @", e.getMessage());
                 }
-                return 60;
+                return 120;
+            }
+
+            /** On upgrade, replace an old saved cap once so the 120Hz default actually takes effect. */
+            @Override
+            protected void applyFpsCapDefault(){
+                if(!Core.settings.getBool("fpscap.autoset.v2", false)){
+                    int cap = defaultFpsCap();
+                    Core.settings.put("fpscap", cap);
+                    Core.settings.put("fpscap.autoset.v2", true);
+                    Log.info("[Android] applying @ fps cap on upgrade", cap);
+                }else{
+                    super.applyFpsCapDefault();
+                }
             }
 
             @Override
