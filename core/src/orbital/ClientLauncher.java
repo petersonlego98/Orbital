@@ -102,11 +102,10 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
         //the cap are switched on in applyGameplayFrameSettings() once loading finishes.
         settings.defaults("vsync", true);
         settings.defaults("fpscap", 120);
-        //Bloom builds several full-screen framebuffers and shaders in one frame at the end of the
-        //load, and is expensive on an Intel iGPU in OpenGL 2. Default it off there (the player can
-        //still enable it under Settings > Graphics). This removes the ~1s stall and keeps the GPU
-        //busy for no reason.
-        if(weakGPU) settings.defaults("bloom", false);
+        //Bloom is enabled by default on every profile again. It was previously disabled for
+        //weak/software GPUs to avoid a ~1s stall at the end of the load, but the visual effect is
+        //restored per request; players can still turn it off under Settings > Graphics.
+        settings.defaults("bloom", true);
         //Explicitly keep vsync off while loading so the frame loop can drain assets at full speed.
         graphics.setVSync(false);
         Log.info("[GL] loading without frame limit; vsync/cap apply after load (weak/software GPU: @)", weakGPU);

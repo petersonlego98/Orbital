@@ -142,20 +142,20 @@ public class DesktopLauncher extends ClientLauncher{
                 hdpiMode = HdpiMode.logical;
 
                 //On Windows, Intel drivers (especially the HD 4600 / ig75icd64.dll) are buggy with
-                //modern OpenGL: they corrupt memory and crash in SDL_GL_SwapWindow. Force the oldest
-                //rotation we can request and disable MSAA, which is another common crash trigger on
-                //those drivers. See https://github.com/Anuken/Orbital/issues/11041
+                //modern OpenGL: they corrupt memory and crash in SDL_GL_SwapWindow. Keep the oldest
+                //rotation we can request, but restore MSAA (samples=16) for image quality per request.
+                //See https://github.com/Anuken/Orbital/issues/11041
                 boolean softwareGL = System.getProperty("orbital.softwaregl") != null
                     || System.getenv("ORBITAL_SOFTWAREGL") != null
                     || System.getenv("LIBGL_ALWAYS_SOFTWARE") != null;
                 if(IntelGpuCheck.wasIntel() || softwareGL){
                     allowGl30 = false;
                     coreProfile = false;
-                    samples = 0;
+                    samples = 16;
                     //Request a strict 2.1 context; Intel ICDs misbehave with 4.x contexts, and a
                     //software renderer has no reason to request a high version either.
                     glVersions = new int[][]{{2, 1}, {2, 0}};
-                    Log.info("[GL] @: forced OpenGL 2.1 compatibility context, MSAA off.",
+                    Log.info("[GL] @: forced OpenGL 2.1 compatibility context, MSAA on.",
                         softwareGL ? "software renderer" : "Intel GPU");
                 }else if(OS.isMac){
                     //MacOS supports 4.1 at most
