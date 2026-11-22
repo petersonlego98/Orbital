@@ -110,7 +110,10 @@ android{
             shrinkResources true
             proguardFiles("proguard-rules.pro")
             debuggable false
-            signingConfig signingConfigs.release
+            // Sem keystore configurado, gera AAB sem assinar para o usuário assinar depois.
+            if(keystorePropertiesFile.exists() || project.hasProperty("RELEASE_STORE_FILE")){
+                signingConfig signingConfigs.release
+            }
         }
     }
 
