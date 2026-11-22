@@ -55,7 +55,7 @@ android{
         //Same release number as the Windows build (v1.2.0, see README and
         //docs/RELEASE_NOTES_v1.2.0.md). versionCode is the numeric encoding
         //major*100 + minor*10 + patch so it keeps growing on every release.
-        versionCode 120
+        versionCode 121
         versionName "1.2.0"
         multiDexEnabled = true
     }

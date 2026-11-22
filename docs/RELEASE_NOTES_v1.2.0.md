@@ -18,7 +18,7 @@ registra a desinstalação em `HKCU`. O JRE 21 vai embutido — não é preciso 
 ### Android
 
 **Download:** `Orbital-1.2.0-android-debug.apk` (~83 MB, `versionName` 1.2.0,
-`versionCode` 120)
+`versionCode` 121)
 `SHA-256: 91b65e5ae292484b3331231ae2ba6822687f20d43ddd42cfd5b4d4489d899630`
 
 1. Baixe o APK no celular (ou copie pelo `adb`).
