@@ -391,6 +391,14 @@ public class HudFragment{
                         && orbital.input.FixedCameraControl.selected() != null)
                     .update(b -> b.setColor(orbital.input.FixedCameraControl.awaitingDestination()
                         ? Pal.accent : Color.white));
+
+                //"menu" button: returns to the main menu (saves first, like the pause menu's quit).
+                //Desktop only: mobile already has one in its top-left button strip.
+                tools.button("@menu", Icon.menu, () -> ui.paused.runExitSave())
+                    .name("main-menu")
+                    .tooltip("@menu")
+                    .size(mobile ? 60f : 96f, mobile ? 36f : 44f)
+                    .visible(() -> !mobile && shown());
             }).top().right().padRight(6f);
 
             //minimap + coordinates

@@ -12,6 +12,7 @@ import arc.math.*;
 import arc.util.*;
 import orbital.ai.*;
 import orbital.audio.*;
+import orbital.content.*;
 import orbital.core.*;
 import orbital.engine.validation.EngineValidation;
 import orbital.ctype.*;
@@ -20,6 +21,7 @@ import orbital.game.Saves.*;
 import orbital.game.*;
 import orbital.gen.*;
 import orbital.graphics.*;
+import orbital.type.*;
 import orbital.io.*;
 import orbital.maps.*;
 import orbital.mod.*;
@@ -42,6 +44,9 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
     /** True for Intel iGPUs and software renderers (Mesa llvmpipe, SwiftShader). */
     private boolean weakGPU = false;
     private LoadRenderer loader;
+    /** Load timeline bookkeeping, used to report which asset is stalling the bar. */
+    private String lastLoadingAsset = "";
+    private long loadingAssetStart, lastLoadProgressLog;
 
     @Override
     public void setup(){
@@ -61,24 +66,33 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
         platform = this;
         maxTextureSize = Gl.getInt(Gl.maxTextureSize);
         beginTime = Time.millis();
+        loadingAssetStart = beginTime;
 
         //debug GL information
         Log.info("[GL] Version: @", graphics.getGLVersion());
         Log.info("[GL] Max texture size: @", maxTextureSize);
         Log.info("[GL] Using @ API.", gl30 != null ? "OpenGL 3" : "OpenGL 2");
 
-        IntelGpuCheck.init(graphics.getGLVersion().vendorString);
+        //The live vendor string is authoritative here: the GL context already exists, so the
+        //renderer is known for this very launch. IntelGpuCheck keeps a file on disk because the
+        //desktop launcher has to choose the GL version *before* the window exists - reading that
+        //cached value here left the Intel mitigations off for one launch, and that launch is the
+        //one that uploads the 4096px atlas, merges the font atlas and turns bloom on.
+        String glVendor = graphics.getGLVersion().vendorString;
+        IntelGpuCheck.init(glVendor);
 
-        boolean isIntel = IntelGpuCheck.wasIntel();
+        boolean intelVendor = glVendor != null && glVendor.toLowerCase(java.util.Locale.ROOT).contains("intel");
+        boolean isIntel = intelVendor || IntelGpuCheck.wasIntel();
         //Software renderers (Mesa llvmpipe, SwiftShader) run on the CPU: no GPU to corrupt, but a
         //low frame budget. Treat them like a weak GPU for bloom/cap defaults.
         String glString = graphics.getGLVersion().toString();
         boolean softwareGL = glString.contains("llvmpipe") || glString.contains("SwiftShader")
-            || glString.contains("softpipe") || glString.contains("softpipe") || glString.contains("Mesa");
+            || glString.contains("softpipe") || glString.contains("Mesa");
         weakGPU = isIntel || softwareGL;
 
         if(isIntel && !graphics.isGL30Available()) Log.warn("[GL] Intel GPU detected on previous launch. Due to memory corruption issues, OpenGL 3 support has been disabled for Intel GPUs. See issue #11041.");
         if(softwareGL) Log.info("[GL] Software renderer detected (@): CPU rasterization active", glString);
+        Log.info("[GL] weak GPU profile: @ (intel: @, software: @)", weakGPU, intelVendor, softwareGL);
 
         if(gl30 == null && !isIntel) Log.warn("[GL] Your device or video drivers do not support OpenGL 3. This will cause performance issues.");
 
@@ -146,29 +160,14 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
 
             @Override
             public Music loadSync(AssetManager manager, String fileName, Fi file, MusicParameter parameter){
-                if(parameter != null && parameter.music != null){
-                    mainExecutor.submit(() -> {
-                        try{
-                            parameter.music.load(file);
-                        }catch(Throwable t){
-                            Log.err("Error loading music: " + file, t);
-                        }
-                    });
+                Music music = parameter != null && parameter.music != null ? parameter.music : new Music();
 
-                    return parameter.music;
-                }else{
-                    Music music = new Music();
-
-                    mainExecutor.submit(() -> {
-                        try{
-                            music.load(file);
-                        }catch(Throwable t){
-                            Log.err("Error loading music: " + file, t);
-                        }
-                    });
-
-                    return music;
-                }
+                //The track is only registered here. Decoding it now would spend ~30 CPU-seconds
+                //on 25 MB of OGG while the game is still loading, freezing the loading screen and
+                //stealing cores from the asset loader. MusicRegistry decodes it in the background
+                //when the track is first needed.
+                MusicRegistry.register(music, file);
+                return music;
             }
         });
 
@@ -291,6 +290,7 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
             if(loader != null){
                 loader.draw();
             }
+            logLoadingProgress();
             if(assets.update(1000 / loadingFPS)){
                 loader.dispose();
                 loader = null;
@@ -338,6 +338,26 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
                                 boolean started = orbital.game.TestEnginePhase.start(units);
                                 Log.info("[cpuprofile] stress battle requested=@ units, started=@", units, started);
                             });
+                        }
+                    }
+
+                    //On desktop, open the star map focused on the last played sector right after
+                    //loading, leaving the player ready to enter it. PlanetDialog.show() switches to
+                    //the system view when there is no current sector, so lookAt() must run after it.
+                    if(!mobile && ui != null && ui.planet != null){
+                        try{
+                            ui.planet.show();
+                            Planet planet = state == null ? null :
+                                (state.rules.sector != null ? state.rules.sector.planet
+                                    : ui.planet.state.planet);
+                            if(planet == null) planet = Planets.serpulo;
+                            Sector sector = planet.getLastSector();
+                            if(sector != null){
+                                ui.planet.lookAt(sector);
+                                ui.planet.selectSector(sector);
+                            }
+                        }catch(Throwable e){
+                            Log.warn("[load] could not focus the star map: @", e.getMessage());
                         }
                     }
 
@@ -389,6 +409,41 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
         //reset the limiter clock so the first gameplay frames are not throttled by stale state
         lastTargetFps = -1;
         nextFrame = Time.nanos();
+    }
+
+    /**
+     * Writes the load timeline to the log: the percentage of the bar, the asset that is being
+     * processed and how long that asset held the screen.
+     *
+     * <p>Arc's asset manager blocks the render thread while an asset is loaded (the async loader
+     * is waited on with {@code Future.get()}, and the synchronous loaders run inline). While it is
+     * blocked, no frame is drawn, so the screen keeps showing the last frame - a bar frozen at some
+     * percentage. The log is the only place where the blocking asset is visible, so it is written
+     * once per second and whenever an asset takes longer than half a second.</p>
+     */
+    private void logLoadingProgress(){
+        if(assets == null) return;
+
+        long now = Time.millis();
+        String name = null;
+        AssetDescriptor current = assets.getCurrentLoading();
+        if(current != null) name = current.fileName;
+
+        if(name != null && !name.equals(lastLoadingAsset)){
+            long held = now - loadingAssetStart;
+            //only report the assets that actually hold the screen for a noticeable time
+            if(held >= 500){
+                Log.info("[load] @ held the screen for @ms (total @ms)", lastLoadingAsset, held, now - beginTime);
+            }
+            lastLoadingAsset = name;
+            loadingAssetStart = now;
+        }
+
+        if(now - lastLoadProgressLog >= 1000){
+            lastLoadProgressLog = now;
+            Log.info("[load] @% (@ms) current: @",
+                Math.round(assets.getProgress() * 100f), now - beginTime, name == null ? "-" : name);
+        }
     }
 
     @Override
