@@ -1344,6 +1344,8 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
     }
 
     boolean hasNoCandidate(Sector sector){
+        //All Quatia sectors are directly habitable; no base or launch chain is required.
+        if(sector.planet == orbital.content.Planets.qatia) return false;
         return sector != sector.planet.getStartSector() && !sector.hasBase() && findLauncher(sector) == null;
     }
 

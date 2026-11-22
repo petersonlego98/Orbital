@@ -44,7 +44,8 @@ public final class ExpeditionClock{
     }
 
     public static boolean isExpedition(@Nullable Sector sector){
-        return sector != null && sector == sector();
+        //The asteroid expedition (Gier) was removed; every Quatia sector is now playable directly.
+        return false;
     }
 
     /** @return whether the player is currently inside the expedition sector. */

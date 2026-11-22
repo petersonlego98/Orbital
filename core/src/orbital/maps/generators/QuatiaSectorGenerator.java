@@ -122,7 +122,8 @@ public class QuatiaSectorGenerator implements WorldGenerator{
     private void rainforest(){
         for(Tile tile : tiles){
             float n = Simplex.noise2d(seed + 11, 3, 0.55, 1f / 42f, tile.x, tile.y);
-            tile.setFloor(n > 0.22f ? Blocks.moss.asFloor() : (n > -0.28f ? Blocks.grass.asFloor() : Blocks.dirt.asFloor()));
+            //grass is the green Amazon floor; moss (purple in this fork) is only a rare accent.
+            tile.setFloor(n > 0.52f ? Blocks.moss.asFloor() : (n > -0.4f ? Blocks.grass.asFloor() : Blocks.dirt.asFloor()));
         }
     }
 
@@ -130,9 +131,9 @@ public class QuatiaSectorGenerator implements WorldGenerator{
     private void highlands(){
         for(Tile tile : tiles){
             float m = Simplex.noise2d(seed + 23, 3, 0.6, 1f / 30f, tile.x, tile.y);
-            if(m > 0.46f){
-                tile.setFloor((m > 0.68f ? Blocks.snow.asFloor() : Blocks.stone.asFloor()));
-            }else if(m > 0.38f && rand.chance(0.35f)){
+            if(m > 0.40f){
+                tile.setFloor((m > 0.58f ? Blocks.snow.asFloor() : Blocks.stone.asFloor()));
+            }else if(m > 0.33f && rand.chance(0.35f)){
                 tile.setFloor(Blocks.basalt.asFloor());
             }
         }
@@ -143,8 +144,8 @@ public class QuatiaSectorGenerator implements WorldGenerator{
         for(Tile tile : tiles){
             if(tile.floor().isLiquid || tile.floor() == Blocks.snow || tile.floor() == Blocks.ice) continue;
             float r = 1f - Math.abs(Simplex.noise2d(seed + 37, 2, 0.6, 1f / 36f, tile.x, tile.y));
-            if(r > 0.90f){
-                tile.setFloor(r > 0.965f ? Blocks.deepwater.asFloor() : Blocks.water.asFloor());
+            if(r > 0.875f){
+                tile.setFloor(r > 0.955f ? Blocks.deepwater.asFloor() : Blocks.water.asFloor());
             }
         }
     }
@@ -154,7 +155,7 @@ public class QuatiaSectorGenerator implements WorldGenerator{
         for(Tile tile : tiles){
             if(tile.floor() != Blocks.stone && tile.floor() != Blocks.basalt) continue;
             float c = 1f - Math.abs(Simplex.noise2d(seed + 53, 2, 0.7, 1f / 16f, tile.x, tile.y));
-            if(c > 0.925f){
+            if(c > 0.88f){
                 tile.setFloor(rand.chance(0.75f) ? Blocks.slag.asFloor() : Blocks.hotrock.asFloor());
             }
         }
@@ -163,9 +164,9 @@ public class QuatiaSectorGenerator implements WorldGenerator{
     /** Cryofluid streams running down the snowy peaks. */
     private void cryoStreams(){
         for(Tile tile : tiles){
-            if(tile.floor() != Blocks.snow && tile.floor() != Blocks.ice) continue;
+            if(tile.floor() != Blocks.snow && tile.floor() != Blocks.ice && tile.floor() != Blocks.iceSnow) continue;
             float c = 1f - Math.abs(Simplex.noise2d(seed + 71, 2, 0.7, 1f / 20f, tile.x, tile.y));
-            if(c > 0.93f){
+            if(c > 0.88f){
                 tile.setFloor(Blocks.cryofluid.asFloor());
             }
         }
@@ -196,7 +197,7 @@ public class QuatiaSectorGenerator implements WorldGenerator{
             for(Tile tile : tiles){
                 if(tile.floor().isLiquid || tile.floor() == Blocks.snow) continue;
                 float n = Simplex.noise2d(seed + 100 + i * 17, 2, 0.7, 1f / scales[i], tile.x, tile.y);
-                if(n > 0.62f && rand.chance(0.75f)){
+                if(n > 0.78f && rand.chance(0.55f)){
                     tile.setOverlay(deposits[i]);
                 }
             }
