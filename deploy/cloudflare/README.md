@@ -10,12 +10,14 @@ what keeps the session in the kbps range.
 ```bash
 cd deploy/cloudflare
 wrangler login
-wrangler d1 create orbital-events        # copy the printed database_id into wrangler.toml
-wrangler d1 execute orbital-events --file=schema.sql
 wrangler deploy
 ```
 
-The WebSocket endpoint is `wss://orbital-online.<your-subdomain>.workers.dev/ws?room=default`.
+That's it — no D1 database, no Durable Object, no paid resource. The SSE endpoint is
+`https://orbital-online.<your-subdomain>.workers.dev/events?room=default`.
+
+The Java client is `SseClient` (same connect/send/receive API as the old `WsClient`), used by
+`OnlineClient`. Commands are POSTed to `/event?room=default`.
 
 ## Client
 
@@ -27,15 +29,17 @@ Java side (in `core`):
 
 Enable the server-side log with `-Dorbital.eventlog=1 -Dorbital.eventlog.dir=<folder>`.
 
-## Free tier limits
+## Free tier limits (100% free, no payment method needed)
 
-- Workers: 100k requests/day — fine for a small room.
-- D1: 100k rows written/day; the hourly cron deletes events older than 24h.
-- Durable Objects: **not free** on the current Cloudflare pricing. The `wrangler.toml` uses one
-  Durable Object per room; for a strictly-free deployment, replace `OrbitalRoom` with a plain
-  Worker that keeps the seq in D1 and uses no in-memory socket set (broadcast needs Durable
-  Objects, so true multiplayer relay on the free plan requires a different design — e.g. polling
-  `/events?after=SEQ` at 5 Hz from each client, which still stays in kbps).
+- Workers: **100k requests/day**. One long-lived SSE connection is one request, so normal play
+  uses a handful of requests per day — nowhere near the cap.
+- D1: **not used**. The old design wrote one row per event and would hit the 100k writes/day cap
+  in minutes. Room state now lives in Worker memory (last 1000 events per room).
+- Durable Objects: **not used** (paid on the current pricing).
+- Trade-off: if the Worker is evicted, in-memory events are lost; clients reconnect from their
+  last applied seq and the game requests a keyframe. There is no persistent history.
+
+`wrangler.toml` contains only `name`, `main` and `compatibility_date` — nothing billable.
 
 ## Authoritative mode (implemented)
 

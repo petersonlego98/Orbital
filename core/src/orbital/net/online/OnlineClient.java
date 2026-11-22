@@ -21,14 +21,14 @@ public final class OnlineClient implements AutoCloseable{
     private static final int OP_KEYFRAME = 3;
     private static final int OP_ACK = 4;
 
-    private final WsClient ws;
+    private final SseClient ws;
     private long appliedSeq = -1;
     private volatile boolean running;
     private Thread reader;
     private final Consumer<EventRecord> listener;
 
     public OnlineClient(String url, Consumer<EventRecord> listener) throws IOException{
-        this.ws = new WsClient(url);
+        this.ws = new SseClient(url);
         this.listener = listener;
     }
 

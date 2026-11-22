@@ -1,14 +1,13 @@
 /**
- * Orbital online relay — Cloudflare Workers free tier.
+ * Orbital online relay — 100% Cloudflare free tier.
  *
- * One Durable Object per room holds the authoritative event sequence and the set of connected
- * sockets. The client sends only compact command frames (OP_EVENT); the room assigns a monotonic
- * seq and server tick, appends the event to D1 and broadcasts it to every other client. Clients
- * catch up with "after seq X" after a reconnect, so normal traffic is a handful of bytes per
- * second instead of full world snapshots.
+ * No Durable Objects (paid) and no D1 writes (100k/day cap). Each room keeps its
+ * event log and the set of connected clients in the Worker's memory. Clients
+ * open one long-lived SSE stream (GET /events) and post commands (POST /event).
+ * One SSE connection is one Worker request, so daily request usage stays tiny.
  *
- * Free-tier notes: Workers + WebSocketPair are free; D1 has 100k rows written/day on the free
- * plan, so prune old events with the scheduled cleanup below. For many players, shard by room.
+ * Trade-off: if the Worker is evicted, in-memory events are lost and clients
+ * reconnect from their last applied seq (the game can request a keyframe).
  */
 
 const OP_JOIN = 1;
@@ -16,151 +15,151 @@ const OP_EVENT = 2;
 const OP_KEYFRAME = 3;
 const OP_ACK = 4;
 
+/** Max events retained per room (memory hygiene). */
+const MAX_EVENTS = 1000;
+/** How often the SSE loop checks for new events (ms). */
+const POLL_MS = 200;
+
+/** room name -> { seq, tick, events: [], clients: Set<function> } */
+const rooms = new Map();
+
+function getRoom(name){
+  let room = rooms.get(name);
+  if(!room){
+    room = {seq: 0n, tick: 0n, events: [], clients: new Set()};
+    rooms.set(name, room);
+  }
+  return room;
+}
+
 // ---- varint helpers (unsigned LEB128) ----
-function readVarint(view, state) {
+function readVarint(view, state){
   let result = 0n, shift = 0n, byte;
-  do {
+  do{
     byte = view.getUint8(state.offset++);
     result |= BigInt(byte & 0x7f) << shift;
     shift += 7n;
-  } while (byte & 0x80);
+  }while(byte & 0x80);
   return result;
 }
-function writeVarint(bytes, value) {
+function writeVarint(bytes, value){
   let v = BigInt(value);
-  while (v > 0x7fn) { bytes.push(Number(v & 0x7fn) | 0x80); v >>= 7n; }
+  while(v > 0x7fn){ bytes.push(Number(v & 0x7fn) | 0x80); v >>= 7n; }
   bytes.push(Number(v));
 }
-function readZigzag(view, state) {
+function readZigzag(view, state){
   const n = readVarint(view, state);
   return Number((n >> 1n) ^ -(n & 1n));
 }
-
-export class OrbitalRoom {
-  constructor(state, env) {
-    this.state = state;
-    this.env = env;
-    this.sockets = new Set();
-    this.seq = 0n;
-    this.tick = 0n;
-  }
-
-  async fetch(request) {
-    const pair = new WebSocketPair();
-    pair.client.accept();
-    this.sockets.add(pair.client);
-    pair.client.addEventListener('close', () => this.sockets.delete(pair.client));
-    pair.client.addEventListener('message', (event) => this.onMessage(pair.client, event.data));
-
-    // On join, send a keyframe marker with the current seq. The world itself is cached as a static
-    // asset (keyframe.bin uploaded to R2) so it is downloaded once, not on every reconnect.
-    this.send(pair.client, [OP_KEYFRAME, ...varintBytes(this.seq)]);
-    return new Response(null, { status: 101, webSocket: pair.client });
-  }
-
-  async onMessage(socket, data) {
-    const bytes = new Uint8Array(data);
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    const state = { offset: 0 };
-    const op = view.getUint8(state.offset++);
-
-    if (op === OP_JOIN) {
-      const after = readVarint(view, state);
-      // Replay everything the client missed, then it is up to date.
-      await this.replay(socket, after);
-      return;
-    }
-
-    if (op === OP_ACK) {
-      // Acknowledgement is only used for pruning, which is handled by the scheduled cleanup.
-      return;
-    }
-
-    if (op === OP_EVENT) {
-      const typeId = Number(readVarint(view, state));
-      const length = Number(readVarint(view, state));
-      const payload = bytes.slice(state.offset, state.offset + length);
-
-      // Authoritative sequencing: the server assigns seq/tick, never the client.
-      this.seq++;
-      this.tick++;
-      const frame = [OP_EVENT, ...varintBytes(this.seq), ...varintBytes(this.tick),
-        ...zigzag(-1), ...varintBytes(typeId), ...varintBytes(payload.length), ...payload];
-
-      // Persist one row per event. D1 free tier is generous enough for small rooms; prune below.
-      try {
-        await this.env.DB.prepare(
-          'INSERT INTO events (room, seq, tick, type_id, payload) VALUES (?, ?, ?, ?, ?)'
-        ).bind(this.roomId(), this.seq.toString(), this.tick.toString(), typeId,
-          btoa(String.fromCharCode(...payload))).run();
-      } catch (e) {
-        // A persistence failure must not stall gameplay; the in-memory broadcast still works.
-        console.error('D1 write failed', e);
-      }
-
-      this.broadcast(frame, socket);
-    }
-  }
-
-  async replay(socket, after) {
-    if (after >= this.seq) return;
-    try {
-      const rows = await this.env.DB.prepare(
-        'SELECT seq, tick, type_id, payload FROM events WHERE room = ? AND CAST(seq AS INTEGER) > ? ORDER BY CAST(seq AS INTEGER) LIMIT 500'
-      ).bind(this.roomId(), after.toString()).all();
-      for (const row of rows.results) {
-        const payload = Uint8Array.from(atob(row.payload), c => c.charCodeAt(0));
-        this.send(socket, [OP_EVENT, ...varintBytes(BigInt(row.seq)), ...varintBytes(BigInt(row.tick)),
-          ...zigzag(-1), ...varintBytes(Number(row.type_id)), ...varintBytes(payload.length), ...payload]);
-      }
-    } catch (e) {
-      console.error('replay failed', e);
-    }
-  }
-
-  broadcast(frame, except) {
-    const bytes = new Uint8Array(frame);
-    for (const socket of this.sockets) {
-      if (socket === except) continue;
-      try { socket.send(bytes); } catch (e) { this.sockets.delete(socket); }
-    }
-  }
-
-  send(socket, frame) {
-    try { socket.send(new Uint8Array(frame)); } catch (e) { this.sockets.delete(socket); }
-  }
-
-  roomId() {
-    return this.state.id.toString();
-  }
-}
-
-function varintBytes(value) {
+function varintBytes(value){
   const out = [];
   writeVarint(out, value);
   return out;
 }
-function zigzag(value) {
+function zigzag(value){
   const out = [];
   writeVarint(out, (BigInt(value) << 1n) ^ (BigInt(value) >> 63n));
   return out;
 }
 
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (url.pathname === '/ws') {
-      const id = env.ORBITAL_ROOM.idFromName(url.searchParams.get('room') || 'default');
-      const room = env.ORBITAL_ROOM.get(id);
-      return room.fetch(request);
-    }
-    if (url.pathname === '/health') return new Response('ok');
-    return new Response('Orbital online relay', { status: 200 });
-  },
+function eventFrame(event){
+  return [OP_EVENT, ...varintBytes(event.seq), ...varintBytes(event.tick),
+    ...zigzag(-1), ...varintBytes(event.typeId),
+    ...varintBytes(event.payload.length), ...event.payload];
+}
 
-  // Free-tier hygiene: drop events older than 24h so D1 writes stay within quota.
-  async scheduled(event, env, ctx) {
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    ctx.waitUntil(env.DB.prepare('DELETE FROM events WHERE created_at < ?').bind(cutoff).run());
+export default{
+  async fetch(request){
+    const url = new URL(request.url);
+    const name = url.searchParams.get('room') || 'default';
+
+    if(url.pathname === '/health') return new Response('ok');
+
+    if(url.pathname === '/events'){
+      //Long-lived Server-Sent Events stream: one request per client, no polling
+      //requests from the client and no paid Durable Object.
+      const room = getRoom(name);
+      let cursor = BigInt(url.searchParams.get('after') || '0');
+      const encoder = new TextEncoder();
+      let send;
+      let closed = false;
+
+      const stream = new ReadableStream({
+        start(controller){
+          send = (frame) =>{
+            if(closed) return;
+            try{
+              controller.enqueue(encoder.encode('data: ' + btoa(String.fromCharCode(...frame)) + '\n\n'));
+            }catch(e){
+              closed = true;
+            }
+          };
+          room.clients.add(send);
+          //Tell the client which seq the current world corresponds to.
+          send([OP_KEYFRAME, ...varintBytes(room.seq)]);
+        },
+        async pull(controller){
+          if(closed){
+            controller.close();
+            return;
+          }
+          for(const event of room.events){
+            if(event.seq > cursor){
+              send(eventFrame(event));
+              cursor = event.seq;
+            }
+          }
+          //Yield so the Worker does not burn CPU; awaiting is free wall-clock time.
+          await new Promise(resolve => setTimeout(resolve, POLL_MS));
+        },
+        cancel(){
+          closed = true;
+          if(send) room.clients.delete(send);
+        }
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache, no-transform',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no'
+        }
+      });
+    }
+
+    if(url.pathname === '/event' && request.method === 'POST'){
+      const room = getRoom(name);
+      const bytes = new Uint8Array(await request.arrayBuffer());
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const state = {offset: 0};
+      const op = view.getUint8(state.offset++);
+
+      if(op === OP_JOIN || op === OP_ACK){
+        //Join cursor is carried by /events?after=; ACK is only a pruning hint.
+        return new Response('ok');
+      }
+
+      if(op === OP_EVENT){
+        const typeId = Number(readVarint(view, state));
+        const length = Number(readVarint(view, state));
+        const payload = bytes.slice(state.offset, state.offset + length);
+
+        //Authoritative sequencing: server assigns seq/tick, never the client.
+        room.seq++;
+        room.tick++;
+        const event = {seq: room.seq, tick: room.tick, typeId, payload};
+        room.events.push(event);
+        if(room.events.length > MAX_EVENTS) room.events.shift();
+
+        const frame = eventFrame(event);
+        for(const client of room.clients) client(frame);
+        return new Response('ok');
+      }
+
+      return new Response('bad op', {status: 400});
+    }
+
+    return new Response('Orbital online relay (free tier, SSE)', {status: 200});
   }
 };
