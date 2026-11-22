@@ -12,7 +12,7 @@ import static orbital.content.UnitTypes.*;
 public class SerpuloTechTree{
 
     public static void load(){
-        Planets.serpulo.techTree = nodeRoot("serpulo", coreShard, () -> {
+        Planets.qatia.techTree = nodeRoot("serpulo", coreShard, () -> {
 
             node(conveyor, () -> {
                 node(junction, () -> {

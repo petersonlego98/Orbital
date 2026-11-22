@@ -23,7 +23,7 @@ public class PlanetParams{
     /** the unit length direction vector of the camera **/
     public Vec3 camDir = new Vec3(0, 0, -1);
     /** Planet being looked at. */
-    public Planet planet = Planets.serpulo;
+    public Planet planet = Planets.qatia;
 
     /** Zoom relative to planet. */
     public float zoom = 1f;

@@ -895,7 +895,7 @@ public class ApplicationTests{
                 assertFalse(state.rules.allowEditRules, "Sector " + sector.name + " must not have rule editing enabled.");
                 assertFalse(state.rules.allowEditWorldProcessors, "Sector " + sector.name + " must not have world processor editing enabled.");
                 assertEquals(Team.sharded, state.rules.defaultTeam, "Sector " + sector.name + " must have the Sharded player team.");
-                assertEquals(Vars.state.getPlanet() == Planets.serpulo ? Team.crux : Team.malis, state.rules.waveTeam, "Sector " + sector.name + " must have the correct enemy team.");
+                assertEquals(Vars.state.getPlanet() == Planets.qatia ? Team.crux : Team.malis, state.rules.waveTeam, "Sector " + sector.name + " must have the correct enemy team.");
 
                 Seq<TimerObjective> timers = state.rules.objectives.all.select(m -> m instanceof TimerObjective && !m.hidden && ((TimerObjective)m).text != null &&
                 !((TimerObjective)m).text.isEmpty() && !((TimerObjective)m).text.contains("@")).as();
@@ -960,7 +960,10 @@ public class ApplicationTests{
                 assertEquals(1, Team.sharded.cores().size, "Sector must have one core: " + sector + " (" + Team.sharded.cores() + ")");
 
                 assertTrue(hasSpawnPoint, "Sector \"" + sector.name + "\" has no spawn points.");
-                assertTrue(spawner.countSpawns() > 0 || (state.rules.attackMode && state.rules.waveTeam.data().hasCore()), "Sector \"" + sector.name + "\" has no enemy spawn points: " + spawner.countSpawns());
+                //Quatia is a peaceful world without waves, so sectors here have no enemy spawns.
+                if(state.rules.waves){
+                    assertTrue(spawner.countSpawns() > 0 || (state.rules.attackMode && state.rules.waveTeam.data().hasCore()), "Sector \"" + sector.name + "\" has no enemy spawn points: " + spawner.countSpawns());
+                }
             }));
         }
 

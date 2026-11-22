@@ -205,8 +205,8 @@ public abstract class SaveVersion extends SaveFileReader{
         }
 
         //replace the default serpulo env with erekir
-        if(state.rules.planet == Planets.serpulo && state.rules.hasEnv(Env.scorching)){
-            state.rules.planet = Planets.erekir;
+        if(state.rules.planet == Planets.qatia && state.rules.hasEnv(Env.scorching)){
+            state.rules.planet = Planets.qatia;
         }
     }
 
@@ -558,8 +558,8 @@ public abstract class SaveVersion extends SaveFileReader{
         //the requiredPlanets filter needs this, since the rules aren't read yet
         if(headless){
             try{
-                Planet planet = content.planet(new JsonReader().parse(saveState.ruleString).getString("planet", Planets.serpulo.name));
-                state.rules.planet = planet == null ? Planets.serpulo : planet;
+                Planet planet = content.planet(new JsonReader().parse(saveState.ruleString).getString("planet", Planets.qatia.name));
+                state.rules.planet = planet == null ? Planets.qatia : planet;
             }catch(Exception ignored){}
         }
 

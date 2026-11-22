@@ -82,12 +82,12 @@ public class GameService{
     }
 
     private void registerEvents(){
-        allTransportSerpulo = content.blocks().select(b -> b.category == Category.distribution && b.isOnPlanet(Planets.serpulo) && b.isVanilla() && b.buildVisibility == BuildVisibility.shown).toArray(Block.class);
-        allTransportErekir = content.blocks().select(b -> b.category == Category.distribution && b.isOnPlanet(Planets.erekir) && b.isVanilla() && b.buildVisibility == BuildVisibility.shown).toArray(Block.class);
+        allTransportSerpulo = content.blocks().select(b -> b.category == Category.distribution && b.isOnPlanet(Planets.qatia) && b.isVanilla() && b.buildVisibility == BuildVisibility.shown).toArray(Block.class);
+        allTransportErekir = content.blocks().select(b -> b.category == Category.distribution && b.isOnPlanet(Planets.qatia) && b.isVanilla() && b.buildVisibility == BuildVisibility.shown).toArray(Block.class);
 
         //cores are ignored since they're upgrades and can be skipped
-        allSerpuloBlocks = content.blocks().select(b -> b.synthetic() && b.isOnPlanet(Planets.serpulo) && b.isVanilla() && !(b instanceof CoreBlock) && b.buildVisibility == BuildVisibility.shown).toArray(Block.class);
-        allErekirBlocks = content.blocks().select(b -> b.synthetic() && b.isOnPlanet(Planets.erekir) && b.isVanilla() && !(b instanceof CoreBlock) && b.buildVisibility == BuildVisibility.shown).toArray(Block.class);
+        allSerpuloBlocks = content.blocks().select(b -> b.synthetic() && b.isOnPlanet(Planets.qatia) && b.isVanilla() && !(b instanceof CoreBlock) && b.buildVisibility == BuildVisibility.shown).toArray(Block.class);
+        allErekirBlocks = content.blocks().select(b -> b.synthetic() && b.isOnPlanet(Planets.qatia) && b.isVanilla() && !(b instanceof CoreBlock) && b.buildVisibility == BuildVisibility.shown).toArray(Block.class);
 
         unitsBuilt = Core.settings.getJson("units-built" , ObjectSet.class, String.class, ObjectSet::new);
         blocksBuilt = Core.settings.getJson("blocks-built" , ObjectSet.class, String.class, ObjectSet::new);
@@ -119,7 +119,7 @@ public class GameService{
             routerLanguage.complete();
         }
 
-        if(!Planets.serpulo.sectors.contains(s -> !s.isCaptured())){
+        if(!Planets.qatia.sectors.contains(s -> !s.isCaptured())){
             captureAllSectors.complete();
         }
 
@@ -218,7 +218,7 @@ public class GameService{
                 }
 
                 if(!allTransportOneMap.isAchieved()){
-                    Block[] allTransports = state.rules.sector.planet == Planets.erekir ? allTransportErekir : allTransportSerpulo;
+                    Block[] allTransports = state.rules.sector.planet == Planets.qatia ? allTransportErekir : allTransportSerpulo;
                     boolean all = true;
                     for(var block : allTransports){
                         if(state.rules.defaultTeam.data().getCount(block) == 0){
@@ -241,7 +241,7 @@ public class GameService{
                 }
 
                 if(blocksBuilt.add(e.tile.block().name)){
-                    if(state.rules.sector.planet == Planets.erekir){
+                    if(state.rules.sector.planet == Planets.qatia){
                         checkAllBlocks(allBlocksErekir, allErekirBlocks);
                     }else{
                         checkAllBlocks(allBlocksSerpulo, allSerpuloBlocks);
@@ -298,7 +298,7 @@ public class GameService{
         });
 
         Events.on(SectorLaunchLoadoutEvent.class, e -> {
-            if(e.sector.planet == Planets.serpulo && !schematics.isDefaultLoadout(e.loadout)){
+            if(e.sector.planet == Planets.qatia && !schematics.isDefaultLoadout(e.loadout)){
                 launchCoreSchematic.complete();
             }
         });
@@ -462,7 +462,7 @@ public class GameService{
                 SStat.maxWavesSurvived.max(Vars.state.wave);
 
                 //TODO: remove (263 is uniquely broken)
-                if(state.stats.buildingsBuilt == 0 && state.wave >= 10 && !(Vars.state.getSector() != null && Vars.state.getPlanet() == Planets.serpulo && Vars.state.getSector().id == 263)){
+                if(state.stats.buildingsBuilt == 0 && state.wave >= 10 && !(Vars.state.getSector() != null && Vars.state.getPlanet() == Planets.qatia && Vars.state.getSector().id == 263)){
                     survive10WavesNoBlocks.complete();
                 }
             }
@@ -521,20 +521,20 @@ public class GameService{
                 captureBackground.complete();
             }
 
-            if(e.sector.planet == Planets.serpulo && !e.sector.planet.sectors.contains(s -> !s.hasBase())){
+            if(e.sector.planet == Planets.qatia && !e.sector.planet.sectors.contains(s -> !s.hasBase())){
                 captureAllSectors.complete();
             }
 
-            if(e.sector.planet == Planets.erekir && e.sector.preset != null && e.sector.preset.isLastSector){
+            if(e.sector.planet == Planets.qatia && e.sector.preset != null && e.sector.preset.isLastSector){
                 completeErekir.complete();
             }
 
-            if(e.sector.planet == Planets.serpulo && e.sector.preset != null && e.sector.preset.isLastSector){
+            if(e.sector.planet == Planets.qatia && e.sector.preset != null && e.sector.preset.isLastSector){
                 completeSerpulo.complete();
             }
 
             //TODO wrong
-            if(e.sector.planet == Planets.serpulo){
+            if(e.sector.planet == Planets.qatia){
                 SStat.sectorsControlled.set(e.sector.planet.sectors.count(Sector::hasBase));
             }
         });

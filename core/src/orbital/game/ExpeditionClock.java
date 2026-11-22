@@ -8,7 +8,7 @@ import orbital.type.*;
 import static orbital.Vars.*;
 
 /**
- * Real-time clock for the asteroid expedition on Gier.
+ * Real-time clock for the asteroid expedition on qatia.
  * The deadline is stored in the global settings, so it keeps counting while the game is closed.
  * When it expires during a run, the player is forced back to the planet map.
  */
@@ -40,7 +40,7 @@ public final class ExpeditionClock{
 
     /** @return the expedition sector, or null if content is not loaded yet. */
     public static @Nullable Sector sector(){
-        return Planets.gier == null || Planets.gier.sectors.isEmpty() ? null : Planets.gier.sectors.first();
+        return Planets.qatia == null || Planets.qatia.sectors.isEmpty() ? null : Planets.qatia.sectors.first();
     }
 
     public static boolean isExpedition(@Nullable Sector sector){
@@ -198,7 +198,7 @@ public final class ExpeditionClock{
         withdrawStartedAt = System.currentTimeMillis();
         if(expired) lastWithdrawn = true;
 
-        ui.announce(expired ? "Prazo da expedição encerrado.\nRetirada forçada de Gier." : "Expedição encerrada.", 3f);
+        ui.announce(expired ? "Prazo da expedição encerrado.\nRetirada forçada de qatia." : "Expedição encerrada.", 3f);
     }
 
     private static void leaveSector(){
@@ -225,8 +225,8 @@ public final class ExpeditionClock{
 
             logic.reset();
 
-            //point the planet map at Gier before showing it, so no stale planet is used
-            ui.planet.viewPlanet(Planets.gier, false);
+            //point the planet map at qatia before showing it, so no stale planet is used
+            ui.planet.viewPlanet(Planets.qatia, false);
             ui.planet.show();
             ui.planet.selectSector(sector);
             ui.expedition.show();

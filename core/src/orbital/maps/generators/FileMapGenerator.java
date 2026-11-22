@@ -23,10 +23,14 @@ public class FileMapGenerator implements WorldGenerator{
         if(maps == null){
             this.map = null;
         }else{
-            Seq<String> candidates = new Seq<>(4);
+            Seq<String> candidates = new Seq<>(8);
 
             //<planetname>/<mapname>.msav
             candidates.add(preset.planet.name + "/" + mapName);
+
+            //Legacy campaign directories: old saves/mods keep their maps under serpulo/erekir.
+            candidates.add("serpulo/" + mapName);
+            candidates.add("erekir/" + mapName);
 
             //<mapname>.msav (directly in maps folder)
             candidates.add(mapName);

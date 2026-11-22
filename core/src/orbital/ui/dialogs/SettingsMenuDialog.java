@@ -51,7 +51,7 @@ public class SettingsMenuDialog extends BaseDialog{
     private Table menu;
     private BaseDialog dataDialog;
     private BaseDialog planetDataDialog;
-    private Planet planet = Planets.serpulo;
+    private Planet planet = Planets.qatia;
     private Seq<SettingsCategory> categories = new Seq<>();
 
     public SettingsMenuDialog(){

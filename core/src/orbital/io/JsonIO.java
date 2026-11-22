@@ -217,7 +217,7 @@ public class JsonIO{
                     return null;
                 }
                 Planet block = Vars.content.getByName(ContentType.planet, jsonData.asString());
-                return block == null ? Planets.serpulo : block;
+                return block == null ? Planets.qatia : block;
             }
         });
 

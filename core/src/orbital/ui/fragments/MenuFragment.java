@@ -230,7 +230,6 @@ public class MenuFragment{
             join = new MobileButton(Icon.add, "@joingame", () -> checkPlay(ui.join::show)),
             editor = new MobileButton(Icon.terrain, "@editor", () -> checkPlay(ui.maps::show)),
             tools = new MobileButton(Icon.settings, "@settings", ui.settings::show),
-            mods = new MobileButton(Icon.book, "@mods", ui.mods::show),
             exit = new MobileButton(Icon.exit, "@quit", () -> Core.app.exit()),
             about = new MobileButton(Icon.info, "@about.button", ui.about::show);
 
@@ -252,7 +251,7 @@ public class MenuFragment{
 
             container.add(editor);
             container.add(tools);
-            container.add(mods);
+            //Mods were removed: no menu button.
             // add even custom buttons (before the exit button)
             for(int i = 0; i < customs.size; i += 2){
                 container.add(customs.get(i));
@@ -273,7 +272,7 @@ public class MenuFragment{
             container.add(editor);
             container.add(tools);
             container.row();
-            container.add(mods);
+            //Mods were removed: no menu button.
             // add custom buttons
             for(int i = 0; i < customs.size; i++){
                 container.add(customs.get(i));
@@ -316,7 +315,6 @@ public class MenuFragment{
                         new MenuButton("@about.button", Icon.info, ui.about::show)
                     ),
                     new MenuButton("@editor", Icon.terrain, () -> checkPlay(ui.maps::show)), steam ? new MenuButton("@workshop", Icon.steam, platform::openWorkshop) : null,
-                    new MenuButton("@mods", Icon.book, ui.mods::show),
                     new MenuButton("@settings", Icon.settings, ui.settings::show)
                 );
             }

@@ -246,7 +246,7 @@ public class Rules{
     /** Parameters for planet rendered in the background. Cannot be changed once a map is loaded. */
     public @Nullable PlanetParams planetBackground;
     /** Rules from this planet are applied. If it's {@code sun}, mixed tech is enabled. */
-    public Planet planet = Planets.serpulo;
+    public Planet planet = Planets.qatia;
     /** If the `data` instruction is allowed for world processors */
     public boolean allowLogicData = false;
 

@@ -12,7 +12,7 @@ import orbital.world.*;
 import static orbital.Vars.*;
 
 public class SectorGenerateDialog extends BaseDialog{
-    Planet planet = Planets.erekir;
+    Planet planet = Planets.qatia;
     int sector = 0, seed = 0;
 
     public SectorGenerateDialog(){

@@ -91,7 +91,7 @@ public class NuclearReactor extends PowerGenerator{
         if(hasItems){
             stats.add(Stat.productionTime, itemDuration / 60f, StatUnit.seconds);
         }
-        if(heatOutput > 0f && (ui != null && (ui.planet.isShown() ? ui.planet.state.planet : state.isGame() ? state.getPlanet() : null) == Planets.erekir)){
+        if(heatOutput > 0f && (ui != null && (ui.planet.isShown() ? ui.planet.state.planet : state.isGame() ? state.getPlanet() : null) == Planets.qatia)){
             //using StatUnit.localized() strips the icon
             stats.add(Stat.output, table -> table.add(Core.bundle.format("bar.upto", "[red]" + Iconc.waves + "[] " + Strings.fixed(heatOutput, 0) + " " + Core.bundle.get("unit.heatunitsperside"))));
         }

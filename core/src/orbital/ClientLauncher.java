@@ -346,15 +346,23 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
                     //the system view when there is no current sector, so lookAt() must run after it.
                     if(!mobile && ui != null && ui.planet != null){
                         try{
+                            //Capture the target planet/sector BEFORE show(): show() calls
+                            //viewSystem() when there is no current sector, replacing state.planet
+                            //with the sun, which would make getLastSector() point at the wrong body.
+                            Planet target = (state != null && state.rules.sector != null)
+                                ? state.rules.sector.planet : Planets.qatia;
+                            Sector sector = target.getLastSector();
                             ui.planet.show();
-                            Planet planet = state == null ? null :
-                                (state.rules.sector != null ? state.rules.sector.planet
-                                    : ui.planet.state.planet);
-                            if(planet == null) planet = Planets.serpulo;
-                            Sector sector = planet.getLastSector();
                             if(sector != null){
+                                //lookAt restores planet/systemView, then select rebuilds the panel.
                                 ui.planet.lookAt(sector);
                                 ui.planet.selectSector(sector);
+                                //The dialog animates uiAlpha/zoom over the next frames; defer the
+                                //focus once more so it is not overwritten by that animation.
+                                Core.app.post(() -> {
+                                    ui.planet.lookAt(sector);
+                                    ui.planet.selectSector(sector);
+                                });
                             }
                         }catch(Throwable e){
                             Log.warn("[load] could not focus the star map: @", e.getMessage());

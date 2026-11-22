@@ -141,8 +141,8 @@ public class SerpuloPlanetGenerator extends PlanetGenerator{
     public void getEmissiveColor(Vec3 position, Color out){
         float dst = 999f, captureDst = 999f, lightScl = 0f;
 
-        Object[] sectors = Planets.serpulo.sectors.items;
-        int size = Planets.serpulo.sectors.size;
+        Object[] sectors = Planets.qatia.sectors.items;
+        int size = Planets.qatia.sectors.size;
 
         for(int i = 0; i < size; i ++){
             var sector = (Sector)sectors[i];
@@ -212,8 +212,8 @@ public class SerpuloPlanetGenerator extends PlanetGenerator{
 
                 float dst = 999f;
 
-                Object[] sectors = Planets.serpulo.sectors.items;
-                int size = Planets.serpulo.sectors.size;
+                Object[] sectors = Planets.qatia.sectors.items;
+                int size = Planets.qatia.sectors.size;
 
                 for(int i = 0; i < size; i ++){
                     var sector = (Sector)sectors[i];

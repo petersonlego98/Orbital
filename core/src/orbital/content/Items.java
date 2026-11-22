@@ -4,13 +4,19 @@ import arc.graphics.*;
 import arc.struct.*;
 import orbital.type.*;
 
+import static orbital.Vars.*;
+
 public class Items{
     public static Item
     scrap, copper, lead, graphite, coal, titanium, thorium, silicon, plastanium,
     phaseFabric, surgeAlloy, sporePod, sand, blastCompound, pyratite, metaglass,
     beryllium, tungsten, oxide, carbide, fissileMatter, dormantCyst;
 
-    public static final Seq<Item> serpuloItems = new Seq<>(), erekirItems = new Seq<>(), erekirOnlyItems = new Seq<>();
+    /** All non-hidden resources of the single playable world, used by the universal loadout. */
+    public static final Seq<Item> universalItems = new Seq<>();
+
+    /** Kept as aliases so older code and mods still compile. */
+    public static final Seq<Item> serpuloItems = universalItems, erekirItems = universalItems, erekirOnlyItems = new Seq<>();
 
     public static void load(){
         copper = new Item("copper", Color.valueOf("d99d73")){{
@@ -145,7 +151,12 @@ public class Items{
         beryllium, tungsten, oxide, carbide, fissileMatter, dormantCyst
         );
 
-        erekirOnlyItems.addAll(erekirItems).removeAll(serpuloItems);
+        //One unified catalogue: every non-hidden item, regardless of its old planet.
+        universalItems.clear();
+        for(Item item : content.items()){
+            if(!item.hidden) universalItems.add(item);
+        }
+        erekirOnlyItems.clear();
 
     }
 }

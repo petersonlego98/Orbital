@@ -72,8 +72,7 @@ public class ContentLoader{
         Weathers.load();
         Planets.load();
         SectorPresets.load();
-        SerpuloTechTree.load();
-        ErekirTechTree.load();
+        UniversalTechTree.load();
     }
 
     /** Creates mod content, if applicable. */

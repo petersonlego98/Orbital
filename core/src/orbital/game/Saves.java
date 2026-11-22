@@ -52,7 +52,7 @@ public class Saves{
 
         //clear old megabase sectors from the beta period
         saves.removeAll(s -> {
-            if(s.getSector() != null && s.getSector().planet == Planets.serpulo && serpuloRemoval.contains(s.getSector().id) && s.meta.build < 157 && s.meta.build > 146){
+            if(s.getSector() != null && s.getSector().planet == Planets.qatia && serpuloRemoval.contains(s.getSector().id) && s.meta.build < 157 && s.meta.build > 146){
                 s.getSector().clearInfo();
                 s.file.delete();
                 return true;
@@ -170,7 +170,7 @@ public class Saves{
 
         //process remaps later to allow swaps of sectors
         for(var remap : remaps){
-            if(remap.sourceSector.planet == Planets.serpulo) Vars.hadSerpuloRemaps = true;
+            if(remap.sourceSector.planet == Planets.qatia) Vars.hadSerpuloRemaps = true;
             var remapTarget = remap.destSector;
 
             //overwrite the target sector's info with the save's info

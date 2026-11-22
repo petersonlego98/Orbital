@@ -293,7 +293,7 @@ public class HintsFragment{
             () -> ui.hints.events.contains("factorycontrol")
         ),
 
-        coreUpgrade(() -> state.isCampaign() && state.rules.sector.planet == Planets.serpulo && Blocks.coreFoundation.unlocked()
+        coreUpgrade(() -> state.isCampaign() && state.rules.sector.planet == Planets.qatia && Blocks.coreFoundation.unlocked()
             && state.rules.defaultTeam.core() != null
             && state.rules.defaultTeam.core().block == Blocks.coreShard
             && state.rules.defaultTeam.core().items.has(Blocks.coreFoundation.requirements),
@@ -301,7 +301,7 @@ public class HintsFragment{
         ),
 
         serpuloCoreZone(
-            () -> state.isCampaign() && state.getPlanet() == Planets.serpulo && Vars.indexer.isBlockPresent(Blocks.coreZone) &&
+            () -> state.isCampaign() && state.getPlanet() == Planets.qatia && Vars.indexer.isBlockPresent(Blocks.coreZone) &&
                 (!state.rules.attackMode || state.stats.getDestroyed(Blocks.coreShard) + state.stats.getDestroyed(Blocks.coreFoundation) + state.stats.getDestroyed(Blocks.coreNucleus) > 0),
             () -> state.rules.defaultTeam.cores().size > 1
         ),

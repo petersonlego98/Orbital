@@ -79,7 +79,7 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
 
         shouldPause = true;
         state.planet = content.getByName(ContentType.planet, Core.settings.getString("lastplanet", "serpulo"));
-        if(state.planet == null) state.planet = Planets.serpulo;
+        if(state.planet == null) state.planet = Planets.qatia;
 
         clampZoom();
 
@@ -202,7 +202,7 @@ public class PlanetDialog extends BaseDialog implements PlanetInterfaceRenderer{
         }
 
         if(!selectable(state.planet)){
-            state.planet = Planets.serpulo;
+            state.planet = Planets.qatia;
         }
 
         rebuildButtons();

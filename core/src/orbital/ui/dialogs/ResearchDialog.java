@@ -384,7 +384,7 @@ public class ResearchDialog extends BaseDialog{
 
                 //if there is no root, fall back to serpulo
                 if(rootPlanets.size == 0){
-                    rootPlanets.add(Planets.serpulo);
+                    rootPlanets.add(Planets.qatia);
                 }
 
                 //add global counts of each sector

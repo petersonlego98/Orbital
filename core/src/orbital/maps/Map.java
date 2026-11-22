@@ -103,10 +103,10 @@ public class Map implements Comparable<Map>, Publishable{
             Rules result = JsonIO.read(base, tags.get("rules", "{}"));
 
             //replace the default serpulo env with erekir
-            if(result.planet == Planets.serpulo && result.hasEnv(Env.scorching)){
-                result.planet = Planets.erekir;
+            if(result.planet == Planets.qatia && result.hasEnv(Env.scorching)){
+                result.planet = Planets.qatia;
             }
-            if(result.planet == null) result.planet = Planets.serpulo;
+            if(result.planet == null) result.planet = Planets.qatia;
             if(result.spawns.isEmpty()) result.spawns = Vars.waves.get();
             return result;
         }catch(Throwable e){

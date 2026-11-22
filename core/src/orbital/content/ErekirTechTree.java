@@ -51,7 +51,7 @@ public class ErekirTechTree{
         rebalance();
 
         //TODO might be unnecessary with no asteroids
-        Seq<Objective> erekirSector = Seq.with(new OnPlanet(Planets.erekir));
+        Seq<Objective> erekirSector = Seq.with(new OnPlanet(Planets.qatia));
 
         var costMultipliers = new ObjectFloatMap<Item>();
         for(var item : content.items()) costMultipliers.put(item, 0.9f);
@@ -62,7 +62,7 @@ public class ErekirTechTree{
         costMultipliers.put(Items.carbide, 0.3f);
         costMultipliers.put(Items.phaseFabric, 0.2f);
 
-        Planets.erekir.techTree = nodeRoot("erekir", coreBastion, true, () -> {
+        Planets.qatia.techTree = nodeRoot("erekir", coreBastion, true, () -> {
             context().researchCostMultipliers = costMultipliers;
 
             node(duct, erekirSector, () -> {

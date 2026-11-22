@@ -17,7 +17,7 @@ import java.util.*;
 //internal use only!
 public class SectorSelectDialog extends BaseDialog{
     Table sectors = new Table();
-    Planet planet = Planets.serpulo;
+    Planet planet = Planets.qatia;
     Cons<SectorPreset> cons = s -> {};
     TextField search;
 

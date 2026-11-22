@@ -512,6 +512,14 @@ public class Mods implements Loadable{
 
     /** Loads all mods from the folder, but does not call any methods on them.*/
     public void load(){
+        //Mods were removed from Orbital: only the unified Quatia content is loaded. Keeping this
+        //class as an empty stub preserves the API used by saves/networking without loading any
+        //external content (which used to declare the removed serpulo/erekir planets).
+        Log.info("[mods] external mod loading is disabled");
+        return;
+    }
+
+    private void loadLegacy(){
         var candidates = new Seq<Fi>();
 
         // Add local mods

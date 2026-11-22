@@ -760,11 +760,21 @@ public class ContentParser{
 
             currentContent = preset;
             read(() -> {
-                Planet planet = preset.planet == null ? Planets.serpulo : preset.planet;
+                Planet planet = preset.planet == null ? Planets.qatia : preset.planet;
+                String declaredPlanet = value.getString("planet", "qatia");
                 if(value.has("planet")){
-                    planet = locate(ContentType.planet, value.getString("planet", "serpulo"));
-
-                    if(planet == null) throw new RuntimeException("Planet '" + value.getString("planet") + "' not found.");
+                    Planet resolvedPlanet = locate(ContentType.planet, declaredPlanet);
+                    //Old mods declare serpulo/erekir. Those bodies no longer exist; keep the
+                    //declared name as the asset directory (their maps live under maps/<old>/)
+                    //while the sector itself is attached to the only playable world.
+                    if(resolvedPlanet != null){
+                        planet = resolvedPlanet;
+                    }else if(declaredPlanet.equals("serpulo") || declaredPlanet.equals("erekir")){
+                        //Keep an unregistered shadow body with the old name so legacy mods still
+                        //find their maps under maps/<old-name>/ and keep their sector ids.
+                        planet = new Planet(declaredPlanet, Planets.sun, 1f);
+                        planet.sectors.add(new Sector(planet, orbital.graphics.g3d.PlanetGrid.Ptile.empty));
+                    }
                 }
 
                 if(value.has("sector")){

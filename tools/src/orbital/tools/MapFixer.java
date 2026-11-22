@@ -43,7 +43,7 @@ public class MapFixer{
                 if(preset == null) return;
 
                 //uniquely broken (TODO: remove and fix 263)
-                if(preset.sector.planet == Planets.serpulo && preset.sector.id == 263) return;
+                if(preset.sector.planet == Planets.qatia && preset.sector.id == 263) return;
 
                 String targetName = preset.requireUnlock ? preset.localizedName : f.nameWithoutExtension();
 
