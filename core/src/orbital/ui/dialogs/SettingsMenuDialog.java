@@ -346,6 +346,21 @@ public class SettingsMenuDialog extends BaseDialog{
         return categories;
     }
 
+    /** Shared handler for the automatic DPI switch on desktop and Android. */
+    private void onDpiToggle(boolean automatic){
+        int fallback = android ? 125 : 100;
+        if(automatic){
+            //The current value is the manual scale the user had before enabling automatic mode;
+            //keep it for when the option is turned off again.
+            DpiPreference.setManualScale(settings.getInt("uiscale", fallback));
+        }else{
+            //The persisted uiscale currently holds the detected DPI value. Restore the manual
+            //choice so turning this option off has a visible effect after restart.
+            settings.put("uiscale", DpiPreference.manualScale(fallback));
+        }
+        ui.showInfo(bundle.get("settings.autodpi.restart"));
+    }
+
     void rebuildMenu(){
         menu.clearChildren();
 
@@ -462,13 +477,19 @@ public class SettingsMenuDialog extends BaseDialog{
             //if the user changed their UI scale, but then put it back, don't consider it 'changed'
             boolean modified = s != lastUiScale[0];
             Core.settings.put("uiscalechanged", modified);
-            // A manual UI scale takes precedence over the automatically detected Windows DPI.
+            // A manual UI scale takes precedence over the automatically detected DPI.
             if(modified && DpiPreference.available()){
                 DpiPreference.setAutomatic(false);
                 DpiPreference.setManualScale(s);
             }
             return s + "%";
         });
+
+        //Advanced Graphics does not exist on touch devices, so the DPI switch lives next to the
+        //UI-scale slider there. Both platforms share the same preference and restart notice.
+        if(mobile && DpiPreference.available()){
+            graphics.checkPref(DpiPreference.key, true, this::onDpiToggle);
+        }
 
         graphics.sliderPref("screenshake", 4, 0, 8, i -> (i / 4f) + "x");
 
@@ -637,18 +658,7 @@ public class SettingsMenuDialog extends BaseDialog{
         }
 
         if(!mobile && DpiPreference.available()){
-            advancedgraphics.checkPref(DpiPreference.key, true, automatic -> {
-                if(automatic){
-                    // The current value is the manual scale that the user had before enabling
-                    // automatic mode; keep it for when the option is turned off again.
-                    DpiPreference.setManualScale(settings.getInt("uiscale", 100));
-                }else{
-                    // The persisted uiscale currently holds the detected DPI value. Restore the
-                    // manual choice so turning this option off has a visible effect after restart.
-                    settings.put("uiscale", DpiPreference.manualScale(100));
-                }
-                ui.showInfo(bundle.get("settings.autodpi.restart"));
-            });
+            advancedgraphics.checkPref(DpiPreference.key, true, this::onDpiToggle);
         }
 
         //renderer choice is desktop-only: Vulkan has no mobile backend and the preference has to be

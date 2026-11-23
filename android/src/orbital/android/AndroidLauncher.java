@@ -49,9 +49,13 @@ public class AndroidLauncher extends AndroidApplication{
         });
 
         super.onCreate(savedInstanceState);
-        if(doubleScaleTablets && isTablet(this)){
+        boolean tablet = doubleScaleTablets && isTablet(this);
+        if(tablet){
             Scl.setAddition(0.5f);
         }
+
+        //Must run before initialize(): Vars reads the DPI recommendation while loading settings.
+        AndroidDpiSupport.install(this, tablet);
 
         initialize(new ClientLauncher(){
 

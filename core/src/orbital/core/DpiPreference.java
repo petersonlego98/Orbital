@@ -6,12 +6,11 @@ import arc.util.*;
 import static arc.Core.*;
 
 /**
- * Shared preference used to keep the interface at a consistent physical size on high-DPI Windows
- * displays.
+ * Shared preference used to keep the interface at a consistent physical size on high-DPI displays.
  *
- * <p>The desktop launcher installs a scale provider before the client is created. The core then
- * uses that value as the default UI scale, while still allowing the user to override it with the
- * regular UI-scale slider.</p>
+ * <p>The desktop and Android launchers each install a scale provider before the client is created.
+ * The core then uses that value as the default UI scale, while still allowing the user to override
+ * it with the regular UI-scale slider.</p>
  */
 public final class DpiPreference{
     /** Setting that controls whether the detected DPI scale is applied automatically. */
@@ -20,11 +19,15 @@ public final class DpiPreference{
     public static final String manualScaleKey = "uiscale.manual";
     /** DPI used by Windows for a 100% interface scale. */
     public static final int baselineDpi = 96;
+    /** Density (dpi / 160) of the Android device where the old fixed 125% default fit well. */
+    public static final float androidReferenceDensity = 420f / 160f;
+    /** Arc's quantised density factor times that 125% default on the reference device. */
+    public static final float androidReferenceScale = 2f * 1.25f;
     /** Range accepted by the UI-scale slider. */
     public static final int minScale = 25, maxScale = 300;
 
     /**
-     * Supplies the recommended UI scale as a percentage. It is installed by the Windows desktop
+     * Supplies the recommended UI scale as a percentage. It is installed by the desktop or Android
      * launcher; null means that no DPI-aware scale is available.
      */
     public static @Nullable Intp scaleProvider;
@@ -67,6 +70,18 @@ public final class DpiPreference{
     public static int manualScale(int fallback){
         int scale = settings == null ? fallback : settings.getInt(manualScaleKey, fallback);
         return scale < minScale || scale > maxScale ? fallback : scale;
+    }
+
+    /**
+     * Android UI-scale recommendation. Arc already multiplies the mobile scene by a density factor
+     * quantised to 0.5 steps (and clamped at 1). This returns the product that makes the final
+     * scale track the real density, so buttons keep the same physical size on every display.
+     */
+    public static int recommendedAndroidScale(float density, float addition){
+        float arcBase = Math.max(1f, (float)Math.round((density / 1.5f + addition) / 0.5d) * 0.5f);
+        float target = density * androidReferenceScale / androidReferenceDensity;
+        int percent = Math.round(target / arcBase * 100f);
+        return Math.max(100, Math.min(200, percent));
     }
 
     /** Remembers a manual UI scale so disabling automatic DPI can restore it. */

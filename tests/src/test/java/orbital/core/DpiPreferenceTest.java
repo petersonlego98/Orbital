@@ -90,6 +90,27 @@ class DpiPreferenceTest{
     }
 
     @Test
+    void androidScaleKeepsTheReferenceDeviceUnchanged(){
+        //420dpi (density 2.625) quantises to an Arc base of 2.0, so 125% keeps the old layout.
+        assertEquals(125, DpiPreference.recommendedAndroidScale(2.625f, 0f));
+    }
+
+    @Test
+    void androidScaleTracksDensityWithoutDoubleScaling(){
+        //A denser screen needs a bigger product than the fixed 125% to keep the physical size.
+        assertTrue(DpiPreference.recommendedAndroidScale(2f, 0f) > 125);
+        //The tablet density bonus already enlarges Arc's base, so the product must shrink.
+        assertTrue(DpiPreference.recommendedAndroidScale(2.625f, 0.5f) <
+            DpiPreference.recommendedAndroidScale(2.625f, 0f));
+    }
+
+    @Test
+    void androidScaleStaysInATouchFriendlyBand(){
+        assertEquals(100, DpiPreference.recommendedAndroidScale(1f, 0f));
+        assertTrue(DpiPreference.recommendedAndroidScale(4f, 0f) <= 200);
+    }
+
+    @Test
     void settingChangesAreIgnoredWithoutLiveSettings(){
         Core.settings = null;
 

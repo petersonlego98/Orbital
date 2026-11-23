@@ -528,14 +528,14 @@ public class Vars implements Loadable{
         //adds the extra that makes labels and buttons comfortable without the user having
         //to hunt for the Graphics > UI Scaling slider.
         //
-        //Windows can additionally report the scale of the monitor that owns the window. When
-        //automatic DPI scaling is enabled, that value keeps controls at the same physical size
-        //on high-resolution/high-DPI displays. An explicit UI-scale choice disables the
-        //automatic mode in the settings menu.
-        boolean automaticDpi = !Vars.android && DpiPreference.available()
-            && settings.getBool(DpiPreference.key, true);
-        int defaultUiScale = automaticDpi ? DpiPreference.recommendedScale(100)
-            : (Vars.android ? 125 : 100);
+        //Windows reports the scale of the monitor that owns the window, and Android reports the
+        //display density. When automatic DPI scaling is enabled the launcher-provided scale keeps
+        //controls at the same physical size across displays. The platform fallback (125% on
+        //touch screens, 100% on desktop) is used when auto mode is off or no provider exists.
+        //An explicit UI-scale choice disables the automatic mode in the settings menu.
+        boolean automaticDpi = DpiPreference.available() && settings.getBool(DpiPreference.key, true);
+        int fallbackScale = Vars.android ? 125 : 100;
+        int defaultUiScale = automaticDpi ? DpiPreference.recommendedScale(fallbackScale) : fallbackScale;
         int uiscale = settings.getInt("uiscale", defaultUiScale);
         if(automaticDpi){
             // Keep the scale the user had before automatic DPI was introduced, so turning the
