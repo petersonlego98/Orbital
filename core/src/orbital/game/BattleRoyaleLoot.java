@@ -38,7 +38,7 @@ public final class BattleRoyaleLoot{
         {ModuleDropKind.repair, ModuleDropKind.overdrive, ModuleDropKind.weapon, ModuleDropKind.liquid},
         {ModuleDropKind.repair, ModuleDropKind.force, ModuleDropKind.weapon, ModuleDropKind.transport},
         {ModuleDropKind.repair, ModuleDropKind.overdrive, ModuleDropKind.weapon, ModuleDropKind.armor},
-        {ModuleDropKind.repair, ModuleDropKind.force, ModuleDropKind.weapon, ModuleDropKind.weapon},
+        {ModuleDropKind.repair, ModuleDropKind.force, ModuleDropKind.weapon, ModuleDropKind.mining},
     };
 
     private static final Seq<DroppedModule> drops = new Seq<>();
@@ -157,6 +157,7 @@ public final class BattleRoyaleLoot{
             case pointDefense -> new String[]{"segment"};
             case liquid -> new String[]{"wave", "tsunami"};
             case transport -> new String[]{"mass-driver"};
+            case mining -> new String[]{"mechanical-drill", "pneumatic-drill", "laser-drill", "blast-drill"};
             case armor -> new String[]{"copper-wall-large", "titanium-wall-large", "plastanium-wall-large", "surge-wall-large"};
             default -> new String[]{"duo"};
         };

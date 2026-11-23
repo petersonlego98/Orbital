@@ -1848,6 +1848,7 @@ public class TurretLoadoutDialog extends BaseDialog{
             case unitRepair -> Blocks.repairPoint;
             case liquid -> Blocks.wave;
             case transport -> Blocks.massDriver;
+            case mining -> Blocks.mechanicalDrill;
             //walls and ramparts: all of them are armour, so the representative icon is the
             //simplest plate in the category
             case armor -> Blocks.copperWall;

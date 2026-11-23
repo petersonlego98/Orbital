@@ -7054,6 +7054,30 @@ public class Blocks{
 
         hideModuleOnlyTurrets();
         hideWallModules();
+        hideModuleOnlyDrills();
+    }
+
+    /**
+     * Ore drills exist only as dorsal mining modules: their definitions, stats, sprites and
+     * recipes stay alive (the module catalogue reads them and old maps may still hold placed
+     * drills), but they can no longer be built.
+     *
+     * <p>Planet drills (sector scanning) and cliff crushers (sand from terrain) are not ore
+     * drills and remain placeable. As with the other {@code moduleOnly} lists, the names are
+     * explicit so modded drills keep their own decision and research nodes stay untouched.</p>
+     */
+    private static void hideModuleOnlyDrills(){
+        ObjectSet<String> moduleOnly = ObjectSet.with(
+            "mechanical-drill", "pneumatic-drill", "laser-drill", "blast-drill",
+            "plasma-bore", "large-plasma-bore", "impact-drill", "eruption-drill"
+        );
+        for(Block block : content.blocks()){
+            if(block != null && moduleOnly.contains(block.name)){
+                block.buildVisibility = BuildVisibility.hidden;
+                block.inEditor = false;
+                block.moduleOnly = true;
+            }
+        }
     }
 
     /**

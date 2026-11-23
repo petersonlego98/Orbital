@@ -21,6 +21,11 @@ public enum SupportModuleCategory{
     /** logistics: launches items to allied buildings or units ({@code mass-driver}). */
     transport,
     /**
+     * Mining drills: every ore drill is a dorsal module instead of a placeable building.
+     * One per hull; the block's tier sets the speed and range bonus (see MiningModuleAbility).
+     */
+    mining,
+    /**
      * Hull armour plates: every wall and rampart ({@code Wall} blocks of the defense category).
      * They are one single category on purpose - the player may carry any number of wall
      * modules, they simply compete with the turrets for dorsal space and area.
@@ -40,6 +45,10 @@ public enum SupportModuleCategory{
             case "repair-point", "repair-turret", "unit-repair-tower" -> unitRepair;
             case "wave", "tsunami" -> liquid;
             case "mass-driver" -> transport;
+            //every ore drill is a module; planet drills (sector scanning) and wall crushers
+            //(sand from terrain) are different mechanics and stay regular buildings
+            case "mechanical-drill", "pneumatic-drill", "laser-drill", "blast-drill",
+                 "plasma-bore", "large-plasma-bore", "impact-drill", "eruption-drill" -> mining;
             //walls and ramparts: one armour category - only the large (2x2) plates are modules,
             //see WallModuleAbility. Small (1x1) walls stay regular buildable blocks.
             case "copper-wall-large",

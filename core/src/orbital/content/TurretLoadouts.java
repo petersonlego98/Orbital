@@ -59,10 +59,16 @@ public class TurretLoadouts{
         //both removable turrets and support modules.
         setup(UnitTypes.emanate, 1.00f, 6888,
             turrets(t(1, -5.5f, -5.5f), t(1, -5.5f, 5.5f)),
-            supports(s(SupportModuleCategory.repair, 1, 5.5f, 0f)));
+            supports(
+                s(SupportModuleCategory.repair, 1, 5.5f, 0f),
+                s(SupportModuleCategory.mining, 1, 5.5f, 0f)
+            ));
         setup(UnitTypes.horizon, 1.00f, 5184,
             turrets(t(1, -3.25f, 0f)),
-            supports(s(SupportModuleCategory.repair, 1, 4f, 0f)));
+            supports(
+                s(SupportModuleCategory.repair, 1, 4f, 0f),
+                s(SupportModuleCategory.mining, 1, 4f, 0f)
+            ));
 
         //medium hulls - a 2x2 turret nearly fills these silhouettes; anchors only where
         //a fully separate footprint still fits alongside at least one turret slot
@@ -74,7 +80,8 @@ public class TurretLoadouts{
             turrets(t(2, -2.14f, -2.14f), t(1, 9f, 9f)),
             supports(
                 s(SupportModuleCategory.repair, 1, 9f, -9f),
-                s(SupportModuleCategory.unitRepair, 1, 9f, -9f)
+                s(SupportModuleCategory.unitRepair, 1, 9f, -9f),
+                s(SupportModuleCategory.mining, 1, 9f, -9f)
             ));
 
         //heavy hulls
@@ -82,7 +89,8 @@ public class TurretLoadouts{
             turrets(t(2, -8f, -8f), t(2, 8f, 8f)),
             supports(
                 s(SupportModuleCategory.repair, 1, 8f, -8f),
-                s(SupportModuleCategory.pointDefense, 2, 8f, -8f)
+                s(SupportModuleCategory.pointDefense, 2, 8f, -8f),
+                s(SupportModuleCategory.mining, 1, 8f, -8f)
             ));
         setup(UnitTypes.quad, 0.85f, 48400,
             turrets(t(4, -11f, 11f), t(2, 3.02f, -4.11f)),
@@ -94,13 +102,15 @@ public class TurretLoadouts{
                 s(SupportModuleCategory.tractor, 2, -13.06f, -13.06f),
                 s(SupportModuleCategory.liquid, 3, 11.46f, 12.5f),
                 s(SupportModuleCategory.transport, 3, -13.06f, -13.06f),
-                s(SupportModuleCategory.pointDefense, 2, 15.19f, -0.8f)
+                s(SupportModuleCategory.pointDefense, 2, 15.19f, -0.8f),
+                s(SupportModuleCategory.mining, 2, 15.19f, -0.8f)
             ));
         setup(UnitTypes.quell, 0.80f, 26244,
             turrets(t(3, -7.5f, -7.5f), t(1, 8.5f, 8.5f)),
             supports(
                 s(SupportModuleCategory.repair, 2, 9.62f, -8.18f),
-                s(SupportModuleCategory.overdrive, 2, -8.5f, 10f)
+                s(SupportModuleCategory.overdrive, 2, -8.5f, 10f),
+                s(SupportModuleCategory.mining, 2, 9.62f, -8.18f)
             ));
 
         //capital hulls
@@ -114,7 +124,8 @@ public class TurretLoadouts{
                 s(SupportModuleCategory.transport, 3, 13f, 14f),
                 s(SupportModuleCategory.unitRepair, 2, 16.5f, -4f),
                 s(SupportModuleCategory.tractor, 2, -15f, -15f),
-                s(SupportModuleCategory.pointDefense, 2, 13f, 14f)
+                s(SupportModuleCategory.pointDefense, 2, 13f, 14f),
+                s(SupportModuleCategory.mining, 2, 16.5f, -4f)
             ));
         setup(UnitTypes.disrupt, 0.75f, 59049,
             turrets(t(4, -13.5f, -8f), t(2, 16f, -8f)),
@@ -126,7 +137,8 @@ public class TurretLoadouts{
                 s(SupportModuleCategory.transport, 3, -16f, 16f),
                 s(SupportModuleCategory.unitRepair, 2, 0.31f, -20.38f),
                 s(SupportModuleCategory.tractor, 2, 12f, 17f),
-                s(SupportModuleCategory.pointDefense, 2, -16f, 16f)
+                s(SupportModuleCategory.pointDefense, 2, -16f, 16f),
+                s(SupportModuleCategory.mining, 2, 0.31f, -20.38f)
             ));
         setup(UnitTypes.eclipse, 0.50f, 102720,
             turrets(t(5, -19.5f, -10f), t(5, 19.5f, -10f), t(2, -13.79f, 19.79f)),
@@ -138,7 +150,8 @@ public class TurretLoadouts{
                 s(SupportModuleCategory.transport, 3, 2.16f, -26.64f),
                 s(SupportModuleCategory.unitRepair, 2, 16.99f, 16.99f),
                 s(SupportModuleCategory.tractor, 2, -19.5f, -27f),
-                s(SupportModuleCategory.pointDefense, 2, 2.16f, -26.64f)
+                s(SupportModuleCategory.pointDefense, 2, 2.16f, -26.64f),
+                s(SupportModuleCategory.mining, 3, -19.5f, -27f)
             ));
         setup(UnitTypes.oct, 0.85f, 160000,
             turrets(
@@ -153,7 +166,8 @@ public class TurretLoadouts{
                 s(SupportModuleCategory.transport, 3, 9.45f, -33.08f),
                 s(SupportModuleCategory.unitRepair, 2, 10.75f, 8.6f),
                 s(SupportModuleCategory.tractor, 2, -21.07f, -27.14f),
-                s(SupportModuleCategory.pointDefense, 2, 9.45f, -33.08f)
+                s(SupportModuleCategory.pointDefense, 2, 9.45f, -33.08f),
+                s(SupportModuleCategory.mining, 5, -21.07f, -27.14f)
             ));
 
         //demonstration variants: same hulls, with one 1x1 dorsal slot.

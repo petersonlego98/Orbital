@@ -9,6 +9,7 @@ import orbital.world.Block;
 import orbital.world.blocks.defense.*;
 import orbital.world.blocks.defense.turrets.*;
 import orbital.world.blocks.distribution.MassDriver;
+import orbital.world.blocks.production.*;
 import orbital.world.blocks.units.RepairTower;
 import orbital.world.blocks.units.RepairTurret;
 
@@ -267,6 +268,12 @@ public class SupportMount{
             field.coolant = ModuleSupplies.coolant(force);
             field.coolantMultiplier = force.cooldownLiquid;
             return field;
+        }
+
+        if(block instanceof Drill || block instanceof BeamDrill){
+            //block: drills ore from the ground; the unit already has universal mining, so the
+            //module carries over the drill's tier as a speed/range bonus instead of a tier gate
+            return new MiningModuleAbility(block);
         }
 
         return null;

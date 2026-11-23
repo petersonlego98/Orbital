@@ -177,6 +177,7 @@ public class Pal{
     modulePointDefense = Color.valueOf("ffe45c"),
     moduleLiquid = Color.valueOf("5b8cff"),
     moduleTransport = Color.valueOf("d6a25e"),
-    moduleArmor = Color.valueOf("b9c0c8")
+    moduleArmor = Color.valueOf("b9c0c8"),
+    moduleMining = Color.valueOf("f0c05a")
     ;
 }

@@ -20,6 +20,11 @@ public enum ModuleDropKind{
     pointDefense(Pal.modulePointDefense, "support.category.pointDefense"),
     liquid(Pal.moduleLiquid, "support.category.liquid"),
     transport(Pal.moduleTransport, "support.category.transport"),
+    /**
+     * Ore drills left on the floor in the 8x8: a mining module is as useful as a repair field
+     * once every hull can equip one.
+     */
+    mining(Pal.moduleMining, "support.category.mining"),
     armor(Pal.moduleArmor, "support.category.armor");
 
     public final Color color;
@@ -42,6 +47,7 @@ public enum ModuleDropKind{
             case pointDefense -> pointDefense;
             case liquid -> liquid;
             case transport -> transport;
+            case mining -> mining;
             case armor -> armor;
         };
     }

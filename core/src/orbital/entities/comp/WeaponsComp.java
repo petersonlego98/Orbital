@@ -8,6 +8,7 @@ import arc.util.*;
 import orbital.annotations.Annotations.*;
 import orbital.content.*;
 import orbital.ctype.UnlockableContent;
+import orbital.entities.abilities.MiningModuleAbility;
 import orbital.entities.units.*;
 import orbital.gen.*;
 import orbital.type.*;
@@ -369,6 +370,28 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     private SupportMount[] supports(){
         if(supportMounts == null) supportMounts = new SupportMount[0];
         return supportMounts;
+    }
+
+    /** @return the combined mining-speed multiplier of active drill modules (1 with none). */
+    public float miningSpeedMultiplier(){
+        float result = 1f;
+        for(SupportMount mount : supports()){
+            if(mount.active && mount.ability instanceof MiningModuleAbility mining){
+                result *= mining.speedMultiplier;
+            }
+        }
+        return result;
+    }
+
+    /** @return the extra mining range, in world units, from active drill modules. */
+    public float miningRangeBonus(){
+        float result = 0f;
+        for(SupportMount mount : supports()){
+            if(mount.active && mount.ability instanceof MiningModuleAbility mining){
+                result += mining.rangeBonus;
+            }
+        }
+        return result;
     }
 
     /** @return the wall plates currently installed. */

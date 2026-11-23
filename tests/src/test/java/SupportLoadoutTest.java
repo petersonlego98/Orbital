@@ -290,7 +290,7 @@ public class SupportLoadoutTest{
         };
 
         for(UnitType type : capitals){
-            assertEquals(8, type.supportAnchors.size, type.name);
+            assertEquals(9, type.supportAnchors.size, type.name);
 
             //every category is individually installable on a fresh hull
             for(Block block : towerBlocks){
@@ -349,7 +349,7 @@ public class SupportLoadoutTest{
 
         //oct has physical anchors for every category, so a rejection here is caused by
         //the native conflict rule, not by missing space
-        assertEquals(8, UnitTypes.oct.supportAnchors.size);
+        assertEquals(9, UnitTypes.oct.supportAnchors.size);
         Unit oct = UnitTypes.oct.create(Team.sharded);
         assertFalse(oct.canMountSupport(Blocks.mender));
         assertFalse(oct.canMountSupport(Blocks.mendProjector));
@@ -787,6 +787,7 @@ public class SupportLoadoutTest{
                 case unitRepair -> Blocks.repairPoint;
                 case liquid -> Blocks.wave;
                 case transport -> Blocks.massDriver;
+                case mining -> Blocks.mechanicalDrill;
                 //walls and ramparts are one armour category; the simplest plate probes it
                 case armor -> Blocks.copperWall;
             };
@@ -805,11 +806,11 @@ public class SupportLoadoutTest{
         //the projector categories keep the functional-phase compatibility everywhere.
         String[] expected = {
             "mono:", "flare:", "poly:", "mega:", "horizon:repair", "zenith:repair|unitRepair",
-            "antumbra:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport",
-            "eclipse:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport",
-            "quad:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport",
-            "oct:overdrive|tractor|pointDefense|unitRepair|liquid|transport", "avert:", "obviate:repair|pointDefense",
-            "quell:repair|overdrive", "disrupt:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport",
+            "antumbra:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport|mining",
+            "eclipse:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport|mining",
+            "quad:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport|mining",
+            "oct:overdrive|tractor|pointDefense|unitRepair|liquid|transport|mining", "avert:", "obviate:repair|pointDefense",
+            "quell:repair|overdrive|mining", "disrupt:repair|overdrive|force|tractor|pointDefense|unitRepair|liquid|transport|mining",
             "alpha:", "beta:", "gamma:", "evoke:", "incite:", "emanate:repair",
             "mono-duo:", "flare-duo:"
         };
@@ -941,7 +942,7 @@ public class SupportLoadoutTest{
 
             assertTrue(tuned > 0f && tuned < base, "a per-hull tuning knob must be able to shrink further");
             assertEquals(before, compatibility(quad), "tuning must not change the compatibility list");
-            assertEquals(8, quad.supportAnchors.size);
+            assertEquals(9, quad.supportAnchors.size);
             assertEquals(2, quad.turretSlots.size);
         }finally{
             quad.dorsalVisualTuning = original;

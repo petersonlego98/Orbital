@@ -49,7 +49,9 @@ abstract class MinerComp implements Itemsc, Posc, Teamc, Rotc, Drawc{
     public boolean validMine(Tile tile, boolean checkDst){
         if(tile == null) return false;
 
-        if(checkDst && !within(tile.worldx(), tile.worldy(), type.mineRange)){
+        //a mounted drill extends the mining reach; the AI queries unit.validMine() too, so
+        //this single check keeps targeting and the actual mining consistent
+        if(checkDst && !within(tile.worldx(), tile.worldy(), type.mineRange + this.<Unit>self().miningRangeBonus())){
             return false;
         }
 
@@ -85,7 +87,9 @@ abstract class MinerComp implements Itemsc, Posc, Teamc, Rotc, Drawc{
             mineTile = null;
             mineTimer = 0f;
         }else if(mining() && item != null){
-            float rate = Time.delta * type.mineSpeed * state.rules.unitMineSpeed(team());
+            float rate = Time.delta * type.mineSpeed
+                * this.<Unit>self().miningSpeedMultiplier()
+                * state.rules.unitMineSpeed(team());
             mineTimer += rate;
 
             if(Mathf.chance(0.035f * rate)){
