@@ -184,6 +184,9 @@ public final class TestNewFeaturesMode{
         rules.waves = false;
         rules.waveTimer = false;
         rules.loadout = resourceLoadout();
+        //buildings cost nothing in the showcase. This is team-scoped on purpose: the global
+        //flag would also give unlimited build range and turn the mode into sandbox.
+        applyFreeBuild(rules);
         //unit creation is free, but the normal unit cap still applies
         rules.disableUnitCap = false;
 
@@ -816,6 +819,12 @@ public final class TestNewFeaturesMode{
         if(!active() || wavesStarted) return;
         if(setupDialog == null) setupDialog = new ModuleTestSetupDialog();
         setupDialog.openSetup();
+    }
+
+    /** Makes construction free for the player's team without changing the mode or build range. */
+    public static void applyFreeBuild(Rules rules){
+        if(rules == null) return;
+        rules.teams.get(rules.defaultTeam).infiniteResources = true;
     }
 
     /** @return the resources of both planets, one stack of each visible item. */

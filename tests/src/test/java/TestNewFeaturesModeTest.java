@@ -49,6 +49,16 @@ public class TestNewFeaturesModeTest{
     }
 
     @Test
+    void showcaseBuildingsCostNothingWithoutBecomingSandbox(){
+        Rules rules = Gamemode.testFeatures.apply(new Rules());
+        TestNewFeaturesMode.applyFreeBuild(rules);
+
+        assertTrue(rules.isInfiniteResources(rules.defaultTeam), "player constructions must be free");
+        assertFalse(rules.infiniteResources, "the global sandbox flag must stay off");
+        assertEquals(Gamemode.testFeatures, rules.mode(), "the mode must not change to sandbox");
+    }
+
+    @Test
     void otherModesDoNotReportTestMode(){
         assertNotEquals(Gamemode.testFeatures, new Rules().mode());
         assertNotEquals(Gamemode.testFeatures, Gamemode.sandbox.apply(new Rules()).mode());
