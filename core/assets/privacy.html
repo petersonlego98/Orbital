@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Política de Privacidade do Orbital</title>
+</head>
+<body>
+
+<h1>Política de Privacidade do Orbital</h1>
+
+<p><strong>Versão 1.0</strong> — Última atualização: 22 de novembro de 2026.</p>
+
+<p>O Orbital é um jogo gratuito e de código aberto, distribuído sob a licença GNU General Public License v3.0 (GPLv3). Não há publicidade, não há vendas de dados, não há rastreamento de comportamento e não existe telemetria no jogo. Esta política descreve, de forma exaustiva, quais dados o jogo processa, onde eles ficam e o que você pode fazer com eles.</p>
+
+<h2>1. Quem trata os seus dados</h2>
+
+<p>O responsável pelo tratamento dos dados pessoais relacionados ao Orbital é <strong>Péterson (petersonlego98)</strong>, mantenedor do projeto, com o seguinte canal de contato: <a href="mailto:petersonlego3133@gmail.com">petersonlego3133@gmail.com</a>.</p>
+
+<p>O jogo não possui servidor próprio de contas. Não existem cadastro, login, e-mail cadastrado, senha, token de usuário ou perfil de jogador. A identificação no multiplayer é feita por um apelido escolhido por você e por identificadores gerados aleatoriamente no seu dispositivo.</p>
+
+<h2>2. Resumo</h2>
+
+<p>O jogo não coleta dados de forma remota por conta própria. Os únicos dados que saem do seu dispositivo são enviados ao servidor de multiplayer <strong>ao qual você se conecta</strong>, e esse servidor é hospedado por um terceiro, não pelo projeto. Os dados de diagnóstico e os relatórios de erro ficam gravados apenas no seu computador ou celular.</p>
+
+<h2>3. O que o jogo não faz</h2>
+
+<ul>
+<li><strong>Não há telemetria, análise de comportamento ou medição de uso.</strong> O jogo não mede quanto tempo você joga, em que mapas ou com que frequência, e não envia essas informações a lugar nenhum.</li>
+<li><strong>Não há envio remoto de relatórios de erro.</strong> Quando o jogo falha, o relatório de erro é gravado num arquivo local. Ele só sai do dispositivo se você mesmo o exportar.</li>
+<li><strong>Não há identificação do hardware.</strong> O jogo não coleta identificador de dispositivo Android, IMEI, número de telefone, endereço MAC, número de série nem lista de aplicativos instalados.</li>
+<li><strong>Não há conta de usuário</strong>, e portanto não há e-mail, senha, foto de perfil ou rastreamento de sessão.</li>
+<li><strong>Não há acesso a câmera, microfone nem localização geográfica.</strong></li>
+<li><strong>Não há cookies de rastreamento</strong> nem qualquer mecanismo de rastreamento entre instalações ou entre sessões.</li>
+<li><strong>Não há publicidade</strong> e os seus dados não são vendidos, alugados ou cedidos para fins de marketing.</li>
+</ul>
+
+<h2>4. Dados gravados no seu dispositivo</h2>
+
+<p>Os dados abaixo ficam apenas na pasta de dados do jogo, no seu computador ou celular. Nada disso é transmitido automaticamente.</p>
+
+<ul>
+<li><strong>Progresso do jogo (arquivos de save).</strong> Cada partida salva registra versão do jogo, build, data e hora, tempo jogado, mapa, onda, regras aplicadas, etiquetas e a lista de mods em uso. O seu apelido <strong>não</strong> é gravado dentro do arquivo de save.</li>
+<li><strong>Preferências e configurações.</strong> Incluem o apelido escolhido, o idioma do sistema, resolução, escala de interface, volume, opções de gráficos e o histórico de servidores usados. Entre elas estão o identificador aleatório do jogador (uuid) e os identificadores aleatórios por servidor (usid), como descrito na seção 5.</li>
+<li><strong>Registros de diagnóstico.</strong> Relatórios de erro com a pilha de chamadas, a versão do jogo, o sistema operacional, a versão do Java, a memória disponível, a quantidade de núcleos e os mods habilitados. São gravados na subpasta crashes e podem ser exportados manualmente por você, em arquivo de texto.</li>
+<li><strong>Registros de desempenho.</strong> Medições internas de CPU, memória e tempo de quadro. Em uso normal ficam apenas na memória do processo; o registro contínuo em arquivo só é ativado com a opção de depuração específica.</li>
+<li><strong>Lista de servidores conhecidos.</strong> O arquivo server_list.json guarda em cache a lista pública de servidores comunitários obtida da internet.</li>
+</ul>
+
+<h2>5. Dados enviados ao conectar em um servidor de multiplayer</h2>
+
+<p>Ao entrar em um servidor, o jogo envia ao servidor os seguintes dados: o seu <strong>apelido</strong>; o <strong>idioma do sistema</strong> (por exemplo, pt-BR); o <strong>identificador aleatório do jogador (uuid)</strong>, gerado no seu dispositivo com 8 bytes aleatórios e não derivado de nenhum identificador de hardware; o <strong>identificador aleatório por servidor (usid)</strong>, sorteado separadamente para cada endereço de servidor acessado; a informação de <strong>se você está em um dispositivo móvel</strong>; a <strong>cor do jogador</strong>; e a <strong>lista de mods instalados</strong>.</p>
+
+<p>O identificador aleatório serve apenas para distinguir jogadores dentro de uma sessão e para permitir reconexão ao mesmo esquadrão. Ele não permite reconstruir sua identidade fora daquele servidor.</p>
+
+<p>Se você usa o Discord, o indicador de atividade no Discord exibe o modo de jogo, o mapa, a onda, o número de jogadores e o estado da interface. No computador, o identificador uuid é derivado da sua conta Steam quando o jogo é iniciado pelo Steam, e o Steam exibe o seu estado no jogo. Ambas as integrações podem ser desativadas. Elas estão detalhadas na seção 8.</p>
+
+<h2>6. Dados que ficam com o servidor de multiplayer</h2>
+
+<p>Quem hospeda um servidor decide o que ele registra. A implementação padrão do jogo registra, para fins de administração e antiabuso: o <strong>endereço IP</strong> de cada conexão, o <strong>apelido</strong> usado, o <strong>histórico de endereços IP</strong> e de <strong>apelidos</strong> usados no passado, a <strong>contagem de entradas</strong>, o identificador uuid e marcas de banimento. Esses registros são gravados em arquivo no servidor e podem ser consultados pelo administrador dele por meio do painel de administração do jogo.</p>
+
+<p>Quando você hospeda um servidor, o seu apelido é anunciado aos outros computadores da sua <strong>rede local</strong>, por meio de um mecanismo de multicast. Essa informação não sai da sua rede.</p>
+
+<p>O jogo também pode ser usado com um <strong>relay em nuvem opcional</strong>, hospedado como uma função serverless. Nesse relay, os eventos de jogo são mantidos apenas em memória, com um limite de mil eventos por sala. O relay <strong>não registra</strong> endereço IP, uuid ou apelido, e não utiliza banco de dados persistente.</p>
+
+<h2>7. Consultas externas feitas pelo jogo</h2>
+
+<ul>
+<li><strong>Lista de servidores comunitários.</strong> O jogo busca uma lista pública de servidores por requisição anônima a um serviço de distribuição de código. Nenhum dado do jogador é enviado nessa requisição; o resultado é apenas cacheado localmente.</li>
+<li><strong>Verificação de atualizações (computador).</strong> O jogo consulta periodicamente a API pública do repositório de builds para saber se existe uma versão mais recente. Nenhum dado do jogador é enviado.</li>
+<li><strong>Lista de banimentos do Steam (computador).</strong> Quando o jogo é executado pelo Steam, o Steam fornece a lista de contas banidas. Nenhum dado do jogador é enviado ao jogo por essa consulta.</li>
+</ul>
+
+<h2>8. Integrações com terceiros (somente no computador)</h2>
+
+<ul>
+<li><strong>Discord.</strong> Por meio do recurso de presença enriquecida, o jogo informa ao Discord o modo de jogo, o mapa, a onda, o número de jogadores e o estado da interface. A integração pode ser desligada pela opção de inicialização que desativa o Discord; nesse caso, nada é enviado ao Discord. O Discord trata os dados recebidos conforme a política de privacidade do próprio Discord.</li>
+<li><strong>Steam.</strong> O jogo pode ser iniciado pelo Steam, o que permite exibir o estado no jogo na Steam e permite o compartilhamento de mapas, esquemas e mods pela Workspace do Steam. Nesse caso, o identificador uuid do jogador é derivado do seu identificador Steam, e o Steam passa a tratar o seu identificador de conta conforme a política de privacidade do próprio Steam. Nada disso ocorre se você não usar o Steam.</li>
+</ul>
+
+<h2>9. Mods: atenção</h2>
+
+<p><strong>Mods executam código arbitrário dentro do processo do jogo.</strong> Um mod pode ser escrito em Java ou em JavaScript e roda com as mesmas permissões do aplicativo, o que inclui a possibilidade de acessar a rede e de ler ou gravar arquivos no seu dispositivo. Instale apenas mods de fontes confiáveis, e saiba que a instalação de um mod equivale a executar um programa de terceiros.</p>
+
+<p>O jogo não analisa os mods instalados. A lista de mods é enviada apenas ao servidor de multiplayer ao qual você se conecta, como parte do protocolo de conexão. Os mods são de responsabilidade de quem os publica e de quem os instala.</p>
+
+<h2>10. Permissões no Android</h2>
+
+<p>A versão Android solicita apenas as permissões abaixo:</p>
+
+<ul>
+<li><strong>INTERNET</strong> e <strong>ACCESS_NETWORK_STATE</strong> — necessárias para o multiplayer e para as consultas externas descritas na seção 7.</li>
+<li><strong>VIBRATE</strong> — para o retorno tátil das ações na interface.</li>
+<li><strong>Armazenamento</strong> (leitura e gravação, e leitura de imagens), limitadas pela versão do Android instalada — usadas para salvar o progresso do jogo, os mods e os esquemas, e para importar arquivos que você escolher.</li>
+</ul>
+
+<p>O jogo <strong>não</strong> solicita câmera, microfone nem localização. O backup automático do sistema está desativado, o que impede o Android de copiar os dados do jogo para a nuvem por conta própria.</p>
+
+<h2>11. Fundamento legal</h2>
+
+<p>Os dados processados localmente, como o progresso do jogo e as preferências, têm como fundamento a execução do contrato na forma do art. 7º, inciso V, da Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais). Os dados enviados a um servidor de multiplayer têm como fundamento a sua solicitação expressa ao conectar-se a ele, e, quando aplicável, o legítimo interesse do administrador daquele servidor em manter o serviço disponível e livre de abuso. Os dados das integrações opcionais com Discord e Steam seguem os fundamentos definidos por essas plataformas.</p>
+
+<h2>12. Compartilhamento</h2>
+
+<p>O projeto não compartilha dados com terceiros por conta própria, não os vende e não os utiliza para publicidade. Os dados de multiplayer são compartilhados apenas com o servidor ao qual você se conecta e, se você ativar a integração correspondente, com o Discord ou com o Steam. Os dados de diagnóstico locais nunca são compartilhados.</p>
+
+<h2>13. Retenção e eliminação</h2>
+
+<ul>
+<li><strong>Dados locais.</strong> A opção <strong>Limpar todos os dados</strong>, disponível nas Configurações do jogo, apaga o progresso, os mods, os mapas e os demais arquivos da pasta de dados. Atenção: por padrão, essa opção <strong>preserva</strong> o identificador aleatório do jogador e os identificadores por servidor, para que o jogo não o trate como um jogador novo no próximo uso.</li>
+<li><strong>Registros de erro.</strong> Ficam na subpasta crashes e podem ser apagados por você a qualquer momento, junto com o restante da pasta de dados.</li>
+<li><strong>Dados no servidor.</strong> Permanecem sob controle do administrador daquele servidor, que pode editar ou apagar os registros a qualquer momento. O projeto não tem acesso a eles.</li>
+</ul>
+
+<h2>14. Segurança</h2>
+
+<p>As sessões de multiplayer diretas, em que você informa o endereço de um servidor, não são criptografadas de ponta a ponta. Trate o apelido como a única informação pública sobre você dentro de uma partida. O relay em nuvem opcional, quando utilizado, estabelece conexão por HTTPS, com criptografia de transporte. O jogo não armazena senhas, porque não existem contas, e todo o progresso local pode ser apagado a qualquer momento por meio da opção Limpar todos os dados.</p>
+
+<h2>15. Menores de idade</h2>
+
+<p>O Orbital não é direcionado a crianças e não é coletado conscientemente dados de menores de 13 anos. Se você for o responsável por uma criança que utilizou o jogo, apague os dados locais pela opção Limpar todos os dados e entre em contato pelo canal da seção 16.</p>
+
+<h2>16. Seus direitos como titular</h2>
+
+<p>Nos termos do art. 18 da Lei nº 13.709/2018, você pode, a qualquer momento, solicitar a confirmação da existência de tratamento, o acesso aos seus dados, a correção de dados incompletos ou desatualizados, a anonimização, o bloqueio ou a eliminação de dados desnecessários, a portabilidade dos dados, a informação sobre as entidades com as quais compartilhamos dados, a revogação do consentimento e a eliminação dos dados tratados com consentimento.</p>
+
+<p>Para exercer qualquer desses direitos, escreva para <a href="mailto:petersonlego3133@gmail.com">petersonlego3133@gmail.com</a>, informando o seu apelido e o identificador aleatório do jogador, exibidos na tela de informações do jogo. Os dados mantidos por servidores de terceiros dependem do administrador de cada servidor e precisam ser solicitados diretamente a ele.</p>
+
+<h2>17. Alterações desta política</h2>
+
+<p>Esta política pode ser atualizada para refletir mudanças no jogo ou na legislação aplicável. A data da última atualização consta no início do documento. Como o projeto é de código aberto, o histórico completo das versões desta política está disponível no repositório oficial.</p>
+
+<h2>18. Contato</h2>
+
+<p><strong>Péterson (petersonlego98)</strong><br>
+<a href="mailto:petersonlego3133@gmail.com">petersonlego3133@gmail.com</a><br>
+Projeto Orbital — <a href="https://github.com/petersonlego98/Orbital">https://github.com/petersonlego98/Orbital</a></p>
+
+</body>
+</html>

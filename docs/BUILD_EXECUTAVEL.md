@@ -107,16 +107,21 @@ jpackage --type app-image `
 > um mapa muito grande estourar a heap (suba para `2048m`), nunca para "sem
 > limite".
 
-### Passo 4: Copiar licenças, créditos e avisos
+### Passo 4: Copiar licenças, créditos, avisos e política de privacidade
 A GPLv3 exige que a licença e os avisos acompanhem os binários. Copie os arquivos versionados na raiz para a pasta do executável:
 
 ```powershell
 $dest = "deploy\windows64\Orbital"
 Copy-Item LICENSE, README.md, CREDITS.md, NOTICE.txt -Destination $dest -Force
+Copy-Item docs\PRIVACIDADE.html -Destination $dest -Force
 Copy-Item THIRD_PARTY_LICENSES -Destination $dest -Recurse -Force
 New-Item -ItemType Directory -Force -Path "$dest\docs" | Out-Null
 Copy-Item docs\LICENCIAMENTO_ASSETS.md, docs\auditoria-licencas-2026-11.md, docs\BUILD_EXECUTAVEL.md -Destination "$dest\docs" -Force
 ```
+
+> **Fonte da política de privacidade:** o documento canônico é `core/assets/privacy.html`,
+> que entra automaticamente no JAR e no APK. `docs/PRIVACIDADE.html` é uma cópia para leitura
+> fora do jogo. Se o texto mudar, altere primeiro `core/assets/privacy.html` e atualize a cópia.
 
 Resultado esperado:
 
@@ -124,6 +129,7 @@ Resultado esperado:
 Orbital/
 ├── LICENSE
 ├── README.md
+├── PRIVACIDADE.html
 ├── THIRD_PARTY_LICENSES/
 │   ├── GPL-3.0.txt
 │   ├── libraries.txt

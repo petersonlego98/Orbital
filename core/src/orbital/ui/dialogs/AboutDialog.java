@@ -114,9 +114,17 @@ public class AboutDialog extends BaseDialog{
             in.add(table).size(w, h).padTop(5).row();
         }
 
+        //Seção 8: Política de Privacidade
+        section(in, "about.section.privacy", w);
+        body(in, "about.privacy.text", w);
+        in.button(Core.bundle.get("about.privacy.button"), Icon.fileText, Styles.flatt, () -> ui.privacy.show())
+            .growX().height(44f).padBottom(16f).row();
+
         shown(() -> Time.run(1f, () -> Core.scene.setScrollFocus(pane)));
 
-        cont.add(pane).growX();
+        //Fill the content cell in both directions: with growX() alone the pane keeps the
+        //height of its content and spills over the button row on short landscape screens.
+        cont.add(pane).grow();
 
         addCloseButton();
 

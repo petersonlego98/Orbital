@@ -53,6 +53,7 @@ public class UI implements ApplicationListener, Loadable{
     public WidgetGroup menuGroup, hudGroup;
 
     public AboutDialog about;
+    public PrivacyPolicyDialog privacy;
     public GameOverDialog restart;
     public CustomGameDialog custom;
     public EditorMapsDialog maps;
@@ -218,6 +219,7 @@ public class UI implements ApplicationListener, Loadable{
         host = new HostDialog();
         paused = new PausedDialog();
         about = new AboutDialog();
+        privacy = new PrivacyPolicyDialog();
         bans = new BansDialog();
         admins = new AdminsDialog();
         traces = new TraceDialog();
