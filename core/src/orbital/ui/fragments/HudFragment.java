@@ -879,6 +879,9 @@ public class HudFragment{
     private void buildTestFeaturesPanel(Group parent){
         parent.fill(t -> {
             t.bottom().right();
+            //keep the right-hand stack off the screen edge: the test panel's long localized
+            //labels need room, and a flush panel clips its text on Android's scaled UI
+            t.marginRight(8f);
             //Battle royale is a pure squad fight: no command tablet or build palette.
             t.visible(() -> shown() && state.isGame() && !BattleRoyaleMode.active());
             t.touchable = Touchable.childrenOnly;
@@ -953,7 +956,9 @@ public class HudFragment{
             panel.margin(8f).top().left();
             testFeaturesPanel = panel;
 
-            float width = mobile ? 200f : 248f;
+            //Android's scaled font needs more horizontal room than the old 200 units: at 200 the
+            //enemy-section labels ran off the right edge of the screen
+            float width = mobile ? 280f : 248f;
 
             //header: title + collapse/expand toggle (always visible)
             Table header = new Table();
@@ -1039,7 +1044,7 @@ public class HudFragment{
      * bar), so the labels and toggles stay in sync without flickering every frame.</p>
      */
     private void buildEnemyBuildings(Table panel){
-        float width = mobile ? 200f : 248f;
+        float width = mobile ? 280f : 248f;
 
         Table section = new Table();
         section.left();
@@ -1070,20 +1075,27 @@ public class HudFragment{
     }
 
     private void rebuildEnemyBuildings(Table section, float width){
+        //the section has its own 8-unit margin on each side, so its children must be a little
+        //narrower than the section itself or the last words get clipped on Android
+        float inner = width - 16f;
         section.clearChildren();
         section.left();
 
         section.add("@mode.testfeatures.buildings").color(Pal.accent).left().padTop(6f).padBottom(4f).row();
 
-        //team row: one toggle per team that can hold enemy structures
+        //team row: four toggles fit on desktop, but on a scaled Android UI their labels
+        //overlap into one unreadable line - give them two rows of two there
         section.table(teams -> {
             teams.left();
             teams.defaults().growX().padRight(2f).padBottom(2f).height(24f);
-            for(Team team : TestNewFeaturesMode.enemyTeams()){
+            Seq<Team> teamsList = TestNewFeaturesMode.enemyTeams();
+            for(int i = 0; i < teamsList.size; i++){
+                Team team = teamsList.get(i);
                 teams.button(team.localized(), Styles.flatToggleMenut, () -> TestNewFeaturesMode.enemyTeam = team)
                     .update(b -> b.setChecked(TestNewFeaturesMode.enemyTeam == team)).get();
+                if(mobile && i % 2 == 1) teams.row();
             }
-        }).width(width).left().row();
+        }).width(inner).left().row();
 
         section.label(() -> {
             Block block = TestNewFeaturesMode.enemyBlock;
@@ -1095,7 +1107,7 @@ public class HudFragment{
                 : Core.bundle.format("mode.testfeatures.buildings.tap", block.localizedName) + "\n[lightgray]" +
                 Core.bundle.format("mode.testfeatures.buildings.rotate", control.input.rotation));
             return text.toString();
-        }).color(Color.lightGray).width(width).wrap().left().padBottom(4f).row();
+        }).color(Color.lightGray).width(inner).wrap().left().padBottom(4f).row();
 
         //the block button always opens the shared structures tab, so an armed block can be
         //changed directly. The small cancel button disarms it without opening the catalogue.
@@ -1119,7 +1131,7 @@ public class HudFragment{
             }, Styles.defaultt, () -> openCatalog(false)).growX().height(mobile ? 36f : 40f).left();
             row.button(Icon.cancel, Styles.cleari, TestNewFeaturesMode::disarmStructureTools)
                 .size(mobile ? 36f : 40f).height(mobile ? 36f : 40f).left().padLeft(2f);
-        }).width(width).left().padBottom(2f).row();
+        }).width(inner).left().padBottom(2f).row();
 
         section.button("@mode.testfeatures.buildings.remove", Icon.cancel, Styles.cleart, () -> {
             TestNewFeaturesMode.enemyRemoving = !TestNewFeaturesMode.enemyRemoving;
