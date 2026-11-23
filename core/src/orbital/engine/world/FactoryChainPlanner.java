@@ -55,12 +55,16 @@ public final class FactoryChainPlanner{
     public static Seq<BuildPlan> build(Block factory, int rotation, Team team){
         Seq<BuildPlan> plans = new Seq<>();
         if(factory == null || team == null) return plans;
+        //ore drills are dorsal modules now: never queue one as a building. Other moduleOnly
+        //blocks (duo, lancer, ...) are hidden from the player build menu but the RTS AI still
+        //places them, so only drills are filtered here.
+        if(factory instanceof Drill && factory.moduleOnly) return plans;
 
         CoreBuild core = AutoInfrastructure.closestCore(team, 0, 0);
         if(core == null) return plans;
 
         //Only production crafters need the full source/transport chain. Other catalog entries
-        //(turrets, drills, pumps, walls, power blocks, unit factories, logistics, etc.) are
+        //(turrets, pumps, walls, power blocks, unit factories, logistics, etc.) are
         //ordinary structures: find a legal site and enqueue the selected building itself.
         if(!(factory instanceof GenericCrafter)){
             BuildPlan structure = buildStandalone(factory, rotation, team, core);
@@ -99,8 +103,9 @@ public final class FactoryChainPlanner{
         Map<String, String> connectorOwner = new HashMap<>();
 
         //Inputs: for every required ingredient the unit checks what the sector actually offers.
-        //If the ore is present and a drill of sufficient tier can mine it, it mines locally;
-        //otherwise it falls back to the core stock through an item-configured unloader.
+        //Every ore drill is now a dorsal module, not a building, so a factory chain never plans
+        //one: units mine ore directly and the planner pulls ingredients from the core stock
+        //through an item-configured unloader. (bestDrill still handles any future buildable drill.)
         for(Item item : content.items()){
             if(!consumes(factory, item)) continue;
             Block drill = bestDrill(item, core);
@@ -740,23 +745,20 @@ public final class FactoryChainPlanner{
         return block != null && Build.validPlaceIgnoreUnits(block, team, x, y, 0, false, false);
     }
 
-    private static Block fastestDrill(CoreBuild core){
-        Block[] candidates = hasRealPowerSource(core)
-            ? new Block[]{Blocks.laserDrill, Blocks.pneumaticDrill, Blocks.mechanicalDrill}
-            : new Block[]{Blocks.pneumaticDrill, Blocks.mechanicalDrill};
-        return firstPayable(candidates, core, Blocks.mechanicalDrill);
-    }
-
     /**
-     * Fastest affordable drill that can actually mine {@code item}. An ore harder than the drill's
-     * tier would leave a dead drill on the map, so the tier check filters candidates first and the
-     * core-stock fallback handles items no available drill can mine (e.g. tungsten/tier 5 ore).
+     * Fastest affordable drill that can actually mine {@code item}, for blocks that are still
+     * buildable. Ore drills are dorsal modules now ({@code moduleOnly}), so this always returns
+     * null for vanilla content and the caller falls back to the core stock. An ore harder than
+     * the drill's tier would leave a dead drill on the map, so the tier check filters candidates
+     * first; the stock fallback also handles items no drill can mine (e.g. tungsten/tier 5 ore).
      */
     private static Block bestDrill(Item item, CoreBuild core){
         Block[] candidates = hasRealPowerSource(core)
             ? new Block[]{Blocks.laserDrill, Blocks.pneumaticDrill, Blocks.mechanicalDrill}
             : new Block[]{Blocks.pneumaticDrill, Blocks.mechanicalDrill};
         for(Block block : candidates){
+            //a module-only drill has no place in a construction plan - the player cannot place it
+            if(block == null || block.moduleOnly) continue;
             if(!(block instanceof Drill drill)) continue;
             if(drill.tier < item.hardness) continue;
             if(!affordable(block, core)) continue;

@@ -137,13 +137,15 @@ class ConstructionAuditTest{
             }
         }
 
-        for(Block block : new Block[]{Blocks.mechanicalDrill, Blocks.mechanicalPump,
+        for(Block block : new Block[]{Blocks.mechanicalPump,
             Blocks.copperWall, Blocks.conveyor, Blocks.groundFactory, Blocks.container,
             Blocks.lancer, Blocks.solarPanel}){
             List<String> problems = audit(block);
             assertTrue(problems.isEmpty(),
                 block.name + " chain problems:\n" + String.join("\n", problems));
         }
+        assertTrue(FactoryChainPlanner.build(Blocks.mechanicalDrill, 0, Team.sharded).isEmpty(),
+            "ore drills are dorsal modules and must not be queued as buildings");
     }
 
     /** A source beyond the declared source radius must not be enqueued (the builder moves, but
@@ -186,18 +188,19 @@ class ConstructionAuditTest{
         ore(24, 20, 8, 4, Blocks.oreCoal);
 
         Seq<BuildPlan> plans = FactoryChainPlanner.build(Blocks.graphitePress, 0, Team.sharded);
-        BuildPlan drill = null;
+        //ore drills are dorsal modules now; the input comes from a core unloader instead
+        BuildPlan source = null;
         for(BuildPlan plan : plans){
-            if(plan.block instanceof Drill){
-                drill = plan;
+            if(plan.block == Blocks.unloader){
+                source = plan;
                 break;
             }
         }
-        assertNotNull(drill, "the chain must include a drill");
+        assertNotNull(source, "the chain must include a core unloader");
 
-        String first = path(Placement.pathfindLine(true, drill.x, drill.y, 20, 20));
-        String second = path(Placement.pathfindLine(true, drill.x, drill.y, 20, 20));
-        String third = path(Placement.pathfindLine(true, drill.x, drill.y, 20, 20));
+        String first = path(Placement.pathfindLine(true, source.x, source.y, 20, 20));
+        String second = path(Placement.pathfindLine(true, source.x, source.y, 20, 20));
+        String third = path(Placement.pathfindLine(true, source.x, source.y, 20, 20));
 
         assertEquals(first, second, "the pathfinder must return the same line twice");
         assertEquals(second, third, "the pathfinder must return the same line three times");

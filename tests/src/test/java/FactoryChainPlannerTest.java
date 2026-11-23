@@ -79,14 +79,13 @@ class FactoryChainPlannerTest{
 
         boolean drill = false, unloader = false, belt = false, factory = false;
         BuildPlan factoryPlan = null;
-        BuildPlan drillPlan = null;
+        BuildPlan sourcePlan = null;
         for(BuildPlan plan : plans){
-            if(plan.block == Blocks.mechanicalDrill || plan.block == Blocks.pneumaticDrill
-                || plan.block == Blocks.laserDrill){
-                drill = true;
-                drillPlan = plan;
+            if(plan.block instanceof orbital.world.blocks.production.Drill) drill = true;
+            if(plan.block == Blocks.unloader){
+                unloader = true;
+                sourcePlan = plan;
             }
-            if(plan.block == Blocks.unloader) unloader = true;
             if(plan.block == Blocks.conveyor || plan.block == Blocks.titaniumConveyor
                 || plan.block == Blocks.plastaniumConveyor || plan.block == Blocks.surgeConveyor) belt = true;
             if(plan.block == Blocks.graphitePress){
@@ -95,28 +94,26 @@ class FactoryChainPlannerTest{
             }
         }
 
-        assertTrue(drill, "the chain must include a drill on the ore");
-        assertNotEquals(Blocks.laserDrill, drillPlan.block,
-            "without a real power generator the chain must use an unpowered drill tier");
-        assertFalse(unloader, "unloaders do not extract items from drills");
+        assertFalse(drill, "ore drills are dorsal modules and must never be planned as buildings");
+        assertTrue(unloader, "ingredients must come from the core stock through an unloader");
         assertTrue(belt, "the chain must include transport");
         assertTrue(factory, "the chain must include the chosen factory");
         assertNotNull(factoryPlan);
-        assertNotNull(drillPlan);
+        assertNotNull(sourcePlan);
 
-        boolean exitsDrillFootprint = false;
+        boolean exitsSourceFootprint = false;
         for(BuildPlan plan : plans){
             if(!isBelt(plan.block)) continue;
-            int minX = drillPlan.x - (drillPlan.block.size - 1) / 2;
-            int minY = drillPlan.y - (drillPlan.block.size - 1) / 2;
+            int minX = sourcePlan.x - (sourcePlan.block.size - 1) / 2;
+            int minY = sourcePlan.y - (sourcePlan.block.size - 1) / 2;
             int dx = Math.max(0, Math.max(minX - plan.x,
-                plan.x - (minX + drillPlan.block.size - 1)));
+                plan.x - (minX + sourcePlan.block.size - 1)));
             int dy = Math.max(0, Math.max(minY - plan.y,
-                plan.y - (minY + drillPlan.block.size - 1)));
-            assertFalse(dx == 0 && dy == 0, "belts must not overlap the planned drill footprint");
-            if(dx + dy == 1) exitsDrillFootprint = true;
+                plan.y - (minY + sourcePlan.block.size - 1)));
+            assertFalse(dx == 0 && dy == 0, "belts must not overlap the planned unloader footprint");
+            if(dx + dy == 1) exitsSourceFootprint = true;
         }
-        assertTrue(exitsDrillFootprint, "a belt must connect directly to the drill's outer edge");
+        assertTrue(exitsSourceFootprint, "a belt must connect directly to the unloader's outer edge");
 
         //the unit chooses a free site near the core, not a tile picked by the player
         assertTrue(Math.abs(factoryPlan.x - 10) <= 24 && Math.abs(factoryPlan.y - 10) <= 24);
@@ -322,8 +319,8 @@ class FactoryChainPlannerTest{
     }
 
     @Test
-    void mineableOreUsesADrillRatherThanCoreStock(){
-        //coal has hardness 2 and the mechanical drill (tier 2) can mine it
+    void mineableOreUsesCoreStockWhenDrillsAreModules(){
+        //coal is minable by units, but ore drills are dorsal modules, never build plans
         orbital.engine.world.SectorResources.invalidate();
 
         Seq<BuildPlan> plans = FactoryChainPlanner.build(Blocks.graphitePress, 0, Team.sharded);
@@ -333,8 +330,8 @@ class FactoryChainPlannerTest{
             if(plan.block instanceof orbital.world.blocks.production.Drill) drill = true;
             if(plan.block == Blocks.unloader) unloader = true;
         }
-        assertTrue(drill, "available coal ore must be mined with a drill");
-        assertFalse(unloader, "a freely minable ore should not waste core stock");
+        assertFalse(drill, "module-only drills must not be queued as buildings");
+        assertTrue(unloader, "the factory must draw its input from the core stock");
     }
 
     @Test
@@ -369,17 +366,15 @@ class FactoryChainPlannerTest{
 
     @Test
     void ordinaryCatalogStructuresAreQueuedWithoutFactoryRecipeExpansion(){
-        for(Block block : new Block[]{Blocks.duo, Blocks.copperWall, Blocks.conveyor,
-            Blocks.mechanicalDrill}){
+        for(Block block : new Block[]{Blocks.duo, Blocks.copperWall, Blocks.conveyor}){
             Seq<BuildPlan> plans = FactoryChainPlanner.build(block, 0, Team.sharded);
 
             assertEquals(1, plans.size, block.name + " should queue as a single structure");
             assertSame(block, plans.first().block);
         }
 
-        BuildPlan drill = FactoryChainPlanner.build(Blocks.mechanicalDrill, 0, Team.sharded).first();
-        assertNotNull(world.tile(drill.x, drill.y).drop(),
-            "the selected drill must be placed on a tile it can actually mine");
+        assertTrue(FactoryChainPlanner.build(Blocks.mechanicalDrill, 0, Team.sharded).isEmpty(),
+            "a dorsal drill module must never be queued as a building");
     }
 
     @Test

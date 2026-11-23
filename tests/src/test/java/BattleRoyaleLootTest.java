@@ -89,7 +89,8 @@ class BattleRoyaleLootTest{
         DroppedModule drop = BattleRoyaleLoot.all().first();
 
         assertSame(drop, BattleRoyaleLoot.findAt(drop.x, drop.y, 14f));
-        assertNull(BattleRoyaleLoot.findAt(drop.x + 1000f, drop.y, 14f));
+        //far outside the sector: +1000 can land on a neighbouring region's drop
+        assertNull(BattleRoyaleLoot.findAt(drop.x + 100000f, drop.y + 100000f, 14f));
     }
 
     @Test
