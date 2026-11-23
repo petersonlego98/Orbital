@@ -924,6 +924,21 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         return groups;
     }
 
+    /**
+     * @return whether the hull carries a weapon that can shoot, reading the live mounts.
+     *
+     * <p>{@link UnitType#canAttack} is computed when the content is initialised, so it knows
+     * nothing about dorsal turrets and weapon modules mounted later at runtime. A hull whose
+     * only gun is a mounted module would otherwise never acquire an autofire target - which
+     * is what happens in the 8x8 royal where the loadout is fitted after the unit spawns.</p>
+     */
+    public boolean hasMountedGun(){
+        for(WeaponMount mount : mounts){
+            if(!mount.weapon.noAttack) return true;
+        }
+        return false;
+    }
+
     /** @return how many copies of this module kind are mounted on the hull. */
     public int moduleCopies(Weapon weapon){
         int copies = 0;

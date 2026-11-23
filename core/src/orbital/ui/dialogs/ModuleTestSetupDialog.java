@@ -6,6 +6,7 @@ import arc.math.*;
 import arc.scene.style.*;
 import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
+import arc.struct.Seq;
 import arc.util.*;
 import orbital.entities.units.*;
 import orbital.game.*;
@@ -82,23 +83,40 @@ public class ModuleTestSetupDialog extends BaseDialog{
             .width(contentWidth() - 24f).padBottom(8f).row();
         note("@mode.testfeatures.setup.unit.try");
 
-        int columns = Mathf.clamp((int)(contentWidth() / Scl.scl(76f)), 4, 9);
-        int[] index = {0};
-        body.pane(pane -> {
-            pane.top().left();
-            for(UnitType type : TestNewFeaturesMode.aerialTypes()){
-                ImageButton button = pane.button(new TextureRegionDrawable(type.uiIcon), Styles.selecti, () -> {
-                    picked = type;
-                    rebuild();
-                }).size(64f).pad(5f).tooltip(type.localizedName).get();
-                button.resizeImage(48f);
-                button.setChecked(picked == type);
-
-                if(++index[0] % columns == 0){
-                    pane.row();
-                }
+        //Adaptive grid: all airframes must be visible at once, with no scrollbar.
+        Seq<UnitType> types = TestNewFeaturesMode.aerialTypes();
+        int count = types.size;
+        float availableWidth = contentWidth() - 24f;
+        float availableHeight = Math.max(150f, Core.graphics.getHeight() / Scl.scl(1f) - 220f);
+        float gap = 4f, cell = 30f;
+        int columns = 1;
+        for(float size = 64f; size >= 30f; size -= 2f){
+            int candidate = Math.max(1, (int)((availableWidth + gap) / (size + gap)));
+            int rows = (count + candidate - 1) / candidate;
+            columns = candidate;
+            if(rows * (size + gap) <= availableHeight){
+                cell = size;
+                break;
             }
-        }).grow().row();
+        }
+        float iconSize = cell * 0.72f;
+
+        Table grid = new Table();
+        grid.top().left();
+        int[] index = {0};
+        for(UnitType type : types){
+            ImageButton button = grid.button(new TextureRegionDrawable(type.uiIcon), Styles.selecti, () -> {
+                picked = type;
+                rebuild();
+            }).size(cell).pad(gap / 2f).tooltip(type.localizedName).get();
+            button.resizeImage(iconSize);
+            button.setChecked(picked == type);
+
+            if(++index[0] % columns == 0){
+                grid.row();
+            }
+        }
+        body.add(grid).center().row();
 
         buttons.button("@mode.testfeatures.setup.next", Icon.right, () -> {
             if(picked == null || !TestNewFeaturesMode.selectUnit(picked)){

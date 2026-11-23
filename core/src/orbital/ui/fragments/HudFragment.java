@@ -370,6 +370,8 @@ public class HudFragment{
             //research and fixed-camera controls live beside the minimap, on its left
             t.table(tools -> {
                 tools.top().right();
+                //Battle royale keeps only the menu button; the other top tools stay hidden.
+                tools.visible(() -> !BattleRoyaleMode.active());
                 float iconSize = 44f;
                 tools.button(Icon.tree, Styles.clearNonei, iconSize, () -> ui.research.show())
                     .name("research-pinned")
@@ -443,7 +445,7 @@ public class HudFragment{
 
                 cont.row();
 
-                cont.table(select -> {
+                cont.collapser(select -> {
                     select.name = "mobile buttons";
                     select.left();
                     select.defaults().size(dsize).left();
@@ -467,9 +469,10 @@ public class HudFragment{
                         }
                     }).get();
                     flip.name = "flip";
+                    flip.visible(() -> !BattleRoyaleMode.active());
 
                     select.button(Icon.paste, style, ui.schematics::show)
-                    .name("schematics");
+                    .name("schematics").visible(() -> !BattleRoyaleMode.active());
 
                     select.button(Icon.pause, style, () -> {
                         if(net.active()){
@@ -477,7 +480,7 @@ public class HudFragment{
                         }else if(!state.rules.pauseDisabled){
                             state.set(state.isPaused() ? State.playing : State.paused);
                         }
-                    }).name("pause").update(i -> {
+                    }).name("pause").visible(() -> !BattleRoyaleMode.active()).update(i -> {
                         if(net.active()){
                             i.setDisabled(false);
                             i.getStyle().imageUp = Icon.players;
@@ -499,7 +502,7 @@ public class HudFragment{
                         }else{
                             ui.database.show();
                         }
-                    }).name("chat").update(i -> {
+                    }).name("chat").visible(() -> !BattleRoyaleMode.active()).update(i -> {
                         if(net.active() && mobile){
                             i.getStyle().imageUp = Icon.chat;
                         }else if(state.isCampaign()){
@@ -509,12 +512,17 @@ public class HudFragment{
                         }
                     });
 
-                    select.image().color(Pal.gray).width(4f).fillY();
+                    select.image().color(Pal.gray).width(4f).fillY()
+                        .visible(() -> !BattleRoyaleMode.active());
                     //there is no back button on iOS, so the menu has to be shown at all times.
-                }).visible(() -> OS.isIos || !control.input.logicHideHud);
+                //8x8: the strip's only live button is the menu, and it moves into the status
+                //box below. A collapser removes the empty strip from the layout altogether
+                //(visible=false would still reserve its row), so the box reaches the corner.
+                }, () -> !BattleRoyaleMode.active() && (OS.isIos || !control.input.logicHideHud));
 
                 cont.row();
-                cont.image().height(4f).color(Pal.gray).fillX();
+                cont.collapser(sep -> sep.image().height(4f).color(Pal.gray).fillX(),
+                    () -> !BattleRoyaleMode.active());
                 cont.row();
             }
 
@@ -575,14 +583,22 @@ public class HudFragment{
                     imageUpColor = Color.white;
                 }};
 
-                //table with button to skip wave
-                s.button(Icon.play, rightStyle, 30f, () -> {
-                    if(net.client() && player.admin){
-                        Call.adminRequest(player, AdminAction.wave, null);
-                    }else{
-                        logic.skipWave();
-                    }
-                }).growY().fillX().right().width(40f).disabled(b -> !canSkipWave()).name("skip").get().toBack();
+                //Table with the skip-wave button. In 8x8 it is collapsed instead of merely
+                //hidden: an invisible cell still reserves its 40px, which left a gap between
+                //the status box and the menu button.
+                s.collapser(skip -> {
+                    skip.button(Icon.play, rightStyle, 30f, () -> {
+                        if(net.client() && player.admin){
+                            Call.adminRequest(player, AdminAction.wave, null);
+                        }else{
+                            logic.skipWave();
+                        }
+                    }).growY().fillX().right().width(40f).disabled(b -> !canSkipWave()).name("skip").get().toBack();
+                }, () -> !BattleRoyaleMode.active());
+
+                //8x8 mobile: the menu button is inside the status box itself, right after
+                //the unit icon and its health bar (see makeStatusTable). A separate cell here
+                //always left a gap, so no menu button is added to this outer table.
             }).width(dsize * 5 + 4f).name("statustable");
 
             wavesMain.row();
@@ -638,18 +654,18 @@ public class HudFragment{
                 IntFormat mem = new IntFormat("memory");
                 IntFormat memnative = new IntFormat("memory2");
 
-                info.label(() -> fps.get(Core.graphics.getFramesPerSecond())).left().style(Styles.outlineLabel).name("fps");
-                info.row();
+                //all readouts share one row: no row() calls, so FPS, memory and (when
+                //connected) ping/TPS stay side by side instead of stacking down the screen.
+                info.label(() -> fps.get(Core.graphics.getFramesPerSecond())).left().style(Styles.outlineLabel).name("fps").padRight(10f);
 
                 if(android){
-                    info.label(() -> memnative.get((int)(Core.app.getJavaHeap() / 1024 / 1024), (int)(Core.app.getNativeHeap() / 1024 / 1024))).left().style(Styles.outlineLabel).name("memory2");
+                    info.label(() -> memnative.get((int)(Core.app.getJavaHeap() / 1024 / 1024), (int)(Core.app.getNativeHeap() / 1024 / 1024))).left().style(Styles.outlineLabel).name("memory2").padRight(10f);
                 }else{
-                    info.label(() -> mem.get((int)(Core.app.getJavaHeap() / 1024 / 1024))).left().style(Styles.outlineLabel).name("memory");
+                    info.label(() -> mem.get((int)(Core.app.getJavaHeap() / 1024 / 1024))).left().style(Styles.outlineLabel).name("memory").padRight(10f);
                 }
-                info.row();
 
-                info.label(() -> ping.get(netClient.getPing())).visible(net::client).left().style(Styles.outlineLabel).name("ping").row();
-                info.label(() -> tps.get(state.serverTps == -1 ? 60 : state.serverTps)).visible(net::client).left().style(Styles.outlineLabel).name("tps").row();
+                info.label(() -> ping.get(netClient.getPing())).visible(net::client).left().style(Styles.outlineLabel).name("ping").padRight(10f);
+                info.label(() -> tps.get(state.serverTps == -1 ? 60 : state.serverTps)).visible(net::client).left().style(Styles.outlineLabel).name("tps");
 
             }).top().left();
         });
@@ -790,6 +806,21 @@ public class HudFragment{
         parent.fill(t -> {
             t.name = "turret-loadout";
             t.bottom().left();
+            //The hud is built while still in the menu, so the corner must follow the mode live:
+            //battle royale puts the readout in the top-right corner, clear of both touch sticks.
+            float[] lastMargin = {Float.NaN};
+            t.update(() -> {
+                boolean br = BattleRoyaleMode.active();
+                alignCorner(t, br ? Align.topRight : Align.bottomLeft);
+                //the top-right corner may hold the minimap; leave room for it before the modules
+                float margin = br ? (Core.settings.getBool("minimap") ? 160f : 8f) : 0f;
+                if(lastMargin[0] != margin){
+                    lastMargin[0] = margin;
+                    t.marginTop(margin);
+                    t.marginBottom(0f);
+                    t.invalidateHierarchy();
+                }
+            });
             t.touchable = Touchable.childrenOnly;
             t.visible(() -> shown() && !state.isMenu() && !state.isEditor() && selectedHasTurretBar());
             t.table(Styles.black6, bar -> {
@@ -818,12 +849,24 @@ public class HudFragment{
         parent.fill(t -> {
             t.name = "analogstick";
             t.bottom().right();
+            //Mirrored in battle royale: stick on the left, hud readout on the right.
+            t.update(() -> alignCorner(t, BattleRoyaleMode.active() ? Align.bottomLeft : Align.bottomRight));
             t.visible(() -> mobile && shown() && !state.isMenu() && !state.isEditor() && !player.dead()
                 && Core.settings.getBool(KeybindDialog.analogKey, true));
             t.touchable = Touchable.childrenOnly;
             //Cell sizes are scaled by Arc once. Passing Scl.scl(...) here scaled the stick a
             //second time on Android, making it reach into the test-tools panel above it.
             t.add(buildAnalogStick()).size(120f).pad(18f);
+        });
+
+        //8x8 twin-stick: the right stick aims and fires the damage weapons while held.
+        parent.fill(t -> {
+            t.name = "aimstick";
+            t.bottom().right();
+            t.visible(() -> mobile && shown() && BattleRoyaleMode.active() && !state.isMenu()
+                && !state.isEditor() && !player.dead());
+            t.touchable = Touchable.childrenOnly;
+            t.add(buildAimStick()).size(120f).pad(18f);
         });
 
         buildTestFeaturesPanel(parent);
@@ -836,7 +879,8 @@ public class HudFragment{
     private void buildTestFeaturesPanel(Group parent){
         parent.fill(t -> {
             t.bottom().right();
-            t.visible(() -> shown() && state.isGame());
+            //Battle royale is a pure squad fight: no command tablet or build palette.
+            t.visible(() -> shown() && state.isGame() && !BattleRoyaleMode.active());
             t.touchable = Touchable.childrenOnly;
 
             boolean[] wasTest = {!TestNewFeaturesMode.active()};
@@ -1286,6 +1330,7 @@ public class HudFragment{
      * measured height: the corner stays with the modules, and the buttons never cover a cell.
      */
     public float moduleBarHeight(){
+        if(BattleRoyaleMode.active()) return 0f;
         if(turretBarBody == null || !shown() || state.isMenu() || state.isEditor()
         || !selectedHasTurretBar()) return 0f;
         return turretBarBody.getHeight();
@@ -1326,6 +1371,17 @@ public class HudFragment{
 
         AnalogStick stick = new AnalogStick(mobile.analogVector, mobile::syncAnalog);
         stick.name = "analogstick";
+        return stick;
+    }
+
+    /** Right-hand stick of the 8x8 twin-stick layout: aims and fires while held. */
+    private Table buildAimStick(){
+        if(!(control.input instanceof MobileInput mobile)){
+            return new Table();
+        }
+
+        AnalogStick stick = new AnalogStick(mobile.aimVector, mobile::syncAim);
+        stick.name = "aimstick";
         return stick;
     }
 
@@ -1391,18 +1447,76 @@ public class HudFragment{
             }
         }
 
-        //a slot is only free when no turret and no plate sits in it
-        if(unit.mountedTurrets() + unit.wallMounts.length < unit.type.turretSlots.size){
-            modules.add(actionCell(unit, Icon.add, Core.bundle.get("turret.loadout.add")))
-                .size(cellSize).pad(cellPad).tooltip(Core.bundle.get("turret.loadout.add"));
+        //8x8: the pilot must see the whole loadout. The dorsal modules above are already
+        //listed, but the unit's own guns are not dorsal modules and are left out of
+        //moduleGroups(); without these cells eleven of the twenty-one aerial hulls show a
+        //bar with nothing but the supply meters. They are a readout, like a wall plate:
+        //no number (the number keys only address dorsal modules) and no click.
+        if(BattleRoyaleMode.active()){
+            //one cell per fixed mount, even when several guns share the same name: the pilot
+            //must see every hardpoint, and each cell carries its own live reload bar
+            for(WeaponMount mount : fixedGuns(unit)){
+                modules.add(fixedGunCell(unit, mount)).size(cellSize).pad(cellPad)
+                    .tooltip(turretName(mount.weapon));
+            }
         }
 
-        modules.add(actionCell(unit, Icon.hammer, Core.bundle.get("turret.loadout.title")))
-            .size(cellSize).pad(cellPad).tooltip(Core.bundle.get("turret.loadout.title"));
+        //Battle royale keeps the supply/module readout but hides the buttons that open the
+        //module catalogue - the loadout was chosen before the fight and is fixed from now on.
+        if(!BattleRoyaleMode.active()){
+            //a slot is only free when no turret and no plate sits in it
+            if(unit.mountedTurrets() + unit.wallMounts.length < unit.type.turretSlots.size){
+                modules.add(actionCell(unit, Icon.add, Core.bundle.get("turret.loadout.add")))
+                    .size(cellSize).pad(cellPad).tooltip(Core.bundle.get("turret.loadout.add"));
+            }
+
+            modules.add(actionCell(unit, Icon.hammer, Core.bundle.get("turret.loadout.title")))
+                .size(cellSize).pad(cellPad).tooltip(Core.bundle.get("turret.loadout.title"));
+        }
 
         //bars above, modules below, both left-aligned in the same column
         table.add(bars).left().row();
         table.add(modules).left().row();
+    }
+
+    /**
+     * @return every fixed hardpoint of the hull, in mount order, including identical mounts.
+     * These guns are not dorsal modules, so the module model leaves them out; the 8x8 HUD lists
+     * them anyway so the pilot sees the whole loadout.
+     */
+    private static Seq<WeaponMount> fixedGuns(Unit unit){
+        Seq<WeaponMount> mounts = new Seq<>(WeaponMount.class);
+        for(WeaponMount mount : unit.mounts){
+            if(mount == null || mount.weapon == null || mount.weapon.isTurretMount()) continue;
+            mounts.add(mount);
+        }
+        return mounts;
+    }
+
+    /**
+     * A readout cell for one fixed hardpoint: icon and its own live reload bar, no number badge
+     * and no click, because the number keys and the pick-to-fire gesture only address dorsal
+     * modules. Used by the 8x8 HUD so a hull without a dorsal turret still shows its weapons.
+     */
+    private Table fixedGunCell(Unit unit, WeaponMount mount){
+        Weapon weapon = mount.weapon;
+        TextureRegion region = weapon.region != null && weapon.region.found() ? weapon.region : Core.atlas.find(weapon.name);
+        if(region == null || !region.found()) region = unit.type.uiIcon;
+
+        Table cell = new Table();
+        cell.background(Styles.black3);
+
+        Stack stack = new Stack();
+        BorderImage icon = new BorderImage(region, 2f);
+        icon.setScaling(Scaling.fit);
+        icon.border(Pal.gray);
+        stack.add(icon);
+
+        cell.add(stack).size(44f).pad(2f).row();
+
+        Bar reload = new Bar(() -> "", () -> Pal.gray, () -> reloadFraction(mount));
+        cell.add(reload).height(4f).growX().pad(0f, 2f, 2f, 2f).row();
+        return cell;
     }
 
     /**
@@ -1548,6 +1662,43 @@ public class HudFragment{
     }
 
     /**
+     * The red X of an equipped module: takes it off the hull and leaves it on the sector floor.
+     * The touch is stopped so the cell's own click (which selects/toggles the module) never fires.
+     */
+    private static ImageButton dropButton(Runnable action){
+        //own style instance: mutating Styles.clearNonei would turn every other clear icon red
+        ImageButtonStyle style = new ImageButtonStyle();
+        style.up = Styles.none;
+        style.down = Styles.flatDown;
+        style.over = Styles.flatOver;
+        style.imageUpColor = Pal.remove;
+        ImageButton button = new ImageButton(Icon.cancel, style);
+        button.resizeImage(16f);
+        button.addListener(new InputListener(){
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode code){
+                event.stop();
+                return true;
+            }
+
+            @Override
+            public void touchUp(InputEvent event, float x, float y, int pointer, KeyCode code){
+                event.stop();
+                action.run();
+            }
+        });
+        return button;
+    }
+
+    /** Overlay that pins the red X to the top-right corner of a module cell. */
+    private static void addDropButton(Stack stack, Runnable action){
+        Table corner = new Table();
+        corner.top().right();
+        corner.add(dropButton(action)).size(18f).pad(1f);
+        stack.add(corner);
+    }
+
+    /**
      * A weapon cell of the bottom bar: icon with the module number, reload and heat bars, and
      * the pilot's selection. Clicking picks the module: from then on it is the only one that
      * fires, every other module of the hull stays mounted and silent. Clicking the same cell
@@ -1604,6 +1755,9 @@ public class HudFragment{
             lock.top().right();
             lock.image(Icon.lockSmall).size(13f).pad(1f).get().setColor(Pal.gray);
             stack.add(lock);
+        }else{
+            Weapon toDrop = weapon;
+            addDropButton(stack, () -> BattleRoyaleLoot.dropWeapon(unit, toDrop));
         }
 
         cell.add(stack).size(iconSize).pad(2f).row();
@@ -1650,7 +1804,7 @@ public class HudFragment{
      * never removed here, so its anchor, category and footprint stay reserved.
      */
     private Table supportCell(Unit unit, SupportMount mount, int index){
-        return moduleCell(unit, mount.block, () -> mount.active, () -> selectModule(unit, index),
+        return moduleCell(unit, mount.block, mount, () -> mount.active, () -> selectModule(unit, index),
             () -> supportTooltip(unit, index, mount), index);
     }
 
@@ -1674,9 +1828,13 @@ public class HudFragment{
         Table cell = new Table();
         cell.background(Styles.black3);
 
+        Stack stack = new Stack();
         BorderImage icon = new BorderImage(region, 3f);
         icon.setScaling(Scaling.fit);
-        cell.add(icon).size(iconSize).pad(2f).row();
+        stack.add(icon);
+        WallMount toDrop = mount;
+        addDropButton(stack, () -> BattleRoyaleLoot.dropWall(unit, toDrop));
+        cell.add(stack).size(iconSize).pad(2f).row();
 
         //a plate is always defending while installed
         Bar status = new Bar(() -> "", () -> Pal.heal, () -> 1f);
@@ -1699,7 +1857,7 @@ public class HudFragment{
      *
      * @param index position in the bar, used for the number badge; negative leaves it out.
      */
-    private Table moduleCell(Unit unit, Block block, Boolp active, Runnable toggle, Prov<String> tooltip, int index){
+    private Table moduleCell(Unit unit, Block block, SupportMount mount, Boolp active, Runnable toggle, Prov<String> tooltip, int index){
         float iconSize = 44f;
         TextureRegion region = block.uiIcon;
         if(region == null || !region.found()) region = unit.type.uiIcon;
@@ -1722,6 +1880,9 @@ public class HudFragment{
             label.setColor(Pal.accent);
             stack.add(number);
         }
+
+        SupportMount toDrop = mount;
+        addDropButton(stack, () -> BattleRoyaleLoot.dropSupport(unit, toDrop));
 
         //the badge sits on top of the icon; a text supplier keeps it live after every click
         Table overlay = new Table();
@@ -1916,6 +2077,14 @@ public class HudFragment{
         shown = !shown;
     }
 
+    /** Keeps a full-screen fill table's corner in sync with the active game mode. */
+    private static void alignCorner(Table table, int align){
+        if(table.getAlign() != align){
+            table.align(align);
+            table.invalidateHierarchy();
+        }
+    }
+
     private Table makeStatusTable(){
         Table table = new Table(Tex.wavepane);
 
@@ -1928,6 +2097,8 @@ public class HudFragment{
         enemiesf = new IntFormat("wave.enemies"),
         enemycf = new IntFormat("wave.enemycore"),
         enemycsf = new IntFormat("wave.enemycores"),
+        enemyuf = new IntFormat("wave.enemyunit"),
+        enemyusf = new IntFormat("wave.enemyunits"),
 
         waitingf = new IntFormat("wave.waiting", i -> {
             ibuild.setLength(0);
@@ -2050,7 +2221,9 @@ public class HudFragment{
             float pad = -20;
             t.margin(0);
             t.clicked(() -> {
-                if(!player.dead() && mobile){
+                //the 8x8 box stays visible for life/shield readout, but tapping it must not
+                //detach the pilot from its hull (there is no core to respawn into)
+                if(!player.dead() && mobile && !BattleRoyaleMode.active()){
                     Call.unitClear(player);
                     control.input.recentRespawnTimer = 1f;
                     control.input.controlledType = null;
@@ -2096,6 +2269,15 @@ public class HudFragment{
 
                 b.color.set(player.displayAmmo() ? Pal.ammo : playerHasPayloads.get() ? Pal.items : Pal.health);
             });
+
+            //8x8 mobile: the menu lives inside the status box, immediately after the unit
+            //icon and its health bar, so there is no gap between them. The HUD is built once
+            //at startup, before battle royale is active, so the button must always be created
+            //and a collapser - not a build-time check - decides when it takes space.
+            t.collapser(menu -> {
+                menu.button(Icon.menu, Styles.clearNonei, 30f, ui.paused::show)
+                .size(40f).padLeft(0f).name("main-menu");
+            }, () -> mobile && BattleRoyaleMode.active());
 
             t.getChildren().get(1).toFront();
         })).size(120f, 80).padRight(4);
@@ -2151,6 +2333,19 @@ public class HudFragment{
             }
 
             if(!state.rules.waves && state.rules.attackMode){
+                //Battle royale has no cores: show how many enemy units are still fighting.
+                if(BattleRoyaleMode.active()){
+                    int sum = 0;
+                    for(Team team : BattleRoyaleMode.teams()){
+                        if(team == player.team()) continue;
+                        Teams.TeamData data = team.data();
+                        sum += data == null || data.units == null ? 0 : data.units.size;
+                    }
+                    sum = Math.max(sum, 1);
+                    builder.append(sum > 1 ? enemyusf.get(sum) : enemyuf.get(sum));
+                    return builder;
+                }
+
                 int sum = Math.max(state.teams.present.sum(t -> t.team != player.team() ? t.cores.size : 0), 1);
                 builder.append(sum > 1 ? enemycsf.get(sum) : enemycf.get(sum));
                 return builder;

@@ -5,6 +5,7 @@ import arc.func.*;
 import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.input.*;
+import arc.math.*;
 import arc.scene.*;
 import arc.scene.actions.*;
 import arc.scene.event.*;
@@ -14,16 +15,22 @@ import arc.util.*;
 import orbital.graphics.*;
 import orbital.ui.*;
 
+import static orbital.Vars.mobile;
+
 public class LoadingFragment{
     private Table table;
     private TextButton button;
     private Bar bar;
     private Label nameLabel;
+    private @Nullable Cell<Bar> barCell;
+    private @Nullable Cell<TextButton> buttonCell;
+    private float contentWidth = 420f;
     private @Nullable Runnable cancelListener;
     private float progValue;
 
     public void build(Group parent){
         parent.fill(t -> {
+            t.align(Align.center);
             //rect must fill screen completely.
             t.rect((x, y, w, h) -> {
                 if(OrbitalTheme.available()){
@@ -40,40 +47,57 @@ public class LoadingFragment{
             t.visible = false;
             t.touchable = Touchable.enabled;
 
+            //Everything lives in ONE bounded column. Full-width rows let long localized strings
+            //escape their cells and paint over the emblem, the tagline and the progress bar.
+            contentWidth = Math.min(420f, Core.graphics.getWidth() / Scl.scl(1f) * 0.86f);
+            Table content = new Table();
+            t.add(content).center();
+
             //round emblem cut from the key art, in place of the old empty spacer
-            t.add(new Element(){
+            content.add(new Element(){
                 @Override public void draw(){
                     TextureRegion emblem = OrbitalTheme.mark();
                     if(emblem == null) return;
                     Draw.alpha(parentAlpha);
-                    float size = Scl.scl(132f);
+                    //Element coordinates are already scene units: applying Scl.scl here doubled
+                    //the scale on Android and made the emblem overflow its own cell
+                    float size = 112f;
                     Draw.rect(emblem, x + width / 2f, y + height / 2f, size, size);
                     Draw.reset();
                 }
-            }).size(148f, 148f).padBottom(6f).row();
+            }).size(112f, 112f).padBottom(8f).center().row();
 
-            t.add(warningBar()).growX().height(24f);
-            t.row();
-            nameLabel = t.add("@loading").pad(10f).style(Styles.outlineLabel).color(OrbitalTheme.cyan).get();
-            t.row();
+            content.add(warningBar()).growX().height(16f).row();
+
+            Cell<Label> nameCell = content.add("@loading").width(contentWidth).center();
+            nameLabel = nameCell.get();
+            nameLabel.setAlignment(Align.center);
+            nameLabel.setWrap(true);
+            nameLabel.setFontScale(mobile ? 0.75f : 0.9f);
+            nameCell.padTop(8f).padBottom(4f).row();
 
             Label tagline = new Label(Core.bundle.get("loading.orbital.tagline"), Styles.outlineLabel);
-            tagline.setFontScale(0.7f);
+            tagline.setAlignment(Align.center);
+            tagline.setWrap(true);
+            tagline.setFontScale(mobile ? 0.62f : 0.7f);
             tagline.setColor(OrbitalTheme.cyan);
-            t.add(tagline).padBottom(8f).row();
+            content.add(tagline).width(contentWidth).center().padBottom(10f).row();
 
-            t.add(warningBar()).growX().height(24f);
-            t.row();
+            content.add(warningBar()).growX().height(16f).row();
 
-            nameLabel.setText("@loading");
-
-            bar = t.add(new Bar()).pad(3).padTop(6).size(500f, 40f).visible(false).get();
-            t.row();
-            button = t.button("@cancel", OrbitalTheme.loadButton(), () -> {
+            //hidden rows still reserve their size in scene2d, which pushed the visible block up;
+            //collapse the cells until the progress/cancel controls are actually needed
+            bar = new Bar();
+            bar.visible = false;
+            barCell = content.add(bar).size(0f, 0f);
+            barCell.row();
+            buttonCell = content.button("@cancel", OrbitalTheme.loadButton(), () -> {
                 if(cancelListener != null){
                     cancelListener.run();
                 }
-            }).pad(20).size(250f, 70f).visible(false).get();
+            }).size(0f, 0f);
+            button = buttonCell.get();
+            button.visible = false;
             button.keyDown(key -> {
                 if(cancelListener != null && (key == KeyCode.back || key == KeyCode.escape)){
                     cancelListener.run();
@@ -97,6 +121,10 @@ public class LoadingFragment{
     public void setProgress(Floatp progress){
         bar.reset(0f);
         bar.visible = true;
+        if(barCell != null){
+            barCell.size(contentWidth, 40f).pad(3f).padTop(6f);
+            if(table != null) table.invalidateHierarchy();
+        }
         bar.set(() -> ((int)(progress.get() * 100) + "%"), progress, OrbitalTheme.cyan);
     }
 
@@ -124,6 +152,10 @@ public class LoadingFragment{
 
     public void setButton(Runnable listener){
         button.visible = true;
+        if(buttonCell != null){
+            buttonCell.size(Math.min(250f, contentWidth), 70f).pad(20f);
+            if(table != null) table.invalidateHierarchy();
+        }
         button.requestKeyboard();
         cancelListener = listener;
     }
@@ -143,8 +175,10 @@ public class LoadingFragment{
 
     public void show(String text){
         button.visible = false;
+        if(buttonCell != null) buttonCell.size(0f, 0f).pad(0f);
         cancelListener = null;
         bar.visible = false;
+        if(barCell != null) barCell.size(0f, 0f).pad(0f);
         table.clearActions();
         table.touchable = Touchable.enabled;
         nameLabel.setColor(OrbitalTheme.cyan);

@@ -26,21 +26,26 @@ public class ExpeditionDialog extends BaseDialog{
 
         int minutes = (int)(ExpeditionClock.durationMillis() / 60_000L);
 
-        cont.add("Uma janela de " + minutes + " minutos em tempo real em Gier. O prazo continua correndo com o jogo fechado; quando ele termina, a partida é encerrada e você volta ao mapa.")
+        //Keep the copy inside a scrollable pane: on a short landscape screen the raw content
+        //used to overflow over the title and over the button row.
+        Table in = new Table();
+        in.margin(12f);
+
+        in.add("Uma janela de " + minutes + " minutos em tempo real em Gier. O prazo continua correndo com o jogo fechado; quando ele termina, a partida é encerrada e você volta ao mapa.")
             .width(520f).wrap().labelAlign(Align.center);
-        cont.row();
-        cont.add(status).width(520f).padTop(14f).labelAlign(Align.center);
-        cont.row();
-        cont.add(timer).width(520f).padTop(4f).labelAlign(Align.center);
-        cont.row();
-        cont.table(Styles.black6, t -> {
+        in.row();
+        in.add(status).width(520f).padTop(14f).labelAlign(Align.center);
+        in.row();
+        in.add(timer).width(520f).padTop(4f).labelAlign(Align.center);
+        in.row();
+        in.table(Styles.black6, t -> {
             t.margin(10f).left();
             t.add("Inventário global").color(Pal.accent).left();
             t.row();
             t.add(globalItems).left().padTop(6f);
         }).width(520f).padTop(14f).left();
-        cont.row();
-        cont.table(Styles.black6, t -> {
+        in.row();
+        in.table(Styles.black6, t -> {
             t.margin(10f).left();
             t.add("Carga no núcleo de Gier").color(Pal.accent).left();
             t.row();
@@ -48,6 +53,10 @@ public class ExpeditionDialog extends BaseDialog{
             t.row();
             t.add("Durante a expedição, recolha a carga pelo botão ao lado do relógio no HUD.").color(Color.lightGray).left().padTop(6f);
         }).width(520f).padTop(8f).left();
+
+        ScrollPane pane = new ScrollPane(in);
+        pane.setFadeScrollBars(false);
+        cont.add(pane).grow();
 
         buttons.defaults().size(220f, 60f).pad(4f);
         buttons.button("Iniciar expedição", Icon.play, () -> {

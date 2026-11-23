@@ -12,10 +12,17 @@ import orbital.graphics.*;
 import static orbital.Vars.*;
 
 public class BaseDialog extends Dialog{
+    private boolean fillsStage = true;
     protected boolean wasPaused;
     /** If true, this dialog will pause the game while open. */
     protected boolean shouldPause;
     protected Image titleImage;
+
+    @Override
+    public void setFillParent(boolean fill){
+        super.setFillParent(fill);
+        fillsStage = fill;
+    }
 
     public BaseDialog(String title, DialogStyle style){
         super(title, style);
@@ -63,7 +70,14 @@ public class BaseDialog extends Dialog{
      */
     @Override
     public void centerWindow(){
-        setPosition(0f, 0f);
+        //Full-screen menus must stay at the stage origin so Android's system-bar insets do not
+        //shift them. Floating dialogs (showConfirm, editor windows, ...) opt out with
+        //setFillParent(false) and must be centred like ordinary windows.
+        if(fillsStage){
+            setPosition(0f, 0f);
+        }else{
+            super.centerWindow();
+        }
     }
 
     /** Places the buttons as an overlay on top of the content. Used when the content can be scrolled through.*/

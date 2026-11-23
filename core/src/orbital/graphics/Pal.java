@@ -165,6 +165,18 @@ public class Pal{
     blastAmmoFront = Color.valueOf("eeab89"),
 
     thoriumAmmoBack = Color.valueOf("f595be"),
-    thoriumAmmoFront = Color.white.cpy()
+    thoriumAmmoFront = Color.white.cpy(),
+
+    //dropped module borders in the 8x8 battle royale: one distinct hue per category
+    moduleRepair = Color.valueOf("8dff9e"),
+    moduleUnitRepair = Color.valueOf("4ce0c0"),
+    moduleOverload = Color.valueOf("ff9c2e"),
+    moduleWeapon = Color.valueOf("ff5b52"),
+    moduleForce = Color.valueOf("58c8ff"),
+    moduleTractor = Color.valueOf("c07bff"),
+    modulePointDefense = Color.valueOf("ffe45c"),
+    moduleLiquid = Color.valueOf("5b8cff"),
+    moduleTransport = Color.valueOf("d6a25e"),
+    moduleArmor = Color.valueOf("b9c0c8")
     ;
 }

@@ -221,15 +221,12 @@ public class MenuFragment{
         float size = 120f;
         container.defaults().size(size).pad(5).padTop(4f);
 
+        //The mobile menu is limited to the modes that work well with touch controls: the
+        //star map, join/custom/load and the expedition remain available on desktop.
         MobileButton
-            play = new MobileButton(Icon.play, "@starmap", () -> checkPlay(ui.planet::show)),
-            expedition = new MobileButton(Icon.terrain, "Expedição", () -> checkPlay(ui.expedition::show)),
             testFeatures = new MobileButton(Icon.terrain, "Novidades", () -> checkPlay(TestNewFeaturesMode::start)),
-            custom = new MobileButton(Icon.rightOpenOut, "@customgame", () -> checkPlay(ui.custom::show)),
-            maps = new MobileButton(Icon.download, "@loadgame", () -> checkPlay(ui.load::show)),
-            join = new MobileButton(Icon.add, "@joingame", () -> checkPlay(ui.join::show)),
-            editor = new MobileButton(Icon.terrain, "@editor", () -> checkPlay(ui.maps::show)),
             tools = new MobileButton(Icon.settings, "@settings", ui.settings::show),
+            battle = new MobileButton(Icon.units, "@mode.battleRoyale.name", () -> checkPlay(BattleRoyaleMode::start)),
             exit = new MobileButton(Icon.exit, "@quit", () -> Core.app.exit()),
             about = new MobileButton(Icon.info, "@about.button", ui.about::show);
 
@@ -237,39 +234,22 @@ public class MenuFragment{
 
         if(!Core.graphics.isPortrait()){
             container.marginTop(60f);
-            container.add(play);
-            container.add(join);
-            container.add(custom);
-            container.add(maps);
-            container.add(expedition);
+            //Every touch-friendly button shares one row, including the 8x8 mode. The editor
+            //stays out of the main menu (it lives in the map menu) and mods were removed.
             container.add(testFeatures);
-            // add odd custom buttons
-            for(int i = 1; i < customs.size; i += 2){
-                container.add(customs.get(i));
-            }
-            container.row();
-
-            container.add(editor);
             container.add(tools);
-            //Mods were removed: no menu button.
-            // add even custom buttons (before the exit button)
+            container.add(battle);
+            // add custom buttons, if any, before the exit button
             for(int i = 0; i < customs.size; i += 2){
                 container.add(customs.get(i));
             }
             container.add(ios ? about : exit);
         }else{
             container.marginTop(0f);
-            container.add(play);
-            container.add(maps);
-            container.row();
-            container.add(expedition);
-            container.row();
             container.add(testFeatures);
             container.row();
-            container.add(custom);
-            container.add(join);
+            container.add(battle);
             container.row();
-            container.add(editor);
             container.add(tools);
             container.row();
             //Mods were removed: no menu button.
@@ -314,7 +294,7 @@ public class MenuFragment{
                         new MenuButton("@database", Icon.book, ui.database::show),
                         new MenuButton("@about.button", Icon.info, ui.about::show)
                     ),
-                    new MenuButton("@editor", Icon.terrain, () -> checkPlay(ui.maps::show)), steam ? new MenuButton("@workshop", Icon.steam, platform::openWorkshop) : null,
+                    steam ? new MenuButton("@workshop", Icon.steam, platform::openWorkshop) : null,
                     new MenuButton("@settings", Icon.settings, ui.settings::show)
                 );
             }

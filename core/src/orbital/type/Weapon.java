@@ -20,6 +20,7 @@ import orbital.entities.bullet.*;
 import orbital.entities.part.*;
 import orbital.entities.pattern.*;
 import orbital.entities.units.*;
+import orbital.game.*;
 import orbital.gen.*;
 import orbital.graphics.*;
 import orbital.world.meta.*;
@@ -481,7 +482,9 @@ public class Weapon implements Cloneable{
         //two owners can pick the target of this mount: the weapon itself, when it is an
         //uncontrollable auto-targeting weapon (the classic case), and the pilot, when the
         //module was switched to automatic targeting (see WeaponsComp.mountSelfTargets)
-        if(!controllable && autoTarget || unit.mountSelfTargets(mount)){
+        //8x8: healing weapons always pick their own ally target, independent of the aim stick.
+        if(!controllable && autoTarget || unit.mountSelfTargets(mount)
+            || (BattleRoyaleMode.active() && bullet.heals())){
             updateAutoTarget(unit, mount, mountX, mountY);
         }
 
@@ -586,11 +589,47 @@ public class Weapon implements Cloneable{
     }
 
     protected Teamc findTarget(Unit unit, float x, float y, float range, boolean air, boolean ground){
+        //8x8: a healing weapon locks onto the nearest damaged ally (units included), not enemies.
+        if(BattleRoyaleMode.active() && bullet.heals()){
+            return closestDamagedAlly(unit, x, y, range + Math.abs(shootY));
+        }
         return Units.closestTarget(unit.team, x, y, range + Math.abs(shootY), u -> u.checkTarget(air, ground), t -> ground && (unit.type.targetUnderBlocks || !t.block.underBullets));
     }
 
     protected boolean checkTarget(Unit unit, Teamc target, float x, float y, float range){
+        if(BattleRoyaleMode.active() && bullet.heals()){
+            //an ally target stays valid while it is alive, damaged and in range
+            return !(target instanceof Healthc h) || !h.isAdded() || !h.damaged()
+                || !target.within(x, y, range + Math.abs(shootY));
+        }
         return Units.invalidateTarget(target, unit.team, x, y, range + Math.abs(shootY));
+    }
+
+    /** Nearest damaged friendly unit or building, self included; null when nobody needs repair. */
+    private static Teamc closestDamagedAlly(Unit unit, float x, float y, float range){
+        Teamc best = null;
+        float bestDst = range * range;
+
+        if(unit.damaged() && unit.dst2(x, y) <= bestDst){
+            best = unit;
+            bestDst = unit.dst2(x, y);
+        }
+        for(Unit other : Groups.unit){
+            if(other.team != unit.team || !other.damaged() || other == unit) continue;
+            float dst = other.dst2(x, y);
+            if(dst <= bestDst){
+                best = other;
+                bestDst = dst;
+            }
+        }
+        for(Building build : indexer.getDamaged(unit.team)){
+            float dst = build.dst2(x, y);
+            if(dst <= bestDst){
+                best = build;
+                bestDst = dst;
+            }
+        }
+        return best;
     }
 
     protected float bulletRotation(Unit unit, WeaponMount mount, float bulletX, float bulletY){

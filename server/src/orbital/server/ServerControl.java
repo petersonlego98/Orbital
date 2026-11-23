@@ -527,6 +527,8 @@ public class ServerControl implements ApplicationListener{
             state.rules = rules;
             Events.fire(new RulesLoadEvent(state.rules));
             logic.play();
+            //Authoritative spawn + unit-based victory live on the server; clients only receive.
+            BattleRoyaleMode.startServerMatch();
             netServer.openServer();
             info("Battle Royale hosted. Waiting for 8 players...");
         });

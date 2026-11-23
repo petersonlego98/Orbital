@@ -129,8 +129,8 @@ public class AnalogStick extends Table{
     }
 
     private void grab(float x, float y){
+        //drag() publishes the vector and the live/grabbed state together
         drag(x, y);
-        active.run();
     }
 
     private void drag(float x, float y){
@@ -140,7 +140,14 @@ public class AnalogStick extends Table{
         //clamp to the rim: the vector is the knob over the radius, so it is already normalized
         if(knob.len() > radius) knob.setLength(radius);
 
-        sink.set(knob.x / radius, -knob.y / radius);
+        //scene coordinates have Y growing upward, just like world coordinates: pushing the
+        //knob up must publish +Y. Negating here made the unit drive downwards.
+        sink.set(knob.x / radius, knob.y / radius);
+        //publish the vector and the state on every move. A finger that lands exactly on the
+        //centre writes a zero vector on touch-down, so publishing only there would leave the
+        //handler believing the stick was idle for the whole gesture - the unit would never
+        //answer it, which is the bug this fixes.
+        active.run();
     }
 
     private void release(){

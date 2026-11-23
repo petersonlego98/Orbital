@@ -422,7 +422,7 @@ public class DesktopInput extends InputHandler{
             }
         }
 
-        if(!scene.hasMouse() && !locked && state.rules.possessionAllowed){
+        if(!scene.hasMouse() && !locked && state.rules.possessionAllowed && !BattleRoyaleMode.active()){
             if(Core.input.keyDown(Binding.control) && Core.input.keyTap(Binding.select)){
                 Unit on = selectedUnit();
                 var build = selectedControlBuild();
@@ -700,6 +700,13 @@ public class DesktopInput extends InputHandler{
 
         if(Core.input.keyTap(Binding.select) && !Core.scene.hasMouse()){
             tappedOne = false;
+            //8x8: clicking a dropped module installs it and consumes the click, so the unit
+            //never shoots or mines underneath the pickup.
+            boolean lootTap = BattleRoyaleMode.active()
+                && LootInput.tryInstall(input.mouseWorldX(), input.mouseWorldY(), 1, false);
+            if(lootTap){
+                player.shooting = false;
+            }else{
             BuildPlan plan = getPlan(cursorX, cursorY);
 
             if(Core.input.keyDown(Binding.breakBlock)){
@@ -733,6 +740,7 @@ public class DesktopInput extends InputHandler{
                 }
             }else if(!Core.scene.hasKeyboard()){ //if it's out of bounds, shooting is just fine
                 player.shooting = shouldShoot;
+            }
             }
             selectMillis = Time.millis();
             prevSelected = selected;
@@ -901,6 +909,8 @@ public class DesktopInput extends InputHandler{
                 Call.rotateBlock(player, cursor.build, Core.input.axisTap(Binding.rotate) > 0);
             }
         }
+
+        if(BattleRoyaleMode.active()) LootInput.hover(input.mouseWorldX(), input.mouseWorldY());
     }
 
     @Override

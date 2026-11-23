@@ -77,15 +77,31 @@ public class MobileInput extends InputHandler implements GestureListener{
     /** Reused scratch vector for the direct-steering read, so no vector is allocated per frame. */
     private final Vec2 directVec = new Vec2();
 
+    /**
+     * Right-hand stick (battle royale): aims and fires the hull's weapons while a finger is on
+     * it. Healing modules ignore it and pick their own ally target.
+     */
+    public final Vec2 aimVector = new Vec2();
+    /** Whether a finger is on the aim stick right now. */
+    public boolean aimActive;
+
     /** Called by the stick widget when a finger lands on it or leaves it. */
     public void syncAnalog(){
         analogActive = analogVector.len2() > 0.0001f;
     }
 
+    /** Called by the aim stick widget when a finger lands on it or leaves it. */
+    public void syncAim(){
+        aimActive = aimVector.len2() > 0.0001f;
+    }
+
     /**
-     * @return whether the hull is being steered directly this frame - by the analog stick or
-     * by the gamepad's left stick/d-pad. When it is, the hull answers the input instead of
+     * @return whether the unit is being steered directly this frame - by the analog stick or
+     * by the gamepad's left stick/d-pad. When it is, the unit answers the input instead of
      * chasing the camera, which is what removes the lag of dragging the map around.
+     *
+     * <p>In the 8x8 battle royale this is the <b>only</b> way to move the unit: dragging the
+     * screen moves the camera alone. The stick therefore stays live there.</p>
      */
     public boolean directSteering(){
         return analogActive || ControllerInput.moving();
@@ -354,7 +370,9 @@ public class MobileInput extends InputHandler implements GestureListener{
         });
 
         group.fill(t -> {
-            t.visible(() -> !hasSchematic() && !ui.consolefrag.shown() && !(state.isEditor()&& Core.settings.getBool("editor-blocks-shown")));
+            //Battle royale has no command palette: the squad fights on its own.
+            t.visible(() -> !BattleRoyaleMode.active() && !hasSchematic() && !ui.consolefrag.shown()
+                && !(state.isEditor() && Core.settings.getBool("editor-blocks-shown")));
             t.bottom().left();
 
             t.button("@command.queue", Icon.rightOpen, Styles.clearTogglet, () -> {
@@ -606,7 +624,10 @@ public class MobileInput extends InputHandler implements GestureListener{
                 lineStartY = tileY;
                 lastLineX = tileX;
                 lastLineY = tileY;
-            }else if(!tryTapPlayer(worldx, worldy) && Core.settings.getBool("keyboard")){
+            }else if(!tryTapPlayer(worldx, worldy) && Core.settings.getBool("keyboard")
+                //8x8: a tap never makes the unit shoot. Only the analog stick moves it
+                //and the modules pick their own targets.
+                && !BattleRoyaleMode.active()){
                 //shoot on touch down when in keyboard mode
                 player.shooting = !state.isEditor();
             }
@@ -675,6 +696,15 @@ public class MobileInput extends InputHandler implements GestureListener{
         //handle long tap when player isn't building
         if(mode == none){
             Vec2 pos = Core.input.mouseWorld(x, y);
+
+            //8x8: a long press is not a manual-aim gesture here. Touching the screen never
+            //aims or fires the unit; the stick moves it and the modules fire on their own.
+            if(BattleRoyaleMode.active()){
+                //the dropped-module info tooltip was removed: a long press is just a selection
+                //ping again, and a short tap is the only way to install a module
+                if(!state.isPaused()) Fx.select.at(pos);
+                return false;
+            }
 
             if(commandMode){
 
@@ -751,6 +781,13 @@ public class MobileInput extends InputHandler implements GestureListener{
             if(tapped != null) return true;
         }
 
+        //8x8: a short tap on a dropped module installs it. Double tap (possession) and
+        //triple tap (ping) keep their original behaviour.
+        if(BattleRoyaleMode.active() && count == 1 && !Core.scene.hasMouse(x, y)
+            && LootInput.tryInstall(worldx, worldy, count, true)){
+            return true;
+        }
+
         //get tile on cursor
         Tile cursor = tileAt(x, y);
 
@@ -761,7 +798,9 @@ public class MobileInput extends InputHandler implements GestureListener{
 
         Tile linked = cursor.build == null ? cursor : cursor.build.tile;
 
-        if(!player.dead()){
+        //8x8: a tap only pings (three fingers) - it does not pick a shooting target, which
+        //is what makes a tap fire in the other modes.
+        if(!player.dead() && !BattleRoyaleMode.active()){
             checkTargets(worldx, worldy);
         }
 
@@ -788,10 +827,10 @@ public class MobileInput extends InputHandler implements GestureListener{
                 payloadTarget = null;
 
                 //control a unit/block detected on first tap of double-tap
-                if(unitTapped != null && state.rules.possessionAllowed && unitTapped.isAI() && unitTapped.team == player.team() && !unitTapped.dead && unitTapped.playerControllable()){
+                if(!BattleRoyaleMode.active() && unitTapped != null && state.rules.possessionAllowed && unitTapped.isAI() && unitTapped.team == player.team() && !unitTapped.dead && unitTapped.playerControllable()){
                     Call.unitControl(player, unitTapped);
                     recentRespawnTimer = 1f;
-                }else if(buildingTapped != null && state.rules.possessionAllowed){
+                }else if(!BattleRoyaleMode.active() && buildingTapped != null && state.rules.possessionAllowed){
                     Call.buildingControlSelect(player, buildingTapped);
                     recentRespawnTimer = 1f;
                 }else if(!checkConfigTap() && !tryBeginMine(cursor)){
@@ -831,6 +870,8 @@ public class MobileInput extends InputHandler implements GestureListener{
         manualShooting = down = false;
         analogActive = false;
         analogVector.setZero();
+        aimActive = false;
+        aimVector.setZero();
     }
 
     @Override
@@ -1037,7 +1078,9 @@ public class MobileInput extends InputHandler implements GestureListener{
         //do not pan with manual shooting enabled
         if(!down || manualShooting) return false;
 
-        if(selecting){ //pan all plans
+        //8x8: dragging is a camera gesture only - no plans to shift, and no change to the
+        //unit's position. In the other modes a plan under the finger is dragged instead.
+        if(selecting && !BattleRoyaleMode.active()){ //pan all plans
             shiftDeltaX += deltaX;
             shiftDeltaY += deltaY;
 
@@ -1152,8 +1195,21 @@ public class MobileInput extends InputHandler implements GestureListener{
             directVector(directVec);
             float tilt = Math.min(directVec.len(), 1f);
             movement.set(directVec).setLength(speed * tilt);
-            //the camera keeps the hull on screen without ever fighting the finger
-            followCameraBox(unit);
+            //8x8: the stick is the only way to move, so the camera follows the unit while it
+            //is being steered - the player does not have to drag the map to keep it in view.
+            //The other modes keep the dead-zone follow, which leaves the middle of the screen
+            //free for the finger that is dragging.
+            if(BattleRoyaleMode.active()){
+                Core.camera.position.lerp(Tmp.v3.set(unit.getX(), unit.getY()), 0.25f);
+            }else{
+                followCameraBox(unit);
+            }
+        }else if(BattleRoyaleMode.active()){
+            //8x8: dragging moves the camera alone - the unit is never pulled toward it. With
+            //the stick idle the unit simply holds its position; when the stick is tilted the
+            //direct branch above moves it instead.
+            movement.setZero();
+            unit.vel.approachDelta(Vec2.ZERO, unit.speed() * type.accel / 2f);
         }else{
             //original control: drag the map, the hull chases the middle of the screen
             movement.set(targetPos).sub(player).limit(speed);
@@ -1171,6 +1227,9 @@ public class MobileInput extends InputHandler implements GestureListener{
         if(direct){
             //a fully tilted stick reads as a boost, like a held boost key
             player.boosting = directVec.len() > 0.9f;
+        }else if(BattleRoyaleMode.active()){
+            //dragging never boosts the unit in 8x8: the camera and the unit are independent
+            player.boosting = false;
         }else{
             player.boosting = collisions.overlapsTile(rect, EntityCollisions::solid) || !unit.within(targetPos, 85f);
         }
@@ -1186,7 +1245,20 @@ public class MobileInput extends InputHandler implements GestureListener{
             boolean controllerFire = ControllerInput.firing();
 
             //autofire targeting
-            if(manualShooting){
+            //8x8: the right-hand stick aims and fires the damage weapons. Healing modules
+            //self-target allies in Weapon.update and ignore this aim.
+            if(BattleRoyaleMode.active() && aimActive){
+                float distance = Math.max(unit.range(), 80f);
+                player.shooting = !boosted;
+                unit.aim(player.mouseX = unit.x + aimVector.x * distance,
+                    player.mouseY = unit.y + aimVector.y * distance, true);
+                //twin-stick: the hull faces the aim so non-rotating weapons clear their shoot
+                //cone; without this the guns stay pointed along the movement and never fire
+                unit.lookAt(player.mouseX, player.mouseY);
+            }else if(BattleRoyaleMode.active()){
+                //no finger on the aim stick: damage weapons hold fire; healing still self-targets
+                player.shooting = false;
+            }else if(manualShooting){
                 player.shooting = !boosted;
                 unit.aim(player.mouseX = Core.input.mouseWorldX(), player.mouseY = Core.input.mouseWorldY(), true);
             }else if(stickAim != null || controllerFire){
@@ -1201,8 +1273,13 @@ public class MobileInput extends InputHandler implements GestureListener{
                 }
             }else if(target == null){
                 player.shooting = false;
+                //8x8: the modules pick their own targets. The type's canAttack was computed
+                //when the content was made, so it knows nothing about the dorsal modules the
+                //pilot mounted later - the live mounts are what count there.
+                boolean canShoot = unit.type.canAttack
+                    || (BattleRoyaleMode.active() && unit.hasMountedGun());
                 if(Core.settings.getBool("autotarget") && !(player.unit() instanceof BlockUnitUnit u && u.tile() instanceof ControlBlock c && !c.shouldAutoTarget())){
-                    if(unit.type.canAttack){
+                    if(canShoot){
                         target = Units.closestTarget(unit.team, unit.x, unit.y, range, u -> u.checkTarget(type.targetAir, type.targetGround), u -> type.targetGround && type.targetBuildingsMobile);
                     }
 
@@ -1216,7 +1293,11 @@ public class MobileInput extends InputHandler implements GestureListener{
 
                 //when not shooting, aim at mouse cursor
                 //this may be a bad idea, aiming for a point far in front could work better, test it out
-                unit.aim(Core.input.mouseWorldX(), Core.input.mouseWorldY(), true);
+                //8x8: a finger on the screen is not an aim point - touching never aims or
+                //fires the unit. The stick moves it; the modules pick their own targets.
+                if(!BattleRoyaleMode.active()){
+                    unit.aim(Core.input.mouseWorldX(), Core.input.mouseWorldY(), true);
+                }
             }else{
                 Vec2 intercept = player.unit().type.weapons.contains(w -> w.predictTarget) ? Predict.intercept(unit, target, type.weapons.first().bullet) : Tmp.v1.set(target);
 

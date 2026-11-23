@@ -289,7 +289,9 @@ public class PlacementFragment{
         parent.fill(full -> {
             toggler = full;
             //the test mode also builds now: it queues plans for the builder units
-            full.bottom().right().visible(() -> ui.hudfrag.shown() && BuildMenuPreference.oldMenuEnabled());
+            //Battle royale has no construction: the squad is fixed for the whole match.
+            full.bottom().right().visible(() -> ui.hudfrag.shown() && !BattleRoyaleMode.active()
+                && BuildMenuPreference.oldMenuEnabled());
 
             full.table(frame -> {
                 blockFrame = frame;

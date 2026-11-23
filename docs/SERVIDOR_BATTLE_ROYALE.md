@@ -17,7 +17,7 @@ No console do servidor:
 host-br
 ```
 
-O servidor carrega o mapa 8x8 (512x512, 64 cores, 8 times), aplica regras sem IA e **pausa a partida até 8 jogadores conectarem**. O 9º jogador é recusado.
+O servidor carrega o mapa 8x8 (512x512, 8 regiões de spawn, 8 times, sem núcleos), aplica regras sem IA e **pausa a partida até 8 jogadores conectarem**. O 9º jogador é recusado.
 
 ## Entrar na partida
 
@@ -25,7 +25,7 @@ Cada jogador usa **Juntar-se ao Jogo** no menu e informa o IP do servidor. O tim
 
 ## Regras
 
-- `attackMode = true` → vitória do último time com core vivo.
+- `canGameOver = false` → a vitória padrão por núcleos é desligada; `BattleRoyaleMode` decide o vencedor: **último time com unidades vivas**.
 - `pvp = true` → nenhum time é tratado como IA pelo motor.
 - `rtsAi = false` e `infiniteResources = false` para os 8 times.
 - O mapa é gerado no servidor e enviado aos clientes; todos jogam o mesmo terreno (seed fixa `20261120`).

@@ -57,11 +57,15 @@ public class LoadRenderer implements Disposable{
         drawSpace(w, h);
         Draw.flush();
 
-        drawEmblem(w, h, s);
+        float emblemRadius = drawEmblem(w, h, s);
         Draw.flush();
 
-        drawWordmark(w, h, s);
-        drawProgress(w, h, s);
+        //stack the text below the drawn emblem instead of using fixed fractions of the screen:
+        //with Android's 125% UI scaling the old wordmark grew into the planet and the progress
+        //digits grew into the frame
+        float wordmarkY = h * 0.60f - emblemRadius * 1.45f - 24f * s;
+        drawWordmark(w, h, s, wordmarkY);
+        drawProgress(w, h, s, wordmarkY);
 
         Draw.reset();
     }
@@ -92,7 +96,7 @@ public class LoadRenderer implements Disposable{
             float sy = Mathf.randomSeed(i * 3 + 12, 0f, 1f) * h;
             float size = Mathf.randomSeed(i + 41, 0.7f, 1.9f) * Scl.scl(1f);
             //pull stars away from the centre so the emblem stays readable
-            float dist = Mathf.dst(sx, sy, w / 2f, h * 0.56f);
+            float dist = Mathf.dst(sx, sy, w / 2f, h * 0.60f);
             float fade = Mathf.clamp((dist - Math.min(w, h) * 0.20f) / (Math.min(w, h) * 0.18f));
             float twinkle = Mathf.absin(time * 0.045f + i * 1.7f, 1f);
             Draw.color(i % 5 == 0 ? OrbitalTheme.ice : OrbitalTheme.silver, (0.08f + 0.5f * twinkle) * fade);
@@ -129,9 +133,9 @@ public class LoadRenderer implements Disposable{
      * Planet + tilted ring + moon + sparkle, drawn in the same spirit as the app icon
      * (tools/ArtConverter.drawIcon), but vectorised: no texture is available this early.
      */
-    private void drawEmblem(float w, float h, float s){
-        float cx = w / 2f, cy = h * 0.56f;
-        float r = Math.min(Math.min(w, h) * 0.115f, 170f * s);
+    private float drawEmblem(float w, float h, float s){
+        float cx = w / 2f, cy = h * 0.60f;
+        float r = Math.min(Math.min(w, h) * 0.11f, 155f * s);
         float rx = r * 1.62f, ry = r * 0.52f, rot = -18f;
 
         //halo behind the disc
@@ -178,6 +182,7 @@ public class LoadRenderer implements Disposable{
             Lines.line(sx, sy - sp, sx, sy + sp);
         }
         Draw.reset();
+        return r;
     }
 
     /** Arc of a rotated ellipse, walked in small segments so it reads as one stroke of colour. */
@@ -198,26 +203,36 @@ public class LoadRenderer implements Disposable{
 
     // ---------- text and progress ----------
 
-    private void drawWordmark(float w, float h, float s){
+    private void drawWordmark(float w, float h, float s, float y){
         Font font = Fonts.tech;
         if(font == null) return;
 
         Draw.flush();
         font.setColor(OrbitalTheme.silver);
-        font.getData().setScale(s * 2.6f);
+        //smaller than the old 2.6*s: on Android the spaced wordmark was wider than the screen
+        float scale = s * 1.7f;
+        font.getData().setScale(scale);
 
         //spaced letters read as a wordmark without needing a display typeface
         GlyphLayout layout = GlyphLayout.obtain();
-        layout.setText(font, "O R B I T A L");
-        font.draw("O R B I T A L", w / 2f - layout.width / 2f, h * 0.40f);
+        String text = "O R B I T A L";
+        layout.setText(font, text);
+        if(layout.width > w * 0.82f){
+            scale *= w * 0.82f / layout.width;
+            font.getData().setScale(scale);
+            layout.setText(font, text);
+        }
+        font.draw(text, w / 2f - layout.width / 2f, y);
         layout.free();
         font.getData().setScale(1f);
+        font.setColor(Color.white);
         Draw.flush();
     }
 
-    private void drawProgress(float w, float h, float s){
-        float barW = Math.min(w * 0.62f, 620f * s), barH = 22f * s;
-        float bx = w / 2f - barW / 2f, by = h * 0.30f;
+    private void drawProgress(float w, float h, float s, float wordmarkY){
+        float barW = Math.min(w * 0.70f, 560f * s), barH = 20f * s;
+        float bx = w / 2f - barW / 2f;
+        float by = Math.max(h * 0.12f, wordmarkY - 78f * s);
 
         Draw.reset();
         Draw.color(OrbitalTheme.spaceBlue.r, OrbitalTheme.spaceBlue.g, OrbitalTheme.spaceBlue.b, 0.62f);
@@ -251,7 +266,7 @@ public class LoadRenderer implements Disposable{
         if(font == null) return;
 
         font.setColor(OrbitalTheme.cyan);
-        font.getData().setScale(s * 1.5f);
+        font.getData().setScale(s * 1.05f);
         GlyphLayout layout = GlyphLayout.obtain();
 
         //status line: the localised "loading..." label, plus what is being loaded right now
@@ -262,16 +277,23 @@ public class LoadRenderer implements Disposable{
 
         font.setColor(OrbitalTheme.silver);
         layout.setText(font, line);
-        font.draw(line, w / 2f - layout.width / 2f, by - 18f * s);
+        if(layout.width > barW && name != null){
+            String shortName = name.length() > 22 ? name.substring(0, 22) + "..." : name;
+            line = status + "   " + shortName.replace("/", "::");
+            layout.setText(font, line);
+        }
+        font.draw(line, w / 2f - layout.width / 2f, by - 22f * s);
 
         String pct = Mathf.round(p * 100f) + "%";
         font.setColor(OrbitalTheme.silver);
         layout.setText(font, pct);
-        //clearance above the bar: the old 12*s gap put the digits on top of the frame
-        font.draw(pct, w / 2f - layout.width / 2f, by + barH + 34f * s);
+        //above the bar but well below the wordmark baseline: the old 34*s gap put the digits
+        //on top of the frame and, with large UI scaling, on top of the orb itself
+        font.draw(pct, w / 2f - layout.width / 2f, by + barH + 14f * s);
 
         layout.free();
         font.getData().setScale(1f);
+        font.setColor(Color.white);
         Draw.flush();
     }
 }
