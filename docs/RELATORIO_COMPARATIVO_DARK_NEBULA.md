@@ -1,0 +1,149 @@
+# Relatório comparativo — Módulos e Construção: Dark Nebula vs. Orbital
+
+**Data:** 23/11/2026
+**Escopo:** sistemas de módulos de navios e construção/economia do **Hades' Star: DARK NEBULA** (Parallel Space Inc.) comparados ao estado atual do **Orbital** (inclui as mudanças mais recentes: brocas como módulos, fábricas aéreas com evolução por nível e construção gratuita no modo Novidades).
+
+> **Fontes e reliability:** dados do Dark Nebula vêm da [Google Play](https://play.google.com/store/apps/details?id=com.ParallelSpace.Cerberus2) (descrição oficial, 60+ módulos), do [blog de desenvolvimento da Parallel Space](https://blog.hadesstar.com/2023/10/dark-nebula-upgrade-guide.html) (guia de transição 2023) e do post [Module changes in DARK NEBULA](https://blog.hadesstar.com/2022/10/module-changes-in-dark-nebula.html). Contagens de módulos, estações, níveis e regras vêm da wiki comunitária [hadesstar.wiki](https://hadesstar.wiki/modules), que declara usar dados da versão **6.600.0** do app — valores podem mudar com ajustes de servidor. O lado Orbital foi lido diretamente do código-fonte deste repositório.
+
+---
+
+## 1. Visão geral
+
+| | Dark Nebula | Orbital |
+|---|---|---|
+| Gênero | Estratégia espacial online persistente, servidor compartilhado, corporações | Automação/sandbox tático (derivado de Mindustry), jogo local com online opcional |
+| Plataformas | Android, iOS, console (PS/Xbox), Windows via loja | Windows 10/11 64 bits e Android 7+ (mesmo código base) |
+| Escala | Galáxia persistente com estados Amarelo/Vermelho/Azul/Branco/Quântico; até 20 jogadores | Mapa 2D por partida; modos sobrevivência, sandbox, ataque, PvP, Novidades e Battle Royale 8x8 |
+| Unidade de progressão | Império: navios (Battleship/Miner/Transport), estações, planetas, módulos e Corporação | Cascos de unidade, edifícios, tech tree, módulos dorsais e nível de edifício |
+| Tempo | Sessões curtas + guerras de dias (White Star 5 d, Quantum Star meses) | Partida por sessão; sessão de teste descartável no modo Novidades |
+
+---
+
+## 2. Módulos no Dark Nebula
+
+### 2.1 Catálogo (60 módulos, 6 categorias)
+
+| Categoria | Qtd. | Exemplos | Onde pode ser equipado |
+|---|---:|---|---|
+| WEAPON | 9 | Laser, Mass Battery, Battery, Dual Laser, Barrage, Dart Launcher, Chain Ray, Rocket Launcher, Pulse | Battleship |
+| SHIELD | 8 | Alpha, Impulse, Regenerating, Omega, Blast, Mirror, Ally, Motion Shield | Battleship |
+| COMBAT (antigo SUPPORT) | 14 | EMP, Solitude, Fortify, Teleport, Weapon Amplifier, Barrier, Destiny, Delta Rocket, Vengeance, Bond, Leap, Suspend, Omega Rocket, Remote Bomb | **Somente Battleship** (a partir da 2ª edição) |
+| DRONE | 8 | Decoy/Repair/Rocket Drone, Laser Turret, Cerberus Drone, Chain Ray Turret, Delta Drones, Drone Squad | Battleship |
+| MINING | 10 | Mining Boost, Artifact Boost, Hydrogen Replicator, Genesis, Remote Mining, Enrich, Crunch, Hydrogen Upload, Hydrogen Rocket, Blast Drone | Miner |
+| TRANSPORT | 11 | Cargo Bay Extension, Shipment Computer, Cargo Repair, Rush, Stealth, Trade Burst, Shipment Drone, Red Star Life Extender, Relic Drone, Dispatch, Cargo Rocket | Transport |
+
+**Filosofia de design declarada pelos desenvolvedores:** módulos que "escondiam" sistemas do jogo foram removidos e o efeito foi incorporado ao base game. Exemplos: *Time Warp* → substituído por *Weapon Amplifier* (aumenta todas as armas em alcance); *Sanctuary* → removido; *Teleport* → exclusivo de Battleship; *Barrier* deixou de ser "pausa obrigatória". O objetivo é que **todos** os módulos sejam desejáveis e que existam loadouts diferentes por tipo de estrela.
+
+### 2.2 Progressão
+
+- Artefatos de **Red Stars** (6 tipos: WEAPON, SHIELD, COMBAT, DRONE, MINING, TRANSPORT) são depositados na **Research Station** e viram **Blueprints**.
+- Blueprints **não são consumidos**: cada nível exige um total acumulado que você precisa possuir, mais **Créditos** e **tempo de pesquisa**. Nível máximo: **15**.
+- **Desequipar/reinstalar módulos é grátis**, o que incentiva experimentação.
+- Número de slots por navio cresce com o nível da Red Star; cada tipo de navio tem slots especializados (Miner só MINING, Transport só TRANSPORT, Battleship COMBAT/WEAPON/SHIELD/DRONE).
+- Economia: **Credits** (envios/shipments, planetas, estações de comércio), **Hydrogen** (restrição para saltos, mineração e entregas — capped e renovável), **Artifacts/Blueprints**, **Relics** (White Star), **Empire Power**, **Crystals** (aceleração, compra).
+
+### 2.3 Construção no Dark Nebula
+
+- Sistema estelar **Amarelo** é a base: colonize e suba de nível planetas, construa estações, descubra setores com scanners.
+- Estações principais: **Shipyard** (10 níveis — define capacidade da frota), **Research Station**, **Short/Red/Blue/White Star Scanner**, **Trade Station** (10), **Shipment Relay** (11), **Star Harvester** (11/16), **Warp Lane Hub** (22), **Diplomacy Station**, **Jump Gate**, **Quantum Star Gate**, **Red Star Base** (20), entre outras.
+- Construção custa **Credits + tempo**; é possível acelerar com **Crystals**. Estações podem ser realocadas por Credits.
+- Regras de posicionamento: distância mínima de **150 AU** entre estações, **160 AU** de planetas, **60 AU** de campos de asteroides e **120 AU** da estrela; no máximo 14 campos de asteroides por setor.
+- Sua estrela caseira é **segura offline**: ninguém ataca sua base enquanto você não está.
+- Construir navios e subir o nível deles também usa Credits + tempo no Shipyard; **módulos são pesquisados separadamente** das melhorias do casco.
+
+---
+
+## 3. Módulos no Orbital
+
+### 3.1 Quatro famílias de módulos montáveis
+
+1. **Módulos de torreta** — blocos `Turret` adaptados via `TurretWeapon`: 28 torretas de combate + 2 de reparo (`repair-point`, `repair-turret`). São `moduleOnly` (escondidas da construção; ground/naval ainda usam reconstrutores).
+2. **Módulos de arma nativa** — cópias das armas do próprio casco (`WeaponModules`), com sufixo **T1–T5** no nome, usadas apenas para ordenar/exibir no catálogo.
+3. **Módulos de suporte** — 10 categorias em `SupportModuleCategory`: `repair`, `overdrive`, `force`, `tractor`, `pointDefense`, `unitRepair`, `liquid`, `transport`, **`mining`** (brocas) e `armor` (placas). Regras: **um por categoria**, exceto armaduras, que empilham.
+4. **Placas de armadura** — paredes grandes (2x2) ocupam **slots de torreta** e orçamento dorsal; aparecem como tintura do casco.
+
+### 3.2 Geometria e regras de montagem
+
+- `UnitType.turretSlots` e `UnitType.supportAnchors` são posições calibradas por casco (ex.: `mono` 1 slot; `quad` 2 slots + 9 âncoras; `oct` 5 slots + âncoras).
+- Orçamento dorsal: `dorsalBudget() = spriteArea() * 0.5 * loadoutBudgetMultiplier` (ex.: `oct` tem multiplicador 0,85 e área 160.000 px²).
+- Validação usa `DorsalGeometry.fitsHull`, `fitsSilhouette`, sobreposição por footprint desenhado e compatibilidade de munição (`ammoCompatible`). Âncoras de categorias diferentes podem compartilhar a mesma coordenada, mas só um módulo é instalado por posição.
+- No HUD: barra inferior com **uma célula por grupo de módulos idênticos (selo ×N)**, barra de recarga/calor, teclas numéricas, alternância automático/manual, botão de soltar (X vermelho no 8x8).
+- Pools de suprimento derivados dos módulos: **munição, líquido e energia** (`ModuleSupply` / `ModuleSupplies`); energia é leitura, não gasto.
+- No Battle Royale 8x8, módulos caídos no setor são instalados por clique/toque e podem ser soltos de volta.
+
+### 3.3 Progressão e construção no Orbital
+
+- Edifícios são colocados livremente no mapa em grade, com **custos em itens**, energia, líquidos e transporte por esteiras/tubulações.
+- **Brocas são módulos** desde a última mudança: não existem mais brocas-prédio; todas dão bônus de velocidade/alcance de mineração ao casco.
+- **Fábricas de unidades aéreas (e o ship-fabricator de Erekir) evoluem por nível**: T1→T5 trocando o sprite pelo do reconstrutor correspondente, pagando o custo da receita; podem montar qualquer casco de tier ≤ nível e evoluir uma unidade alimentada (consome a unidade + recursos, com progresso). Reconstrutores continuam construíveis para ground/naval.
+- **Nível de edifício** (`BuildingLevels`, até **100**): custo escala a partir dos requisitos do bloco, pago do núcleo, com evolução cronometrada; torretas, silos e núcleos aplicam multiplicadores.
+- **Auto-construção** (`FactoryChainPlanner`): escolhe fontes, unloaders, cadeias de crafter, energia e transporte; no modo Novidades a construção é **gratuita** (recursos infinitos por time, sem alcance ilimitado nem mudança de gamemode).
+- Modos: sobrevivência, sandbox, ataque, PvP, editor, **Novidades** (showcase com tutorial e Ferramentas de teste) e **Battle Royale 8x8**.
+- Extras técnicos: tech tree, esquemáticos, editor de mapas, lógica por script, mods via JAR, replay de eventos, RNG determinístico por tick, suporte OpenGL/Vulkan, multiplayer via ArcNet/relay Cloudflare opcional, política de privacidade sem telemetria.
+
+---
+
+## 4. Equivalências diretas
+
+| Dark Nebula | Orbital | Grau de equivalência |
+|---|---|---|
+| Slot WEAPON (Laser, Barrage, Rocket…) | `TurretWeapon` + módulos de arma nativa (`WeaponModules`) | **Alto** — armas no casco, com categorias e munição |
+| Slot SHIELD (Alpha, Omega, Blast…) | `SupportModuleCategory.force` (ForceProjector → ForceFieldAbility) + placas `armor` | **Médio** — escudo de área/tintura em vez de camada por navio |
+| Slot COMBAT (EMP, Teleport, Fortify, Bond…) | `repair`, `unitRepair`, `tractor`, `pointDefense`, `overdrive` | **Parcial** — Orbital não tem teleporte/EMP/Bond como módulo; tem campos e reparo |
+| Slot DRONE (Decoy/Repair/Rocket Drone…) | **Sem equivalente direto** — o mais próximo é `unitRepair` (RepairBeam/RepairTower) e unidades aliadas controladas por IA | **Baixo** — lacuna clara |
+| Slot MINING (Mining Boost, Genesis, Enrich…) | Categoria `mining`: 8 brocas como módulo, `MiningModuleAbility`, mineração universal das unidades | **Alto** (já que as brocas viraram módulos) |
+| Slot TRANSPORT (Cargo Bay, Rush, Trade Burst…) | Categoria `transport` (`mass-driver`) + inventário da unidade e `FactoryChainPlanner` | **Médio** — Orbital automatiza logística com esteiras/unloaders em vez de módulos de entrega |
+| Blueprint + Research Station (nível 15) | Tech tree + blocos como fonte de módulo (sem nível de módulo) | **Baixo** — Orbital não tem níveis de módulo; tem nível de edifício (100) e nível de fábrica (5) |
+| Shipyard (capacidade da frota) | `UnitFactory` + limites de unidade (`unitCap`) e evolução por nível | **Médio** |
+| Planetas/estações com Credits + tempo | Blocos com itens + tempo + energia; `BuildingLevels` para evolução | **Médio** |
+| Relógio de supernova / tempestade | `waves`, `attackMode`, Battle Royale sem núcleos | **Diferente** — Orbital não usa "estrelas que colapsam" |
+
+---
+
+## 5. Recursos extras que o Orbital tem (e o Dark Nebula não tem ou faz diferente)
+
+1. **Brocas como módulo dorsal** — o Dark Nebula usa módulos *de mineração* para melhorar a taxa, mas mantém a mineração como atividade de nave; no Orbital a broca virou literalmente um módulo montável com tier, velocidade e alcance.
+2. **Fábricas que evoluem de nível com sprite próprio** — T1→T5 trocando para os sprites dos reconstrutores, e podendo evoluir uma unidade dentro da própria fábrica.
+3. **Nível de edifício até 100** com evolução cronometrada, multiplicadores de saúde/capacidade/velocidade e custo escalado a partir dos requisitos do bloco.
+4. **Sistema de slots/âncoras com geometria real** — footprint, silhueta, sobreposição, orçamento dorsal e compatibilidade de munição; o Dark Nebula usa slots fixos por tipo de nave sem geometria.
+5. **Módulos idênticos agrupados (×N)** e controle por número/auto-alvo, com barra de recarga individual — o Dark Nebula trata módulos como slots independentes.
+6. **Construção gratuita no modo Novidades** — resources infinitos por time para testar sem economia, mantendo regras normais de alcance e velocidade.
+7. **Battle Royale 8x8 com loot de módulos pelo chão**, sem núcleos, última esquadra viva vence.
+8. **Automação completa de cadeia produtiva** — `FactoryChainPlanner` escolhe minério, unloader, crafter, energia e transporte automaticamente; o Dark Nebula foca em operações manuais assíncronas.
+9. **Lógica programável, esquemáticos, editor de mapas e mods via JAR**, além de replay de eventos e RNG determinístico por tick — ferramentas de criação ausentes no DN.
+10. **Arquitetura multiplataforma real (Windows + Android) com um único código base**, OpenGL e Vulkan, e **privacidade sem telemetria** (política pública no próprio jogo).
+11. **Suporte offline e LAN/personalizado**, enquanto o DN exige conexão e servidor persistente.
+12. **Economia de itens modular e transporte físico** (esteiras, tubos, unloaders, drones de construção) em vez de Credits/Hydrogen centralizados.
+
+---
+
+## 6. Lacunas do Orbital frente ao Dark Nebula
+
+- **Progressão de módulos por nível** (1→15 com blueprints acumulados, créditos e tempo de pesquisa) — hoje o módulo é apenas "obtido ao pesquisar o bloco", sem níveis.
+- **Restrição por classe de nave** (Miner/Transport/Battleship com slots especializados e COMBAT exclusivo) — no Orbital qualquer casco aceita quase qualquer módulo que caiba.
+- **Drone modules** (decoy, reparo, foguete, torreta) como categoria própria.
+- **Galáxia persistente e corporações** com guerras assíncronas de vários dias, Time Machine e relíquias — o Orbital é orientado a partidas.
+- **Economia de artefatos/blueprints** com comércio horizontal entre jogadores.
+- **Aceleração paga (Crystals)** e sistema de monetização — o Orbital é GPLv3 e sem telemetria.
+
+---
+
+## 7. Conclusão
+
+Os dois jogos resolvem problemas parecidos com abordagens opostas:
+
+- **Dark Nebula** aposta em **metaprogressão de longo prazo**: módulos são o centro do jogo, com níveis, blueprints, slots por classe de nave e um metajogo persistente de corporações/estrelas.
+- **Orbital** aposta em **agência dentro da partida**: o jogador desenha a nave (geometria, slots, orçamento), automatiza a fábrica, controla unidades e pode até evoluir a própria fábrica — com foco em sandbox, criação e partidas curtas.
+
+As ideias do DN que melhor "encaixariam" no Orbital, sem quebrar a identidade do projeto, são: (1) níveis de módulo com custo acumulado (o sistema de `getTotalRequirements` já existe e poderia ser reutilizado), (2) uma categoria de **drone modules**, e (3) restrições de loadout por classe de casco para criar decisões mais interessantes — todas compatíveis com o sistema de âncoras atual.
+
+---
+
+### Referências
+
+- Google Play — Hades' Star: DARK NEBULA (descrição oficial): https://play.google.com/store/apps/details?id=com.ParallelSpace.Cerberus2
+- Parallel Space — *Dark Nebula upgrade guide* (04/10/2023): https://blog.hadesstar.com/2023/10/dark-nebula-upgrade-guide.html
+- Parallel Space — *Module changes in DARK NEBULA* (12/10/2022): https://blog.hadesstar.com/2022/10/module-changes-in-dark-nebula.html
+- Hades' Star Wiki (comunitária, dados v6.600.0) — Modules, Ships, Space stations, How to play, Mechanics, Artifacts: https://hadesstar.wiki/
+- GamingOnPhone — lançamento Android/iOS (10/11/2023): https://gamingonphone.com/news/hades-star-dark-nebula-a-space-strategy-game-is-now-available-on-android-and-ios/
+- Código-fonte do Orbital: `core/src/orbital/{type,content,game,ui,world}/...`, `tests/src/test/java/...`
