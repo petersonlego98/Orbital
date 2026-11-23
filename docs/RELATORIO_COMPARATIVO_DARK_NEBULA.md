@@ -147,3 +147,131 @@ As ideias do DN que melhor "encaixariam" no Orbital, sem quebrar a identidade do
 - Hades' Star Wiki (comunitária, dados v6.600.0) — Modules, Ships, Space stations, How to play, Mechanics, Artifacts: https://hadesstar.wiki/
 - GamingOnPhone — lançamento Android/iOS (10/11/2023): https://gamingonphone.com/news/hades-star-dark-nebula-a-space-strategy-game-is-now-available-on-android-and-ios/
 - Código-fonte do Orbital: `core/src/orbital/{type,content,game,ui,world}/...`, `tests/src/test/java/...`
+
+---
+
+## 8. Anexo — comparativo lado a lado de cada equivalência
+
+Cada tabela compara o mecanismo correspondente nos dois jogos. "Equivalência" mede o quanto a **função** é a mesma, não o quanto o código se parece.
+
+### E1 — Armas (WEAPON ↔ torretas/armas nativas)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Catálogo | 9 módulos: Laser, Mass Battery, Battery, Dual Laser, Barrage, Dart Launcher, Chain Ray, Rocket Launcher, Pulse | 28 torretas adaptadas (`TurretWeapon`) + cópias das armas dos cascos (`WeaponModules`, T1–T5) | Alta |
+| Onde vai | Slot WEAPON do Battleship | Slot de torreta ou mount nativo do casco | Igual em espírito |
+| Espaço | Slot fixo, sem geometria | Footprint, silhueta, orçamento dorsal e sobreposição (`DorsalGeometry`) | Orbital mais complexo |
+| Munição | Sem munição por módulo; dano/cooldown | Item/líquido com compatibilidade e pool compartilhado (`ModuleSupply`) | Orbital mais profundo |
+| Seleção de alvo | Automática pelo jogo | Automática ou manual **por módulo**, com alternância no HUD | Orbital dá mais controle |
+| Progressão | Nível 1–15 por blueprints | Sem nível de módulo; desbloqueio vem da tech tree do bloco | DN mais profundo |
+
+### E2 — Escudos (SHIELD ↔ `force` + `armor`)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Catálogo | 8 escudos: Alpha, Impulse, Regenerating, Omega, Blast, Mirror, Ally, Motion | ForceProjector → `ForceFieldAbility`; placas grandes → categoria `armor` | Média |
+| Como funciona | Parte do dano passa (ex.: Alpha deixa 95% no Quantum Star; Motion deixa 60%) | Escudo poligonal com lados/raio/regeneração; placas somam pontos de vida e aplicam tintura | Diferente |
+| Abrangência | Protege o próprio navio (Ally Shield protege aliados em alcance) | Protege unidades aéreas e construções próximas | Parecido |
+| Combinabilidade | Vários escudos empilháveis | **Um** módulo `force` por casco; placas `armor` empilham | Orbital mais restritivo |
+| Veredito | Camada de defesa reativa | Defesa de área + armadura acumulável | Média |
+
+### E3 — Combate/suporte (COMBAT ↔ `repair`/`unitRepair`/`tractor`/`pointDefense`/`overdrive`)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Catálogo | 14 módulos: EMP, Solitude, Fortify, Teleport, Weapon Amplifier, Barrier, Destiny, Delta Rocket, Vengeance, Bond, Leap, Suspend, Omega Rocket, Remote Bomb | Cinco categorias de suporte, cada uma com 1–3 blocos (mend/overdrive/force/parallax/segment/repair-point/repair-turret/unit-repair-tower) | Parcial |
+| Restrição de navio | **Somente Battleship** | Qualquer casco que tenha a âncora da categoria | Orbital mais livre |
+| Tipo de efeito | Controle: desativar, teleportar, prender, pausar, amplificar | Suporte: curar, boostar, defender, rebocar aliado, interceptar projéteis | Função diferente |
+| O que falta no Orbital | — | Teleport, EMP, Bond, Leap, Suspend, Destiny, Vengeance e Amplifier não existem como módulo | Lacuna clara |
+| O que o Orbital tem e o DN não | — | Cura auto-alvo para aliados, defesa de pontos e rebocador de unidades com comportamento próprio | Contrapartida |
+
+### E4 — Drones (DRONE ↔ sem categoria equivalente)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Catálogo | 8 módulos: Decoy, Repair, Rocket Drone, Laser Turret, Cerberus Drone, Chain Ray Turret, Delta Drones, Drone Squad | Não existe categoria de drone; o mais próximo são `unitRepair` (RepairBeam/RepairTower) e unidades aliadas com IA | **Baixa** |
+| Entidade | Cria drones persistentes no mapa, com vida e comportamento próprio | Habilidade anexada ao casco; não cria entidades autônomas | Diferente |
+| Defesa / distração | Decoy atrai fogo inimigo | `tractor` e `pointDefense` fazem papel parcial (atração/interceptação) | Parcial |
+| Ataque | Rocket Drone, Laser Turret, Chain Ray Turret | Módulos de torreta montados no casco | Diferente |
+| Veredito | Categoria inteira dedicada a entidades destacáveis | Orbital concentra tudo no próprio casco | Maior lacuna do comparativo |
+
+### E5 — Mineração (MINING ↔ categoria `mining`)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Catálogo | 10 módulos: Mining Boost, Artifact Boost, Hydrogen Replicator, Genesis, Remote Mining, Enrich, Crunch, Hydrogen Upload, Hydrogen Rocket, Blast Drone | 8 brocas como módulo + `MiningModuleAbility` + mineração universal das unidades | Alta |
+| Recurso | **Hydrogen** (com teto e renovação diária) | Itens: cobre, chumbo, titânio, tório, etc. | Diferente |
+| Ação | Miner nave viaja até asteroides e extrai | Unidade aponta laser para o tile e recebe o item | Diferente |
+| Progressão | Nível 1–15 do módulo | Tier 2–7 da broca vira multiplicador de velocidade e bônus de alcance | Função equivalente |
+| Combinação | Vários módulos de mineração em slots de Miner | **Uma broca por casco** (categoria exclusiva) | Orbital mais restritivo |
+
+### E6 — Transporte (TRANSPORT ↔ `transport` + logística)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Catálogo | 11 módulos: Cargo Bay Extension, Shipment Computer, Cargo Repair, Rush, Stealth, Trade Burst, Shipment Drone, Red Star Life Extender, Relic Drone, Dispatch, Cargo Rocket | Categoria `transport` (`MassDriver` → `MassDriverAbility`) + inventário da unidade e offload no núcleo | Média |
+| Objetivo | Entregar shipments por **Credits**, com bônus e custo de Hydrogen | Mover itens fisicamente para núcleo/unidades/other buildings | Igual em intenção, diferente em escala |
+| Automação | Shipment Relay entrega tudo instantaneamente por Hydrogen | `FactoryChainPlanner` escolhe minério, unloader, crafter, energia e esteiras | Orbital automatiza a cadeia produtiva |
+| Velocidade | Rush reduz consumo de Hydrogen do Transport | Unidades têm velocidade própria; módulos não alteram combustível | Diferente |
+| Veredito | Logística centrada em entrega e economia | Logística centrada em fluxo físico de itens | Média |
+
+### E7 — Progressão de módulos (Blueprints ↔ Tech tree / custo acumulado)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Fonte | Artefatos de Red Star → Research Station → Blueprints de 6 tipos | Tech tree (`SerpuloTechTree`, `ErekirTechTree`) + pesquisa de blocos | Diferente |
+| Consumo | Blueprints **não são gastos**: cada nível exige um total acumulado | Não há nível de módulo; o módulo existe após desbloqueio do bloco | Diferente |
+| Nível máximo | 15 | Nenhum para módulos (edifícios chegam a 100; fábricas a 5) | DN mais profundo |
+| Custo extra | Credits + tempo de pesquisa | Itens de construção + tempo + energia | Análogo em espírito |
+| Reutilização | `UnitType.getTotalRequirements()` no Orbital já faz soma acumulada — poderia sustentar níveis de módulo | Base técnica existe | Oportunidade de design |
+
+### E8 — Construção/estações (sistema estelar ↔ blocos no mapa)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Onde se constrói | Sistema estelar Amarelo, com planetas e setores | Mapa 2D em grade (512x512 no BR, 256x256 showcase) | Diferente |
+| Unidade | Estações com nível e custo em Credits + tempo | Blocos com custo em itens + energia + líquidos | Média |
+| Exemplos | Shipyard, Research Station, scanners, Trade Station, Shipment Relay, Star Harvester, Warp Lane Hub | Fábricas, torretas, núcleos, esteiras, tubos, brocas-módulo, unidades | Diferente |
+| Regras espaciais | Distância mínima: 150 AU entre estações, 160 de planetas, 60 de asteroides, 120 da estrela | Grade, footprint, colisão, `Build.validPlace` | Orbital mais granular |
+| Evolução | Estações sobem de nível (Shipyard 10, Star Harvester 11/16, Red Star Base 20) | `BuildingLevels` até 100, custo escalado `1 + (nível-1)*0.35` | Orbital vai mais longe |
+| Automação | Shipment Relay acelera entregas | `FactoryChainPlanner` monta cadeias completas | Orbital mais automático |
+| Segurança offline | Casa é inviolável offline | Depende do modo; BR e PvP têm combate | Diferente |
+
+### E9 — Fábricas de navios (Shipyard ↔ UnitFactory evoluído)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Função | Shipyard define capacidade da frota; níveis 1–10 | `UnitFactory` produz unidades com planos e tempo; capacidade via `unitCap` | Média |
+| Progressão | Nível do Shipyard com Credits + tempo | Nível T1→T5 com custo do reconstrutor e troca de sprite | Análogo |
+| Unidades | Transport, Miner, Battleship (7 níveis cada) | Cascos aéreos/terrestres/navais com tiers T1–T5 | Parcial |
+| Evolução de unidade | Navios sobem de nível no shipyard | Fábrica aérea evolui uma unidade alimentada: consome a original + recursos, gera a de tier maior | Orbital único nesse ponto |
+| Reconstrutores | Não existem (módulos cuidam da progressão) | Continuam para ground/naval; aéreos viraram evolução da fábrica | Diferente |
+
+### E10 — Slots e encaixe (slots fixos ↔ geometria dinâmica)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Modelo | Slots por classe de nave; número cresce com Red Star level | Slots de torreta + âncoras de suporte por casco, com posições calibradas | Função igual, implementação oposta |
+| Restrição | Classe define o que cabe | `SupportAnchor.accepts`, `TurretSlot.accepts`, tamanho, footprint, silhueta | Orbital muito mais rígido geometricamente |
+| Quantidade exemplar | Battleship tem slots de WEAPON/SHIELD/COMBAT/DRONE | `mono`: 1 slot; `quad`: 2 slots + 9 âncoras; `oct`: 5 slots + âncoras | — |
+| Categoria exclusiva | COMBAT só em Battleship | Uma por categoria de suporte; `armor` empilha | Parcial |
+| Veredito | Simples e legível | Poderoso e complexo | Diferente, não inferior |
+
+### E11 — Loot e aleatoriedade (artefatos ↔ drops do 8x8)
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Origem | Red Stars (10 min, supernova) | Battle Royale 8x8 (32 drops iniciais + 1 a cada 30 s) | Análogo |
+| Tipos | 6 tipos de artefato (WEAPON, SHIELD, COMBAT, DRONE, MINING, TRANSPORT) | 11 tipos de `ModuleDropKind` (inclui `mining` e `weapon`) | Orbital mais granular |
+| Resultado | Research → blueprints | Instala o módulo direto no casco | Diferente |
+| Risco | Naves pegas na supernova são perdidas | Sem núcleos; última esquadra viva | Diferente |
+
+### E12 — Economia e pressão de tempo
+
+| Aspecto | Dark Nebula | Orbital | Equivalência |
+|---|---|---|---|
+| Recursos | Credits, Hydrogen, Blueprints, Relics, Empire Power, Crystals | Itens (minério), energia, líquidos, suprimentos de módulos | Diferente |
+| Tempo | App diário: entregas, Blue Stars, Research; guerras de dias | Partida por sessão; auto-build em tempo real | Diferente |
+| Pressão | Supernova em minutos; White Star 5 dias | Waves/ataque/BR; modo Novidades sem pressão e sem custo | Orbital mais casual |
+| Aceleração | Crystals | `BuildingLevels` com evolução cronometrada; nada pago | — |
+| Veredito | MMO com economia persistente | Sandbox/tático autossuficiente | Diferente por design |
