@@ -132,6 +132,11 @@ public final class WeaponModules{
         return type == null || type.name == null ? 0 : unitTiers.get(type.name, 0);
     }
 
+    /** @return the legacy name-based tier, used once to assign {@link UnitType#tier}. */
+    public static int nameTier(UnitType type){
+        return type == null || type.name == null ? 0 : unitTiers.get(type.name, 0);
+    }
+
     /** @return every combat-capable unit weapon that can become a module. */
     public static Seq<Definition> all(){
         if(cached != null) return cached;

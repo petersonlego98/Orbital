@@ -14,6 +14,7 @@ import arc.util.*;
 import arc.util.io.*;
 import orbital.*;
 import orbital.ai.*;
+import orbital.content.WeaponModules;
 import orbital.ctype.*;
 import orbital.entities.*;
 import orbital.entities.units.*;
@@ -24,6 +25,7 @@ import orbital.io.*;
 import orbital.logic.*;
 import orbital.type.*;
 import orbital.ui.*;
+import orbital.world.*;
 import orbital.world.blocks.*;
 import orbital.world.blocks.payloads.*;
 import orbital.world.consumers.*;
@@ -39,6 +41,17 @@ public class UnitFactory extends UnitBlock{
     public Seq<UnitPlan> plans = new Seq<>(4);
     public Sound createSound = Sounds.unitCreate;
     public float createSoundVolume = 1f;
+
+    /** Whether this factory evolves in levels instead of relying on separate reconstructor blocks. */
+    public boolean leveled = false;
+    /** Highest evolution level this factory can reach. */
+    public int maxLevel = 5;
+    /** Hulls selectable by a leveled factory, priced by their full requirement chain. */
+    public Seq<UnitType> evolutionUnits = new Seq<>();
+    /** Factory visual per evolution level; index 0 is T2, 1 is T3 and so on. */
+    public Block[] evolutionVisuals = {};
+    /** Time, in ticks, to evolve a unit that is fed into a leveled factory. */
+    public float evolutionTime = 60f * 30f;
 
     public UnitFactory(String name){
         super(name);
@@ -81,7 +94,11 @@ public class UnitFactory extends UnitBlock{
         config(UnitCommand.class, (UnitFactoryBuild build, UnitCommand command) -> build.command = command);
         configClear((UnitFactoryBuild build) -> build.command = null);
 
-        consume(new ConsumeItemDynamic((UnitFactoryBuild e) -> e.currentPlan != -1 ? plans.get(Math.min(e.currentPlan, plans.size - 1)).requirements : ItemStack.empty));
+        consume(new ConsumeItemDynamic((UnitFactoryBuild e) -> {
+            UnitPlan evolution = e.evolutionPlan();
+            if(evolution != null) return evolution.requirements;
+            return e.currentPlan != -1 ? plans.get(Math.min(e.currentPlan, plans.size - 1)).requirements : ItemStack.empty;
+        }));
     }
 
     @Override
@@ -226,6 +243,15 @@ public class UnitFactory extends UnitBlock{
         public @Nullable Vec2 commandPos;
         public @Nullable UnitCommand command;
         public int currentPlan = -1;
+        /** Current evolution level of a leveled factory; 1 until it is upgraded. */
+        public int level = 1;
+        /** Plan index of the unit this factory evolves a fed payload into; -1 = build mode. */
+        public int evolveTarget = -1;
+
+        /** @return the plan used for the current evolution target, or null. */
+        public @Nullable UnitPlan evolutionPlan(){
+            return evolveTarget >= 0 && evolveTarget < plans.size ? plans.get(evolveTarget) : null;
+        }
 
         public float fraction(){
             return currentPlan == -1 ? 0 : progress / plans.get(currentPlan).time;
@@ -281,9 +307,37 @@ public class UnitFactory extends UnitBlock{
             return super.sense(sensor);
         }
 
+        /**
+         * @return the cost of the next evolution level: the items the matching reconstructor
+         * would have consumed to reach that tier. Each tier is paid once, so moving from T1 to
+         * T3 costs the additive plus the multiplicative recipe.
+         */
+        public ItemStack[] levelCost(int target){
+            if(!leveled || target < 2 || target - 1 > evolutionVisuals.length) return ItemStack.empty;
+            Block visual = evolutionVisuals[target - 2];
+            if(visual == null) return ItemStack.empty;
+            return visual.findConsumer(i -> i instanceof ConsumeItems) instanceof ConsumeItems ci
+                ? ci.items : ItemStack.empty;
+        }
+
+        public boolean canLevelUp(){
+            if(!leveled || level >= maxLevel) return false;
+            ItemStack[] cost = levelCost(level + 1);
+            Building core = team.core();
+            return cost.length > 0 && core != null && core.items.has(cost, 1f);
+        }
+
+        /** Spends the cumulative cost from the core and swaps the factory visual to the next tier. */
+        public void levelUp(){
+            if(!canLevelUp()) return;
+            for(ItemStack stack : levelCost(level + 1)) team.core().items.remove(stack.item, stack.amount);
+            level++;
+        }
+
         @Override
         public void buildConfiguration(Table table){
-            Seq<UnitType> units = Seq.with(plans).map(u -> u.unit).retainAll(u -> u.unlockedNow() && !u.isBanned());
+            Seq<UnitType> units = Seq.with(plans).map(u -> u.unit).retainAll(u -> u.unlockedNow() && !u.isBanned()
+                && (!leveled || WeaponModules.tierOf(u) <= level));
 
             if(units.any()){
                 ItemSelection.buildTable(UnitFactory.this, table, units, () -> currentPlan == -1 ? null : plans.get(currentPlan).unit, unit -> configure(plans.indexOf(u -> u.unit == unit)), selectionRows, selectionColumns);
@@ -343,6 +397,28 @@ public class UnitFactory extends UnitBlock{
 
                 table.add(commands).fillX().left();
 
+                if(leveled){
+                    table.row();
+                    Table evolution = new Table();
+                    evolution.top().left().background(Styles.black6).margin(6f);
+                    evolution.add(Core.bundle.format("factory.evolution.level", level, maxLevel))
+                        .color(Pal.accent).left().row();
+                    if(level < maxLevel){
+                        evolution.button(Core.bundle.format("factory.evolution.upgrade", level + 1),
+                            Styles.defaultt, this::levelUp).size(220f, 36f).left()
+                            .disabled(b -> !canLevelUp()).row();
+                    }
+                    evolution.add("@factory.evolution.target").left().row();
+                    for(UnitType target : plans.map(p -> p.unit)
+                        .retainAll(u -> u.unlockedNow() && !u.isBanned() && u.tier > 1 && u.tier <= level)){
+                        int index = plans.indexOf(p -> p.unit == target);
+                        evolution.button("T" + target.tier + " " + target.localizedName, Styles.togglet, () -> {
+                            evolveTarget = evolveTarget == index ? -1 : index;
+                        }).update(b -> b.setChecked(evolveTarget == index))
+                            .size(220f, 32f).left().row();
+                    }
+                    table.add(evolution).fillX().left();
+                }
             }else{
                 table.table(Styles.black3, t -> t.add("@none").color(Color.lightGray));
             }
@@ -378,7 +454,14 @@ public class UnitFactory extends UnitBlock{
 
         @Override
         public void draw(){
-            Draw.rect(region, x, y);
+            //a leveled factory wears the reconstructor sprite of its current tier; the
+            //reconstructor blocks themselves stay in the game for ground/naval progression
+            TextureRegion shell = region;
+            if(leveled && level > 1 && level - 2 < evolutionVisuals.length
+                && evolutionVisuals[level - 2] != null){
+                shell = evolutionVisuals[level - 2].region;
+            }
+            Draw.rect(shell, x, y);
             Draw.rect(outRegion, x, y, rotdeg());
 
             if(currentPlan != -1){
@@ -416,6 +499,31 @@ public class UnitFactory extends UnitBlock{
 
             moveOutPayload();
 
+            //evolution mode: a unit payload is consumed together with the cumulative cost of the
+            //target hull, then replaced by the evolved unit on the output conveyor
+            if(leveled && evolveTarget >= 0 && evolveTarget < plans.size
+                && payload instanceof UnitPayload){
+                UnitPlan target = plans.get(evolveTarget);
+                if(efficiency > 0){
+                    progress += edelta() * Vars.state.rules.unitBuildSpeed(team);
+                    speedScl = Mathf.lerpDelta(speedScl, 1f, 0.05f);
+                    if(progress >= evolutionTime){
+                        consume();
+                        Unit evolved = target.unit.create(team);
+                        if(evolved.isCommandable() && command != null) evolved.command().command(command);
+                        payload = new UnitPayload(evolved);
+                        payVector.setZero();
+                        progress = 0f;
+                        evolveTarget = -1;
+                        createSound.at(this, 1f + Mathf.range(0.06f), createSoundVolume);
+                        Events.fire(new UnitCreateEvent(evolved, this));
+                    }
+                }else{
+                    speedScl = Mathf.lerpDelta(speedScl, 0f, 0.05f);
+                }
+                return;
+            }
+
             if(currentPlan != -1 && payload == null){
                 UnitPlan plan = plans.get(currentPlan);
 
@@ -452,8 +560,16 @@ public class UnitFactory extends UnitBlock{
 
         @Override
         public boolean shouldConsume(){
-            if(currentPlan == -1) return false;
-            return enabled && payload == null && team.activateUnitFactories();
+            boolean evolving = leveled && evolveTarget >= 0 && payload instanceof UnitPayload;
+            if(!evolving && currentPlan == -1) return false;
+            return enabled && (evolving || payload == null) && team.activateUnitFactories();
+        }
+
+        @Override
+        public boolean acceptUnitPayload(Unit unit){
+            UnitPlan target = evolutionPlan();
+            return leveled && target != null && unit.type.tier < target.unit.tier
+                && target.unit.tier <= level && !target.unit.isBanned();
         }
 
         @Override
@@ -479,7 +595,7 @@ public class UnitFactory extends UnitBlock{
 
         @Override
         public byte version(){
-            return 3;
+            return 4;
         }
 
         @Override
@@ -489,6 +605,8 @@ public class UnitFactory extends UnitBlock{
             write.s(currentPlan);
             TypeIO.writeVecNullable(write, commandPos);
             TypeIO.writeCommand(write, command);
+            //level progression; evolveTarget is transient and must be re-selected after a load
+            write.b(level);
         }
 
         @Override
@@ -503,6 +621,8 @@ public class UnitFactory extends UnitBlock{
             if(revision >= 3){
                 command = TypeIO.readCommand(read);
             }
+
+            level = revision >= 4 ? read.b() : 1;
         }
     }
 }

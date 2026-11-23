@@ -53,6 +53,8 @@ public class UnitType extends UnlockableContent implements Senseable{
     public int envEnabled = Env.terrestrial;
     /** The environment flags that this unit *cannot* function in. If the env matches any of these, it will explode or be disabled. */
     public int envDisabled = Env.scorching;
+    /** Research/evolution tier (T1-T5), used by leveled air factories. */
+    public int tier = 1;
 
     /** movement speed (world units/t) */
     public float speed = 1.1f,

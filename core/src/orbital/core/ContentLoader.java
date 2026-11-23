@@ -64,6 +64,17 @@ public class ContentLoader{
         Liquids.load();
         Bullets.load();
         UnitTypes.load();
+        //Evolution tiers follow the air reconstructor chains (mono->poly->mega->quad->oct and
+        //flare->horizon->zenith->antumbra->eclipse), not the cosmetic weapon-module tiers.
+        UnitTypes.mono.tier = UnitTypes.flare.tier = 1;
+        UnitTypes.monoDuo.tier = UnitTypes.flareDuo.tier = 1;
+        UnitTypes.poly.tier = UnitTypes.horizon.tier = 2;
+        UnitTypes.mega.tier = UnitTypes.zenith.tier = 3;
+        UnitTypes.quad.tier = UnitTypes.antumbra.tier = 4;
+        UnitTypes.oct.tier = UnitTypes.eclipse.tier = 5;
+        UnitTypes.elude.tier = 1;
+        UnitTypes.avert.tier = 2;
+        UnitTypes.obviate.tier = 3;
         //Every non-enemy unit shares the starter unit's mining laser and can mine every ore.
         //Must run before Content.init(), which builds the per-unit mine command list.
         applyUniversalMining();

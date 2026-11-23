@@ -7055,6 +7055,44 @@ public class Blocks{
         hideModuleOnlyTurrets();
         hideWallModules();
         hideModuleOnlyDrills();
+        setupFactoryEvolution();
+    }
+
+    /**
+     * Air factories grow in levels instead of sending hulls to separate reconstructors. Their
+     * sprite becomes the matching reconstructor at each tier, and every tier-eligible air hull
+     * becomes a buildable plan priced by its full requirement chain. Reconstructor blocks stay
+     * buildable because ground and naval units still use them.
+     */
+    private static void setupFactoryEvolution(){
+        UnitFactory air = (UnitFactory)airFactory;
+        UnitFactory ship = (UnitFactory)shipFabricator;
+        air.leveled = true;
+        air.maxLevel = 5;
+        air.evolutionVisuals = new Block[]{
+            additiveReconstructor, multiplicativeReconstructor, exponentialReconstructor, tetrativeReconstructor
+        };
+        air.evolutionUnits.addAll(
+            UnitTypes.mono, UnitTypes.flare, UnitTypes.poly,
+            UnitTypes.alpha, UnitTypes.beta, UnitTypes.gamma, UnitTypes.evoke, UnitTypes.incite, UnitTypes.emanate,
+            UnitTypes.horizon, UnitTypes.avert, UnitTypes.mega, UnitTypes.zenith,
+            UnitTypes.obviate, UnitTypes.quell, UnitTypes.quad,
+            UnitTypes.antumbra, UnitTypes.disrupt, UnitTypes.eclipse, UnitTypes.oct
+        );
+
+        ship.leveled = true;
+        ship.maxLevel = 3;
+        ship.evolutionVisuals = new Block[]{shipRefabricator, primeRefabricator};
+        ship.evolutionUnits.addAll(UnitTypes.elude, UnitTypes.avert, UnitTypes.obviate);
+
+        for(UnitFactory factory : new UnitFactory[]{air, ship}){
+            for(UnitType unit : factory.evolutionUnits){
+                if(factory.plans.contains(p -> p.unit == unit)) continue;
+                ItemStack[] reqs = unit.getTotalRequirements();
+                if(reqs == null || reqs.length == 0) continue;
+                factory.plans.add(new UnitFactory.UnitPlan(unit, 60f * (10f + unit.tier * 5f), reqs));
+            }
+        }
     }
 
     /**
