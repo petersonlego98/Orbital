@@ -52,11 +52,11 @@ android{
         applicationId "com.orbital.peterson"
         minSdkVersion 24          // Android 7.0 Nougat (mínimo exigido pela Proteção Automática do Play)
         targetSdkVersion 36
-        //Same release number as the Windows build (v1.2.0, see README and
-        //docs/RELEASE_NOTES_v1.2.0.md). versionCode is the numeric encoding
+        //Same release number as the Windows build (v1.3, see README and
+        //docs/RELEASE_NOTES_v1.3.md). versionCode is the numeric encoding
         //major*100 + minor*10 + patch so it keeps growing on every release.
-        versionCode 121
-        versionName "1.2.0"
+        versionCode 130
+        versionName "1.3"
         multiDexEnabled = true
     }
 
