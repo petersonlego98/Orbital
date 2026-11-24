@@ -256,10 +256,6 @@ abstract class BuilderComp implements Posc, Statusc, Teamc, Rotc{
         if(idx != -1){
             plans.removeIndex(idx);
         }
-        //auto-build: a cancelled player plan is withdrawn from the builder units too
-        if(isLocal()){
-            orbital.input.AutoBuildSync.onPlayerPlanRemoved(x, y, breaking, team);
-        }
     }
 
     /** Return whether this builder's place queue contains items. */
@@ -301,12 +297,6 @@ abstract class BuilderComp implements Posc, Statusc, Teamc, Rotc{
             plans.addFirst(place);
         }
 
-        //auto-build: the local player's plan is offered to the team builder units
-        //(see AutoBuildSync); other units never reach this, only the local player's
-        //own builder does
-        if(isLocal()){
-            orbital.input.AutoBuildSync.onPlayerPlanAdded(place, team);
-        }
     }
 
     boolean activelyBuilding(){

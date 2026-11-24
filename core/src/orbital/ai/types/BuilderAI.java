@@ -36,19 +36,6 @@ public class BuilderAI extends AIController{
     }
 
     @Override
-    public void init(){
-        //rebuild much faster with buildAI; there are usually few builder units so this is fine
-        if(rebuildPeriod == defaultRebuildPeriod && unit.team.rules().buildAi){
-            rebuildPeriod = 10f;
-        }
-    }
-
-    /** Forces the next team plan pickup on the following update instead of waiting for the rebuild timer (auto-build). */
-    public void pingForTeamPlans(){
-        timer.reset(timerTarget3, rebuildPeriod);
-    }
-
-    @Override
     public void updateMovement(){
 
         if(target != null && shouldShoot()){
@@ -244,17 +231,11 @@ public class BuilderAI extends AIController{
 
     @Override
     public AIController fallback(){
-        if(unit.team.isAI() && unit.team.rules().prebuildAi){
-            return new PrebuildAI();
-        }
         return unit.type.flying ? new FlyingAI() : new GroundAI();
     }
 
     @Override
     public boolean useFallback(){
-        if(unit.team.isAI() && unit.team.rules().prebuildAi){
-            return true;
-        }
         return state.rules.waves && unit.team == state.rules.waveTeam && !unit.team.rules().rtsAi;
     }
 

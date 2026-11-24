@@ -21,8 +21,8 @@ import static orbital.Vars.*;
  *
  * <p>Every flying unit in this fork gets a 0.5 build speed by default, so the Mono hull used by
  * the test mode can already build: what blocked construction there was the hidden block menu.
- * The player's plans also reach the team queue, and the tablet button is what puts a group
- * into the rebuild command that consumes it.</p>
+ * Construction is always manual: the player places plans and the tablet button puts a group into
+ * the rebuild command that executes them.</p>
  */
 public class TestModeBuildTest{
 
@@ -53,15 +53,10 @@ public class TestModeBuildTest{
         Player pilot = Player.create();
         pilot.team(Team.sharded);
         Vars.player = pilot;
-
-        Core.settings.put("autobuild", true);
-        AutoBuildSync.resetState();
     }
 
     @AfterEach
     void cleanup(){
-        AutoBuildSync.withdrawAll(Team.sharded);
-        Core.settings.remove("autobuild");
         state.rules.modeName = previousMode;
         state.rules.infiniteResources = false;
         Vars.player = previousPlayer;
@@ -77,14 +72,6 @@ public class TestModeBuildTest{
         return mono;
     }
 
-    private static int teamPlansAt(int x, int y){
-        int count = 0;
-        for(Teams.BlockPlan p : Team.sharded.data().plans){
-            if(p.x == x && p.y == y) count++;
-        }
-        return count;
-    }
-
     @Test
     void testModeIsKeyedToTheRulesName(){
         assertTrue(TestNewFeaturesMode.active());
@@ -95,7 +82,7 @@ public class TestModeBuildTest{
     }
 
     @Test
-    void theTestPilotQueuesPlansThatReachTheBuilderUnits(){
+    void theTestPilotCanQueueBuildPlans(){
         Unit mono = pilotMono();
 
         assertTrue(TestNewFeaturesMode.active(), "test mode is active by rules name");
@@ -104,8 +91,7 @@ public class TestModeBuildTest{
 
         mono.addBuild(new BuildPlan(10, 10, 0, Blocks.conveyor));
 
-        assertEquals(1, mono.plans.size, "the plan stays on the player's unit so he can help");
-        assertEquals(1, teamPlansAt(10, 10), "and reaches the team queue for the builder units");
+        assertEquals(1, mono.plans.size, "the manually placed plan stays on the player's unit");
     }
 
     @Test
@@ -132,7 +118,6 @@ public class TestModeBuildTest{
         assertTrue(mono.canBuild());
         mono.addBuild(new BuildPlan(10, 10, 0, Blocks.conveyor));
         assertEquals(1, mono.plans.size, "normal placement keeps working outside the test mode");
-        assertEquals(1, teamPlansAt(10, 10), "auto-build forwarding is not mode-gated");
     }
 
     @Test
@@ -140,12 +125,12 @@ public class TestModeBuildTest{
         int env = state.rules.env;
         try{
             state.rules.env = 0;
-            assertTrue(TestNewFeaturesMode.blockAvailable(Blocks.conveyor), "Serpulo block");
-            assertTrue(TestNewFeaturesMode.blockAvailable(Blocks.duct), "Erekir block");
+            assertTrue(TestNewFeaturesMode.blockAvailable(Blocks.copperWall), "Serpulo block");
+            assertTrue(TestNewFeaturesMode.blockAvailable(Blocks.berylliumWall), "Erekir block");
 
             state.rules.env = env;
-            assertTrue(TestNewFeaturesMode.blockAvailable(Blocks.conveyor), "environment bits do not filter the test catalog");
-            assertTrue(TestNewFeaturesMode.blockAvailable(Blocks.duct));
+            assertTrue(TestNewFeaturesMode.blockAvailable(Blocks.copperWall), "environment bits do not filter the test catalog");
+            assertTrue(TestNewFeaturesMode.blockAvailable(Blocks.berylliumWall));
         }finally{
             state.rules.env = env;
         }
@@ -162,17 +147,9 @@ public class TestModeBuildTest{
         IntSeq ids = new IntSeq();
         ids.add(oct.id);
 
-        //a plan queued *before* the group was put into construction mode is still picked up
-        AutoBuildSync.onPlayerPlanAdded(new BuildPlan(10, 10, 0, Blocks.conveyor), Team.sharded);
-
         //this is the same call the tablet's CONSTRUIR button makes
         InputHandler.setUnitCommandChunked(ids, UnitCommand.rebuildCommand);
         assertEquals(UnitCommand.rebuildCommand, ai.currentCommand(), "the group is now in construction mode");
-        AutoBuildSync.pingBuildersNow(Team.sharded);
-
-        oct.controller().updateUnit();
-        assertNotNull(oct.buildPlan(), "the delegated builder takes the pending plan immediately");
-        assertEquals(10, oct.buildPlan().x);
 
         //toggling off returns to move and clears the group's plans (CommandAI.command does it)
         InputHandler.setUnitCommandChunked(ids, UnitCommand.moveCommand);

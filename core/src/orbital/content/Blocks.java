@@ -7064,6 +7064,23 @@ public class Blocks{
         hideModuleOnlyDrills();
         setupFactoryEvolution();
         replaceOresWithPetronio();
+        hideDistributionBlocks();
+    }
+
+    /**
+     * Every distribution building (belts, ducts, pipes, routers, unloaders, mass drivers, ...)
+     * leaves the player build menu. Their definitions, recipes and sprites stay intact so old maps
+     * and saves keep working and the automatic factory planner can still route items.
+     */
+    private static void hideDistributionBlocks(){
+        for(Block block : content.blocks()){
+            //ore floors use the default distribution category too - never hide terrain
+            if(block == null || block.category != Category.distribution || block instanceof Floor) continue;
+            block.buildVisibility = BuildVisibility.hidden;
+            block.inEditor = false;
+            //mass-driver is also a dorsal support module: keep it in that catalogue
+            if(SupportModuleCategory.isSupport(block)) block.moduleOnly = true;
+        }
     }
 
     /**

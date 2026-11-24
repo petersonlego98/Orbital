@@ -37,7 +37,8 @@ import static orbital.Vars.*;
 public class PlacementFragment{
     final int rowWidth = 4;
 
-    public Category currentCategory = Category.distribution;
+    //distribution is hidden from the player build menu, so open on production instead
+    public Category currentCategory = Category.production;
 
     Seq<Block> returnArray = new Seq<>(), returnArray2 = new Seq<>();
     Seq<Category> returnCatArray = new Seq<>();
@@ -79,7 +80,7 @@ public class PlacementFragment{
     public PlacementFragment(){
         Events.on(WorldLoadEvent.class, event -> {
             Core.app.post(() -> {
-                currentCategory = Category.distribution;
+                currentCategory = Category.production;
                 control.input.block = null;
                 rebuild();
             });

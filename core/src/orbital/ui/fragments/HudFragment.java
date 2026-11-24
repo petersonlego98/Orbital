@@ -1011,9 +1011,6 @@ public class HudFragment{
 
         content.button("@mode.testfeatures.catalog.units", Icon.units, () -> openCatalog(true))
             .width(width).height(40f).left().row();
-        content.button("@mode.testfeatures.catalog.buildings", Icon.distribution, () -> openCatalog(false, true))
-            .width(width).height(40f).left()
-            .update(b -> b.setChecked(TestNewFeaturesMode.lastPlayerBlock != null)).row();
 
         Table modules = new Table();
         modules.left();
@@ -1137,7 +1134,6 @@ public class HudFragment{
             TestNewFeaturesMode.enemyRemoving = !TestNewFeaturesMode.enemyRemoving;
             //the remove mode is its own tool: it cannot share the cursor with a block
             TestNewFeaturesMode.enemyBlock = null;
-            TestNewFeaturesMode.playerBlock = null;
         }).checked(b -> TestNewFeaturesMode.enemyRemoving).growX().left().padBottom(2f).row();
 
         section.button(b -> b.add(Core.bundle.format("mode.testfeatures.buildings.clear", TestNewFeaturesMode.enemyTeam.localized())).left(),
@@ -1155,8 +1151,7 @@ public class HudFragment{
         Table placer = new Table();
         placer.name = "enemybuildplacer";
         placer.touchable = Touchable.disabled;
-        placer.update(() -> placer.touchable =
-            TestNewFeaturesMode.enemyToolArmed() || TestNewFeaturesMode.playerToolArmed()
+        placer.update(() -> placer.touchable = TestNewFeaturesMode.enemyToolArmed()
             ? Touchable.enabled : Touchable.disabled);
         placer.clicked(this::placeToolAtCursor);
         //right click disarms the active tool: it also blocks aiming, which is how the normal
@@ -1192,20 +1187,11 @@ public class HudFragment{
         });
     }
 
-    /** Drops (or removes) the armed structure under the cursor, for the player or the enemy team. */
+    /** Drops (or removes) the armed structure under the cursor, for the enemy team. */
     private void placeToolAtCursor(){
         if(!state.isGame() || !TestNewFeaturesMode.active()) return;
 
         int x = World.toTile(Core.input.mouseWorldX()), y = World.toTile(Core.input.mouseWorldY());
-
-        if(TestNewFeaturesMode.playerToolArmed()){
-            Block block = TestNewFeaturesMode.playerBlock;
-            if(block == null) return;
-            if(TestNewFeaturesMode.queuePlayerBuilding(block, x, y, control.input.rotation, block.nextConfig())){
-                block.placeSound.at(Core.input.mouseWorldX(), Core.input.mouseWorldY());
-            }
-            return;
-        }
 
         if(TestNewFeaturesMode.enemyRemoving){
             Block previous = world.tile(x, y) == null ? null : world.tile(x, y).block();
@@ -1232,21 +1218,13 @@ public class HudFragment{
 
     /** Opens the shared units/structures catalogue on the requested tab. */
     private void openCatalog(boolean units){
-        openCatalog(units, false);
-    }
-
-    /**
-     * Opens the shared catalogue on the requested tab. On the structures tab, {@code armPlayer}
-     * decides which tool a picked structure arms: the player's team or the enemy team.
-     */
-    private void openCatalog(boolean units, boolean armPlayer){
         if(catalogDialog == null){
             catalogDialog = new TestFeaturesCatalogDialog();
         }
         if(units){
             catalogDialog.showUnits();
         }else{
-            catalogDialog.showBuildings(armPlayer);
+            catalogDialog.showBuildings();
         }
     }
 
@@ -1254,12 +1232,10 @@ public class HudFragment{
     private void drawEnemyPlan(){
         if(!state.isGame()) return;
 
-        //the player tool wins when both are somehow armed; arming one clears the other
-        boolean forPlayer = TestNewFeaturesMode.playerToolArmed();
-        if(!forPlayer && !TestNewFeaturesMode.enemyToolArmed()) return;
+        if(!TestNewFeaturesMode.enemyToolArmed()) return;
 
-        Team team = forPlayer ? player.team() : TestNewFeaturesMode.enemyTeam;
-        Block block = forPlayer ? TestNewFeaturesMode.playerBlock : TestNewFeaturesMode.enemyBlock;
+        Team team = TestNewFeaturesMode.enemyTeam;
+        Block block = TestNewFeaturesMode.enemyBlock;
 
         Tile tile = world.tileWorld(Core.input.mouseWorldX(), Core.input.mouseWorldY());
         if(tile == null) return;
@@ -1280,8 +1256,8 @@ public class HudFragment{
         enemyPlan.set(x, y, control.input.rotation, block);
         enemyPlan.config = block.nextConfig();
         enemyPlan.animScale = 1f;
-        block.drawPlan(enemyPlan, emptyPlans, forPlayer
-            || Build.validPlaceIgnoreUnits(block, TestNewFeaturesMode.enemyTeam, x, y, control.input.rotation, true, true));
+        block.drawPlan(enemyPlan, emptyPlans,
+            Build.validPlaceIgnoreUnits(block, TestNewFeaturesMode.enemyTeam, x, y, control.input.rotation, true, true));
         Draw.reset();
     }
 

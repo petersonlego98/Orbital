@@ -92,10 +92,6 @@ public final class TestNewFeaturesMode{
     public static @Nullable Block enemyBlock;
     /** When true, the enemy-building tool removes whatever is under the cursor instead of placing. */
     public static boolean enemyRemoving;
-    /** Block armed by the player-building tool; null means nothing is selected. */
-    public static @Nullable Block playerBlock;
-    /** Last structure type chosen for the player's unit; the unit picks the site, not the cursor. */
-    public static @Nullable Block lastPlayerBlock;
 
     private TestNewFeaturesMode(){
     }
@@ -193,8 +189,6 @@ public final class TestNewFeaturesMode{
         selectedType = null;
         setupOpen = true;
         wavesStarted = false;
-        playerBlock = null;
-        lastPlayerBlock = null;
         enemyBlock = null;
         enemyRemoving = false;
         //a stress battle from a previous session must never leak into a fresh one
@@ -1023,94 +1017,16 @@ public final class TestNewFeaturesMode{
         return active() && (enemyBlock != null || enemyRemoving);
     }
 
-    /**
-     * @return whether a cursor placement tool is armed. Choosing a factory does NOT arm it: the
-     * unit picks the site, so the full-screen map placer must stay disabled.
-     */
-    public static boolean playerToolArmed(){
-        return active() && playerBlock != null;
-    }
-
-    /** Arms the enemy tool with a structure, clearing the player tool. */
+    /** Arms the enemy tool with a structure. */
     public static void armEnemyBlock(Block block){
         enemyBlock = block;
         enemyRemoving = false;
-        playerBlock = null;
     }
 
-    /**
-     * Chooses any catalog structure for the unit to build. The unit picks a legal site; for a
-     * production crafter it also enqueues the whole supply chain. The player never positions
-     * anything on the map.
-     */
-    public static void armPlayerBlock(Block block){
-        lastPlayerBlock = block;
-        playerBlock = null;
-        enemyBlock = null;
-        enemyRemoving = false;
-
-        Unit unit = playerUnit();
-        if(unit == null || block == null){
-            arc.util.Log.warn("[auto-build] no player unit, nothing queued for @", block == null ? "?" : block.name);
-            return;
-        }
-
-        Seq<BuildPlan> plans = orbital.engine.world.FactoryChainPlanner.build(block, 0, player.team());
-        if(unit.canBuild()){
-            for(BuildPlan plan : plans){
-                unit.addBuild(plan, true);
-            }
-        }else{
-            //a non-builder pilot must still get the structure built: hand it to the team builders
-            for(BuildPlan plan : plans){
-                player.team().data().plans.add(new Teams.BlockPlan(
-                    plan.x, plan.y, (short)plan.rotation, plan.block, plan.config));
-            }
-        }
-        arc.util.Log.info("[auto-build] @ plans queued for @ (unit builder: @)",
-            plans.size, block.name, unit.canBuild());
-    }
-
-    /** Disarms every structure tool of the test panel. */
+    /** Disarms the enemy structure tool of the test panel. */
     public static void disarmStructureTools(){
-        playerBlock = null;
-        lastPlayerBlock = null;
         enemyBlock = null;
         enemyRemoving = false;
-    }
-
-    /**
-     * Queues one structure for the player's team through the normal build pipeline, so it
-     * rises at the regular construction speed instead of appearing instantly.
-     *
-     * @return whether the plan was queued.
-     */
-    public static boolean queuePlayerBuilding(Block block, int x, int y, int rotation, @Nullable Object config){
-        if(!active() || block == null) return false;
-
-        Unit unit = playerUnit();
-        if(unit == null) return false;
-
-        //multiblocks are anchored at their center tile, so pull the cursor back into the map
-        if(block.isMultiblock()){
-            x = Mathf.clamp(x, (block.size - 1) / 2, world.width() - block.size / 2 - 1);
-            y = Mathf.clamp(y, (block.size - 1) / 2, world.height() - block.size / 2 - 1);
-        }
-
-        //same check the builder runs when the plan reaches the front of the queue, so a click
-        //on an invalid spot does not leave a plan stuck on the hull forever
-        if(!Build.validPlaceIgnoreUnits(block, player.team(), x, y, rotation, true, true)) return false;
-
-        BuildPlan plan = new BuildPlan(x, y, rotation, block, config);
-
-        //the catalog is the "choose a structure, the unit builds it" flow: always include the
-        //transport routes first, so the factory is supplied the moment it finishes
-        Seq<BuildPlan> infrastructure = orbital.engine.world.AutoInfrastructure.plan(plan, player.team());
-        for(BuildPlan extra : infrastructure){
-            unit.addBuild(extra, true);
-        }
-        unit.addBuild(plan, true);
-        return true;
     }
 
     /**

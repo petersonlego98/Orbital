@@ -365,14 +365,6 @@ public class Rules{
         public boolean fillItems;
         /** If true, resources are not consumed when building. */
         public boolean infiniteResources;
-        /** EXPERIMENTAL, DO NOT USE: Pre-built base AI. Gives the illusion of intelligent design of pre-building an attack base. */
-        public boolean prebuildAi;
-
-        /** AI that builds random schematics. */
-        public boolean buildAi;
-        /** Tier of builder AI. [0, 1] */
-        public float buildAiTier = 1f;
-
         /** Enables "RTS" unit AI. */
         public boolean rtsAi;
         /** Minimum size of attack squads. */

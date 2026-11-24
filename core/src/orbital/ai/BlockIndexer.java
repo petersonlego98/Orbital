@@ -116,14 +116,6 @@ public class BlockIndexer{
             }
 
             updatePresentOres();
-
-            for(Team team : Team.all){
-                var data = state.teams.get(team);
-
-                if(team.rules().prebuildAi && data.hasCore()){
-                    PrebuildAI.sortPlans(data.plans);
-                }
-            }
         });
     }
 

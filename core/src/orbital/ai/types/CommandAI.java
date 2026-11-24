@@ -53,24 +53,6 @@ public class CommandAI extends AIController{
         return command == null ? UnitCommand.moveCommand : command;
     }
 
-    /**
-     * Auto-build: make the delegated builder controller pick up a new team plan on the
-     * next update instead of waiting for its rebuild timer. The delegate is normally
-     * created lazily on the first update, so it is created here when needed.
-     */
-    public void pingForTeamPlans(){
-        if(command != UnitCommand.rebuildCommand && command != UnitCommand.assistCommand) return;
-
-        if(commandController == null){
-            lastCommand = command;
-            commandController = command.controller.get(unit);
-            if(commandController != null) commandController.unit(unit);
-        }
-        if(commandController instanceof BuilderAI ai){
-            ai.pingForTeamPlans();
-        }
-    }
-
     /** Attempts to assign a command to this unit. If not supported by the unit type, does nothing. */
     public void command(UnitCommand command){
         if(unit.type.commands.contains(command)){

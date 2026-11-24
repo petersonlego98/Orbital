@@ -77,7 +77,7 @@
 - **Brocas são módulos** desde a última mudança: não existem mais brocas-prédio; todas dão bônus de velocidade/alcance de mineração ao casco.
 - **Fábricas de unidades aéreas (e o ship-fabricator de Erekir) evoluem por nível**: T1→T5 trocando o sprite pelo do reconstrutor correspondente, pagando o custo da receita; podem montar qualquer casco de tier ≤ nível e evoluir uma unidade alimentada (consome a unidade + recursos, com progresso). Reconstrutores continuam construíveis para ground/naval.
 - **Nível de edifício** (`BuildingLevels`, até **100**): custo escala a partir dos requisitos do bloco, pago do núcleo, com evolução cronometrada; torretas, silos e núcleos aplicam multiplicadores.
-- **Auto-construção** (`FactoryChainPlanner`): escolhe fontes, unloaders, cadeias de crafter, energia e transporte; no modo Novidades a construção é **gratuita** (recursos infinitos por time, sem alcance ilimitado nem mudança de gamemode).
+- **Construção manual**: o jogador coloca cada edifício pelo menu; não há planejador que escolha fontes, unloaders ou transporte automaticamente. No modo Novidades a construção é **gratuita** (recursos infinitos por time, sem alcance ilimitado nem mudança de gamemode).
 - Modos: sobrevivência, sandbox, ataque, PvP, editor, **Novidades** (showcase com tutorial e Ferramentas de teste) e **Battle Royale 8x8**.
 - Extras técnicos: tech tree, esquemáticos, editor de mapas, lógica por script, mods via JAR, replay de eventos, RNG determinístico por tick, suporte OpenGL/Vulkan, multiplayer via ArcNet/relay Cloudflare opcional, política de privacidade sem telemetria.
 
@@ -92,7 +92,7 @@
 | Slot COMBAT (EMP, Teleport, Fortify, Bond…) | `repair`, `unitRepair`, `tractor`, `pointDefense`, `overdrive` | **Parcial** — Orbital não tem teleporte/EMP/Bond como módulo; tem campos e reparo |
 | Slot DRONE (Decoy/Repair/Rocket Drone…) | **Sem equivalente direto** — o mais próximo é `unitRepair` (RepairBeam/RepairTower) e unidades aliadas controladas por IA | **Baixo** — lacuna clara |
 | Slot MINING (Mining Boost, Genesis, Enrich…) | Categoria `mining`: 8 brocas como módulo, `MiningModuleAbility`, mineração universal das unidades | **Alto** (já que as brocas viraram módulos) |
-| Slot TRANSPORT (Cargo Bay, Rush, Trade Burst…) | Categoria `transport` (`mass-driver`) + inventário da unidade e `FactoryChainPlanner` | **Médio** — Orbital automatiza logística com esteiras/unloaders em vez de módulos de entrega |
+| Slot TRANSPORT (Cargo Bay, Rush, Trade Burst…) | Categoria `transport` (`mass-driver`) + inventário da unidade | **Médio** — a logística de esteiras/unloaders ficou oculta do menu; o transporte se dá por módulos e inventário |
 | Blueprint + Research Station (nível 15) | Tech tree + blocos como fonte de módulo (sem nível de módulo) | **Baixo** — Orbital não tem níveis de módulo; tem nível de edifício (100) e nível de fábrica (5) |
 | Shipyard (capacidade da frota) | `UnitFactory` + limites de unidade (`unitCap`) e evolução por nível | **Médio** |
 | Planetas/estações com Credits + tempo | Blocos com itens + tempo + energia; `BuildingLevels` para evolução | **Médio** |
@@ -109,7 +109,7 @@
 5. **Módulos idênticos agrupados (×N)** e controle por número/auto-alvo, com barra de recarga individual — o Dark Nebula trata módulos como slots independentes.
 6. **Construção gratuita no modo Novidades** — resources infinitos por time para testar sem economia, mantendo regras normais de alcance e velocidade.
 7. **Battle Royale 8x8 com loot de módulos pelo chão**, sem núcleos, última esquadra viva vence.
-8. **Automação completa de cadeia produtiva** — `FactoryChainPlanner` escolhe minério, unloader, crafter, energia e transporte automaticamente; o Dark Nebula foca em operações manuais assíncronas.
+8. **Cadeia produtiva montada à mão** — o jogador escolhe minério, crafter, energia e transporte; o Dark Nebula foca em operações manuais assíncronas.
 9. **Lógica programável, esquemáticos, editor de mapas e mods via JAR**, além de replay de eventos e RNG determinístico por tick — ferramentas de criação ausentes no DN.
 10. **Arquitetura multiplataforma real (Windows + Android) com um único código base**, OpenGL e Vulkan, e **privacidade sem telemetria** (política pública no próprio jogo).
 11. **Suporte offline e LAN/personalizado**, enquanto o DN exige conexão e servidor persistente.
@@ -211,7 +211,7 @@ Cada tabela compara o mecanismo correspondente nos dois jogos. "Equivalência" m
 |---|---|---|---|
 | Catálogo | 11 módulos: Cargo Bay Extension, Shipment Computer, Cargo Repair, Rush, Stealth, Trade Burst, Shipment Drone, Red Star Life Extender, Relic Drone, Dispatch, Cargo Rocket | Categoria `transport` (`MassDriver` → `MassDriverAbility`) + inventário da unidade e offload no núcleo | Média |
 | Objetivo | Entregar shipments por **Credits**, com bônus e custo de Hydrogen | Mover itens fisicamente para núcleo/unidades/other buildings | Igual em intenção, diferente em escala |
-| Automação | Shipment Relay entrega tudo instantaneamente por Hydrogen | `FactoryChainPlanner` escolhe minério, unloader, crafter, energia e esteiras | Orbital automatiza a cadeia produtiva |
+| Automação | Shipment Relay entrega tudo instantaneamente por Hydrogen | Cadeia produtiva montada manualmente pelo jogador | DN automático; Orbital manual |
 | Velocidade | Rush reduz consumo de Hydrogen do Transport | Unidades têm velocidade própria; módulos não alteram combustível | Diferente |
 | Veredito | Logística centrada em entrega e economia | Logística centrada em fluxo físico de itens | Média |
 
@@ -234,7 +234,7 @@ Cada tabela compara o mecanismo correspondente nos dois jogos. "Equivalência" m
 | Exemplos | Shipyard, Research Station, scanners, Trade Station, Shipment Relay, Star Harvester, Warp Lane Hub | Fábricas, torretas, núcleos, esteiras, tubos, brocas-módulo, unidades | Diferente |
 | Regras espaciais | Distância mínima: 150 AU entre estações, 160 de planetas, 60 de asteroides, 120 da estrela | Grade, footprint, colisão, `Build.validPlace` | Orbital mais granular |
 | Evolução | Estações sobem de nível (Shipyard 10, Star Harvester 11/16, Red Star Base 20) | `BuildingLevels` até 100, custo escalado `1 + (nível-1)*0.35` | Orbital vai mais longe |
-| Automação | Shipment Relay acelera entregas | `FactoryChainPlanner` monta cadeias completas | Orbital mais automático |
+| Automação | Shipment Relay acelera entregas | Cadeias completas montadas à mão | DN mais automático |
 | Segurança offline | Casa é inviolável offline | Depende do modo; BR e PvP têm combate | Diferente |
 
 ### E9 — Fábricas de navios (Shipyard ↔ UnitFactory evoluído)
@@ -271,7 +271,7 @@ Cada tabela compara o mecanismo correspondente nos dois jogos. "Equivalência" m
 | Aspecto | Dark Nebula | Orbital | Equivalência |
 |---|---|---|---|
 | Recursos | Credits, Hydrogen, Blueprints, Relics, Empire Power, Crystals | Itens (minério), energia, líquidos, suprimentos de módulos | Diferente |
-| Tempo | App diário: entregas, Blue Stars, Research; guerras de dias | Partida por sessão; auto-build em tempo real | Diferente |
+| Tempo | App diário: entregas, Blue Stars, Research; guerras de dias | Partida por sessão; construção manual pelo jogador em tempo real | Diferente |
 | Pressão | Supernova em minutos; White Star 5 dias | Waves/ataque/BR; modo Novidades sem pressão e sem custo | Orbital mais casual |
 | Aceleração | Crystals | `BuildingLevels` com evolução cronometrada; nada pago | — |
 | Veredito | MMO com economia persistente | Sandbox/tático autossuficiente | Diferente por design |

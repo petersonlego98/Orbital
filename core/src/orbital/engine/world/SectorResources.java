@@ -3,11 +3,8 @@ package orbital.engine.world;
 import arc.struct.ObjectMap;
 import arc.struct.ObjectSet;
 import arc.struct.Seq;
-import orbital.content.Blocks;
-import orbital.game.Team;
 import orbital.type.Item;
 import orbital.type.Liquid;
-import orbital.world.Block;
 import orbital.world.Tile;
 import orbital.world.Tiles;
 
@@ -17,10 +14,7 @@ import static orbital.Vars.world;
  * What the builder unit knows about the natural resources of the current sector.
  *
  * <p>A single map scan builds an index of every ore tile by {@link Item} and every liquid tile by
- * {@link Liquid}. The automatic planner uses this instead of rescanning the whole map once per
- * ingredient and per candidate site, and — more importantly — to decide whether a required
- * ingredient can be mined here (place a drill) or must be taken from the core stock through an
- * item-configured unloader.</p>
+ * {@link Liquid}. The planet drill uses this to report which resources a sector actually has.</p>
  *
  * <p>The snapshot is cached for the current {@link Tiles} object. Loading a new map replaces that
  * object, so the next {@link #get()} rescans automatically.</p>
@@ -98,63 +92,6 @@ public final class SectorResources{
     public Seq<Tile> liquids(Liquid liquid){
         Seq<Tile> tiles = liquid == null ? null : liquidSources.get(liquid);
         return tiles == null ? new Seq<>() : tiles;
-    }
-
-    /**
-     * Nearest ore tile of {@code item} where {@code sourceBlock} may be built and that leaves room
-     * for a connector before the factory footprint. Bounded by the planner's source radius so the
-     * site score and the chosen source never disagree.
-     */
-    public Tile nearest(Item item, int x, int y, Block sourceBlock, Block factory, Team team){
-        Seq<Tile> tiles = ores(item);
-        if(tiles.isEmpty() || sourceBlock == null) return null;
-
-        Tile best = null;
-        float bestDistance = Float.MAX_VALUE;
-        for(Tile tile : tiles){
-            if(tile.block() != Blocks.air) continue;
-            if(!FactoryChainPlanner.placeable(sourceBlock, team, tile.x, tile.y)) continue;
-            if(factory != null && FactoryChainPlanner.footprintGap(tile.x, tile.y, sourceBlock.size,
-                x, y, factory.size) < 2) continue;
-            float distance = FactoryChainPlanner.distance(tile.x - x, tile.y - y);
-            if(distance > FactoryChainPlanner.sourceRadius * FactoryChainPlanner.sourceRadius) continue;
-            if(distance < bestDistance){
-                bestDistance = distance;
-                best = tile;
-            }
-        }
-        return best;
-    }
-
-    public float nearestDistance(Item item, int x, int y, Block sourceBlock, Block factory, Team team){
-        Tile tile = nearest(item, x, y, sourceBlock, factory, team);
-        return tile == null ? -1f : FactoryChainPlanner.distance(tile.x - x, tile.y - y);
-    }
-
-    public Tile nearest(Liquid liquid, int x, int y, Block sourceBlock, Block factory, Team team){
-        Seq<Tile> tiles = liquids(liquid);
-        if(tiles.isEmpty() || sourceBlock == null) return null;
-
-        Tile best = null;
-        float bestDistance = Float.MAX_VALUE;
-        for(Tile tile : tiles){
-            if(tile.block() != Blocks.air) continue;
-            if(!FactoryChainPlanner.placeable(sourceBlock, team, tile.x, tile.y)) continue;
-            if(factory != null && FactoryChainPlanner.footprintGap(tile.x, tile.y, sourceBlock.size,
-                x, y, factory.size) < 2) continue;
-            float distance = FactoryChainPlanner.distance(tile.x - x, tile.y - y);
-            if(distance > FactoryChainPlanner.sourceRadius * FactoryChainPlanner.sourceRadius) continue;
-            if(distance < bestDistance){
-                bestDistance = distance;
-                best = tile;
-            }
-        }
-        return best;
-    }
-
-    public float nearestDistance(Liquid liquid, int x, int y, Block sourceBlock, Block factory, Team team){
-        Tile tile = nearest(liquid, x, y, sourceBlock, factory, team);
-        return tile == null ? -1f : FactoryChainPlanner.distance(tile.x - x, tile.y - y);
     }
 
     /** Human-readable list of ore types that actually exist on this map, for decision logs. */

@@ -39,8 +39,6 @@ public class TestFeaturesCatalogDialog extends BaseDialog{
     private final Table list = new Table();
     private final ScrollPane pane;
     private Tab tab = Tab.units;
-    /** Whether the structures tab arms the player's building tool or the enemy one. */
-    private boolean armPlayerTool;
     private String search = "";
 
     public TestFeaturesCatalogDialog(){
@@ -87,15 +85,6 @@ public class TestFeaturesCatalogDialog extends BaseDialog{
 
     /** Opens the catalogue on the structures tab. */
     public void showBuildings(){
-        showBuildings(false);
-    }
-
-    /**
-     * Opens the catalogue on the structures tab, choosing which tool a picked structure arms:
-     * the player's team (queued through the normal build pipeline) or the enemy team (instant).
-     */
-    public void showBuildings(boolean armPlayerTool){
-        this.armPlayerTool = armPlayerTool;
         show(Tab.buildings);
     }
 
@@ -180,16 +169,10 @@ public class TestFeaturesCatalogDialog extends BaseDialog{
             int index = 0;
             for(Block block : categoryBlocks){
                 ImageButton button = addEntry(block, blockIcon(block), cell, () -> {
-                    if(armPlayerTool){
-                        TestNewFeaturesMode.armPlayerBlock(block);
-                    }else{
-                        TestNewFeaturesMode.armEnemyBlock(block);
-                    }
+                    TestNewFeaturesMode.armEnemyBlock(block);
                     hide();
                 });
-                button.update(() -> button.setChecked(armPlayerTool
-                    ? TestNewFeaturesMode.lastPlayerBlock == block
-                    : TestNewFeaturesMode.enemyBlock == block));
+                button.update(() -> button.setChecked(TestNewFeaturesMode.enemyBlock == block));
 
                 index++;
                 found++;

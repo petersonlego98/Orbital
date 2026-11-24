@@ -603,29 +603,10 @@ public class Logic implements ApplicationListener{
                                 }
                             });
                         }
-                        //does not work on PvP so built-in attack maps can have it on by default without issues
-                        if(rules.buildAi && !state.rules.pvp){
-                            if(data.buildAi == null) data.buildAi = new BaseBuilderAI(data);
-                            data.buildAi.update();
-                        }
 
                         if(rules.rtsAi){
                             if(data.rtsAi == null) data.rtsAi = new RtsAI(data);
                             data.rtsAi.update();
-                        }
-
-                        //spawn units for prebuild AI cores
-                        if(rules.prebuildAi && !state.isEditor()){
-                            for(var core : data.cores){
-                                var units = data.getUnits(((CoreBlock)core.block).unitType);
-                                if(units == null || !units.contains(u -> u.flag == core.pos())){
-                                    Unit unit = ((CoreBlock)core.block).unitType.spawn(core, data.team);
-                                    unit.flag = core.pos();
-                                    unit.add();
-                                    Units.notifyUnitSpawn(unit);
-                                    Fx.spawn.at(unit);
-                                }
-                            }
                         }
                     }
                 }

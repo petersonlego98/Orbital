@@ -349,7 +349,7 @@ public class UnitCommandTablet extends Table{
         compactOrder(pad, group, Icon.cancel, "@tablet.order.cancel", () -> cancelOrder(group), b -> pending != null && pendingGroup == group, b -> !(pending != null && pendingGroup == group) && !isFollowing(group), icon);
         pad.row();
         //construction mode: the group takes the rebuild command and executes the team's
-        //queued build plans (see AutoBuildSync). Toggling off returns it to the move command,
+        //queued build plans. Toggling off returns it to the move command,
         //whose command() call clears any plan the group was still holding.
         compactOrder(pad, group, Icon.hammer, "@tablet.order.build", () -> toggleConstruction(group), b -> allConstructing(group), b -> noBuilders(group), icon);
     }
@@ -815,11 +815,6 @@ public class UnitCommandTablet extends Table{
             pendingGroup = null;
         }
 
-        if(on){
-            //plans queued before the button was pressed must be picked up now, not after
-            //the rebuild timer (up to 120s) expires
-            AutoBuildSync.pingBuildersNow(player.team());
-        }
         ui.showInfoToast(Core.bundle.get(on ? "tablet.sent.build" : "tablet.build.off"), 2f);
     }
 

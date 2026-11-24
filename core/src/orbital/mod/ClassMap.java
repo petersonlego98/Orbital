@@ -21,7 +21,6 @@ public class ClassMap{
         classes.put("MinerAI", orbital.ai.types.MinerAI.class);
         classes.put("MissileAI", orbital.ai.types.MissileAI.class);
         classes.put("NoAI", orbital.ai.types.NoAI.class);
-        classes.put("PrebuildAI", orbital.ai.types.PrebuildAI.class);
         classes.put("RepairAI", orbital.ai.types.RepairAI.class);
         classes.put("SuicideAI", orbital.ai.types.SuicideAI.class);
         classes.put("Ability", orbital.entities.abilities.Ability.class);

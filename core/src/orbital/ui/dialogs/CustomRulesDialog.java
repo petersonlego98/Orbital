@@ -337,10 +337,6 @@ public class CustomRulesDialog extends BaseDialog{
                 numberi("@rules.rtsmaxsquadsize", f -> teams.rtsMaxSquad = f, () -> teams.rtsMaxSquad, () -> teams.rtsAi, 1, 1000);
                 number("@rules.rtsminattackweight", f -> teams.rtsMinWeight = f, () -> teams.rtsMinWeight, () -> teams.rtsAi);
 
-                //disallow on Erekir (this is broken for mods I'm sure, but whatever)
-                check("@rules.buildai", b -> teams.buildAi = b, () -> teams.buildAi, () -> team != rules.defaultTeam && rules.env != Planets.qatia.defaultEnv && !rules.pvp);
-                number("@rules.buildaitier", false, f -> teams.buildAiTier = f, () -> teams.buildAiTier, () -> teams.buildAi && rules.env != Planets.qatia.defaultEnv && !rules.pvp, 0, 1);
-
                 check("@rules.protectcores", b -> teams.protectCores = b, () -> teams.protectCores);
                 number("@rules.extracorebuildradius", f -> teams.extraCoreBuildRadius = f * tilesize, () -> Math.min(teams.extraCoreBuildRadius / tilesize, 200), () -> !rules.polygonCoreProtection && teams.protectCores);
                 check("@rules.checkplacement", b -> teams.checkPlacement = b, () -> teams.checkPlacement);
