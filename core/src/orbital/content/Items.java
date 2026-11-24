@@ -10,7 +10,9 @@ public class Items{
     public static Item
     scrap, copper, lead, graphite, coal, titanium, thorium, silicon, plastanium,
     phaseFabric, surgeAlloy, sporePod, sand, blastCompound, pyratite, metaglass,
-    beryllium, tungsten, oxide, carbide, fissileMatter, dormantCyst;
+    beryllium, tungsten, oxide, carbide, fissileMatter, dormantCyst,
+    /** The universal ore: the junction of every mineral in Orbital. */
+    petronio;
 
     /** All non-hidden resources of the single playable world, used by the universal loadout. */
     public static final Seq<Item> universalItems = new Seq<>();
@@ -139,6 +141,13 @@ public class Items{
         dormantCyst = new Item("dormant-cyst", Color.valueOf("df824d")){{
             flammability = 0.1f;
             hidden = true;
+        }};
+
+        //One ore to replace them all. Hardness 6 needs the strongest drills and an evolved hull.
+        petronio = new Item("petronio", Color.valueOf("ffc52e")){{
+            hardness = 6;
+            cost = 1.5f;
+            healthScaling = 0.2f;
         }};
 
         serpuloItems.addAll(

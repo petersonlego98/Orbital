@@ -77,7 +77,7 @@ public class Blocks{
     pebbles, tendrils,
 
     //ores
-    oreCopper, oreLead, oreScrap, oreCoal, oreTitanium, oreThorium,
+    oreCopper, oreLead, oreScrap, oreCoal, oreTitanium, oreThorium, orePetronio,
     oreBeryllium, oreTungsten, oreCrystalThorium, wallOreThorium,
 
     //wall ores
@@ -1007,6 +1007,13 @@ public class Blocks{
             oreDefault = true;
             oreThreshold = 0.882f;
             oreScale = 25.380953f;
+        }};
+
+        //the single ore deposit: every old mineral becomes Petrônio on the map
+        orePetronio = new OreBlock(Items.petronio){{
+            oreDefault = true;
+            oreThreshold = 0.81f;
+            oreScale = 23.47619f;
         }};
 
         oreBeryllium = new OreBlock(Items.beryllium);
@@ -7056,6 +7063,28 @@ public class Blocks{
         hideWallModules();
         hideModuleOnlyDrills();
         setupFactoryEvolution();
+        replaceOresWithPetronio();
+    }
+
+    /**
+     * Petrônio replaces every mineral deposit: old ore blocks stop generating and all of them
+     * drop the universal ore instead. Their sprites and content ids stay alive for old saves.
+     */
+    private static void replaceOresWithPetronio(){
+        for(Block block : content.blocks()){
+            if(block == null || block == orePetronio) continue;
+            Item drop = block.itemDrop;
+            if(drop == null || !isOldOre(drop)) continue;
+            block.itemDrop = Items.petronio;
+            if(block instanceof Floor floor) floor.oreDefault = false;
+        }
+    }
+
+    private static boolean isOldOre(Item item){
+        return item == Items.copper || item == Items.lead || item == Items.coal
+            || item == Items.titanium || item == Items.thorium || item == Items.scrap
+            || item == Items.beryllium || item == Items.tungsten || item == Items.graphite
+            || item == Items.sand;
     }
 
     /**

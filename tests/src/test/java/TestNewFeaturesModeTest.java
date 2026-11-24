@@ -124,7 +124,7 @@ public class TestNewFeaturesModeTest{
                 for(int x = cx - 40; x <= cx + 40; x++){
                     if(!tiles.in(x, y)) continue;
                     Tile t = tiles.getn(x, y);
-                    if(t.drop() == Items.coal){ hasCoal = true; break; }
+                    if(t.drop() == Items.petronio){ hasCoal = true; break; }
                 }
             }
             assertTrue(hasCoal, "quadrant " + i + " must contain its own mineable coal");

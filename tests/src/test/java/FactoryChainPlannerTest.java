@@ -187,6 +187,8 @@ class FactoryChainPlannerTest{
 
         CoreBuild core = (CoreBuild)world.tile(10, 10).build;
         core.items.set(Items.thorium, 0);
+        //Petrônio is a wildcard, so it must be empty too for the factory to be unusable
+        core.items.set(Items.petronio, 0);
         assertTrue(FactoryChainPlanner.build(rare, 0, Team.sharded).isEmpty(),
             "without the exact ore or core stock, an unusable factory must not be queued");
     }
@@ -276,12 +278,12 @@ class FactoryChainPlannerTest{
         orbital.engine.world.SectorResources.invalidate();
         orbital.engine.world.SectorResources resources = orbital.engine.world.SectorResources.get();
 
-        assertTrue(resources.has(Items.coal), "coal ore must be indexed as present in the sector");
+        assertTrue(resources.has(Items.petronio), "Petrônio must be indexed as present in the sector");
         assertFalse(resources.has(Items.thorium), "thorium is absent from this map");
         assertTrue(resources.has(orbital.content.Liquids.water), "water must be indexed as present");
         assertTrue(resources.ores(Items.thorium).isEmpty(),
             "querying an absent ore returns an empty list, never null");
-        assertTrue(resources.summary().contains("coal"));
+        assertTrue(resources.summary().contains("petronio"));
     }
 
     @Test

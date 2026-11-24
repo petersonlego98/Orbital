@@ -225,6 +225,7 @@ public class MenuFragment{
         //star map, join/custom/load and the expedition remain available on desktop.
         MobileButton
             testFeatures = new MobileButton(Icon.terrain, "Novidades", () -> checkPlay(TestNewFeaturesMode::start)),
+            petronio = new MobileButton(Icon.terrain, "@petronio.button", ui.petronio::show),
             tools = new MobileButton(Icon.settings, "@settings", ui.settings::show),
             battle = new MobileButton(Icon.units, "@mode.battleRoyale.name", () -> checkPlay(BattleRoyaleMode::start)),
             exit = new MobileButton(Icon.exit, "@quit", () -> Core.app.exit()),
@@ -237,6 +238,7 @@ public class MenuFragment{
             //Every touch-friendly button shares one row, including the 8x8 mode. The editor
             //stays out of the main menu (it lives in the map menu) and mods were removed.
             container.add(testFeatures);
+            container.add(petronio);
             container.add(tools);
             container.add(battle);
             // add custom buttons, if any, before the exit button
@@ -247,6 +249,8 @@ public class MenuFragment{
         }else{
             container.marginTop(0f);
             container.add(testFeatures);
+            container.row();
+            container.add(petronio);
             container.row();
             container.add(battle);
             container.row();
@@ -292,6 +296,7 @@ public class MenuFragment{
                     new MenuButton("@database.button", Icon.menu,
                         new MenuButton("@schematics", Icon.paste, ui.schematics::show),
                         new MenuButton("@database", Icon.book, ui.database::show),
+                        new MenuButton("@petronio.button", Icon.terrain, ui.petronio::show),
                         new MenuButton("@about.button", Icon.info, ui.about::show)
                     ),
                     steam ? new MenuButton("@workshop", Icon.steam, platform::openWorkshop) : null,

@@ -54,6 +54,7 @@ public class UI implements ApplicationListener, Loadable{
 
     public AboutDialog about;
     public PrivacyPolicyDialog privacy;
+    public PetronioDialog petronio;
     public GameOverDialog restart;
     public CustomGameDialog custom;
     public EditorMapsDialog maps;
@@ -220,6 +221,7 @@ public class UI implements ApplicationListener, Loadable{
         paused = new PausedDialog();
         about = new AboutDialog();
         privacy = new PrivacyPolicyDialog();
+        petronio = new PetronioDialog();
         bans = new BansDialog();
         admins = new AdminsDialog();
         traces = new TraceDialog();

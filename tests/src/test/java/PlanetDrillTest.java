@@ -29,7 +29,7 @@ class PlanetDrillTest{
         tiles.fill();
         for(Tile t : tiles) t.setFloor((orbital.world.blocks.environment.Floor)Blocks.stone);
         for(int y = 10; y < 20; y++){
-            for(int x = 10; x < 20; x++) tiles.getn(x, y).setFloor((orbital.world.blocks.environment.Floor)Blocks.oreCoal);
+            for(int x = 10; x < 20; x++) tiles.getn(x, y).setFloor((orbital.world.blocks.environment.Floor)Blocks.orePetronio);
         }
         world.endMapLoad();
         orbital.engine.world.SectorResources.invalidate();
@@ -44,6 +44,6 @@ class PlanetDrillTest{
 
         PlanetDrill.PlanetDrillBuild b = (PlanetDrill.PlanetDrillBuild)drill;
         assertTrue(b.scanned, "scan must be marked complete");
-        assertTrue(b.foundItems.contains(Items.coal), "the coal in the sector must be discovered");
+        assertTrue(b.foundItems.contains(Items.petronio), "the Petrônio in the sector must be discovered");
     }
 }

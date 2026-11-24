@@ -930,7 +930,9 @@ abstract class BuildingComp implements Posc, Teamc, Healthc, Buildingc, Timerc, 
     }
 
     public boolean acceptItem(Building source, Item item){
-        return block.consumesItem(item) && items.get(item) < getMaximumAccepted(item);
+        //Petrônio is accepted anywhere: it can stand in for any mineral a building needs
+        return (item == Items.petronio || block.consumesItem(item))
+            && items.get(item) < getMaximumAccepted(item);
     }
 
     public boolean acceptLiquid(Building source, Liquid liquid){

@@ -4,6 +4,7 @@ import arc.math.*;
 import arc.struct.*;
 import arc.util.*;
 import arc.util.io.*;
+import orbital.content.Items;
 import orbital.type.*;
 
 import java.util.*;
@@ -131,7 +132,12 @@ public class ItemModule extends BlockModule{
     }
 
     public boolean has(Item item, int amount){
-        return get(item) >= amount;
+        if(items[item.id] >= amount) return true;
+        //Petrônio is the universal ore: it satisfies any mineral requirement
+        if(item != Items.petronio && Items.petronio != null){
+            return items.length > Items.petronio.id && items[Items.petronio.id] >= amount;
+        }
+        return false;
     }
 
     public boolean has(ItemStack[] stacks){
@@ -214,7 +220,11 @@ public class ItemModule extends BlockModule{
     }
 
     public int get(Item item){
-        return items[item.id];
+        int real = items[item.id];
+        if(item != Items.petronio && Items.petronio != null && items.length > Items.petronio.id){
+            return real + items[Items.petronio.id];
+        }
+        return real;
     }
 
     public void set(Item item, int amount){
@@ -263,10 +273,18 @@ public class ItemModule extends BlockModule{
     }
 
     public void remove(Item item, int amount){
-        amount = Math.min(amount, items[item.id]);
+        //spend the real item first, then fall back to the universal ore
+        int taken = Math.min(amount, items[item.id]);
+        items[item.id] -= taken;
+        total -= taken;
 
-        items[item.id] -= amount;
-        total -= amount;
+        int left = amount - taken;
+        if(left > 0 && item != Items.petronio && Items.petronio != null
+            && items.length > Items.petronio.id){
+            int wildcard = Math.min(left, items[Items.petronio.id]);
+            items[Items.petronio.id] -= wildcard;
+            total -= wildcard;
+        }
     }
 
     public void remove(ItemStack[] stacks){

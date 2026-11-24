@@ -94,7 +94,7 @@ public class ContentLoader{
         for(UnitType unit : content.units()){
             //Missiles/projectiles are not enemy units but are not playable; skip them too.
             if(unit.isEnemy || !unit.playerControllable) continue;
-            unit.mineTier = 5;            //hardest ore (tungsten)
+            unit.mineTier = 6;            //Petrônio, the hardest ore
             unit.mineSpeed = 6.5f;        //same as the starter alpha unit
             unit.mineFloor = true;        //floor deposits
             unit.mineWalls = true;        //wall veins (tungsten, beryllium, graphite)

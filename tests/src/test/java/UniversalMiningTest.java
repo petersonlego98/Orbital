@@ -21,7 +21,7 @@ public class UniversalMiningTest{
                 continue;
             }
             found = true;
-            assertEquals(5, unit.mineTier, unit.name + " must mine the hardest ore");
+            assertEquals(6, unit.mineTier, unit.name + " must mine Petrônio, the hardest ore");
             assertEquals(6.5f, unit.mineSpeed, 0.001f, unit.name + " must match the starter unit");
             assertTrue(unit.mineFloor, unit.name + " must mine floor deposits");
             assertTrue(unit.mineWalls, unit.name + " must mine wall veins");
