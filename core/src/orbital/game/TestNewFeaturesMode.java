@@ -25,6 +25,8 @@ import static orbital.Vars.*;
 /** Isolated, fixed-map environment used to validate aerial modules against waves of air units. */
 public final class TestNewFeaturesMode{
     public static final String rulesName = "test-new-features";
+    /** Opt-in setting for the enemy-building tools in the test-mode HUD. Hidden by default. */
+    public static final String enemyBuildMenuKey = "testfeatures.enemybuildmenu";
     /** Purpose-built 4-player sector: 256 tiles, one quadrant (128x128) per player. */
     public static final int mapSize = 256;
     /** Fixed seed for the showcase terrain, so every visit shows the same planet. */
@@ -1012,9 +1014,14 @@ public final class TestNewFeaturesMode{
         return result;
     }
 
+    /** @return whether the enemy-building tools are enabled in settings. */
+    public static boolean enemyBuildMenuEnabled(){
+        return Core.settings.getBool(enemyBuildMenuKey, false);
+    }
+
     /** @return whether the enemy-building tool is armed, either placing or removing. */
     public static boolean enemyToolArmed(){
-        return active() && (enemyBlock != null || enemyRemoving);
+        return active() && enemyBuildMenuEnabled() && (enemyBlock != null || enemyRemoving);
     }
 
     /** Arms the enemy tool with a structure. */

@@ -1,3 +1,4 @@
+import arc.Core;
 import orbital.content.*;
 import orbital.game.*;
 import orbital.ui.dialogs.TestFeaturesCatalogDialog;
@@ -255,16 +256,24 @@ public class TestNewFeaturesModeTest{
     }
 
     @Test
-    void enemyToolIsOnlyArmedInTestMode(){
+    void enemyToolIsOnlyArmedInTestModeAndWhenEnabled(){
         Rules previous = state.rules;
+        boolean previousSetting = Core.settings.getBool(TestNewFeaturesMode.enemyBuildMenuKey, false);
         try{
-            state.rules = Gamemode.sandbox.apply(new Rules());
+            state.rules = Gamemode.testFeatures.apply(new Rules());
             TestNewFeaturesMode.enemyBlock = Blocks.duo;
+
+            //the tools stay hidden until the player enables them in settings
+            Core.settings.put(TestNewFeaturesMode.enemyBuildMenuKey, false);
             assertFalse(TestNewFeaturesMode.enemyToolArmed());
 
-            state.rules = Gamemode.testFeatures.apply(new Rules());
+            Core.settings.put(TestNewFeaturesMode.enemyBuildMenuKey, true);
             assertTrue(TestNewFeaturesMode.enemyToolArmed());
 
+            state.rules = Gamemode.sandbox.apply(new Rules());
+            assertFalse(TestNewFeaturesMode.enemyToolArmed(), "the tools never leave the test mode");
+
+            state.rules = Gamemode.testFeatures.apply(new Rules());
             TestNewFeaturesMode.enemyBlock = null;
             TestNewFeaturesMode.enemyRemoving = true;
             assertTrue(TestNewFeaturesMode.enemyToolArmed());
@@ -272,6 +281,7 @@ public class TestNewFeaturesModeTest{
             state.rules = previous;
             TestNewFeaturesMode.enemyBlock = null;
             TestNewFeaturesMode.enemyRemoving = false;
+            Core.settings.put(TestNewFeaturesMode.enemyBuildMenuKey, previousSetting);
         }
     }
 

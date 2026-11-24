@@ -981,8 +981,10 @@ public class HudFragment{
             content.update(() -> {
                 //drives the optional profiling battle; a no-op unless one was started by a flag
                 TestEnginePhase.update();
-                if(testFeaturesContentSignature != (testFeaturesPanelExpanded ? 1L : 0L)){
-                    testFeaturesContentSignature = testFeaturesPanelExpanded ? 1L : 0L;
+                long signature = (testFeaturesPanelExpanded ? 1L : 0L)
+                    | (TestNewFeaturesMode.enemyBuildMenuEnabled() ? 2L : 0L);
+                if(testFeaturesContentSignature != signature){
+                    testFeaturesContentSignature = signature;
                     rebuildTestFeaturesContent(content, width);
                 }
             });
@@ -1031,7 +1033,8 @@ public class HudFragment{
                 return unit == null || unit.type.turretSlots.isEmpty();
             });
 
-        buildEnemyBuildings(content);
+        //enemy-building tools are opt-in in settings; the test panel stays clean by default
+        if(TestNewFeaturesMode.enemyBuildMenuEnabled()) buildEnemyBuildings(content);
     }
 
     /**
@@ -1189,7 +1192,7 @@ public class HudFragment{
 
     /** Drops (or removes) the armed structure under the cursor, for the enemy team. */
     private void placeToolAtCursor(){
-        if(!state.isGame() || !TestNewFeaturesMode.active()) return;
+        if(!state.isGame() || !TestNewFeaturesMode.active() || !TestNewFeaturesMode.enemyBuildMenuEnabled()) return;
 
         int x = World.toTile(Core.input.mouseWorldX()), y = World.toTile(Core.input.mouseWorldY());
 

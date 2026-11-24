@@ -41,7 +41,7 @@ public class SettingsMenuDialog extends BaseDialog{
     /** Desktop-only renderer settings; see {@link RendererPreference}. */
     public SettingsTable advancedgraphics;
     public SettingsTable game;
-    /** construction automation: who builds the blocks the player queues. */
+    /** construction menu and optional test-mode enemy-building tools. */
     public SettingsTable constructions;
     public SettingsTable sound;
     public SettingsTable dev;
@@ -402,6 +402,10 @@ public class SettingsMenuDialog extends BaseDialog{
     void addSettings(){
         //the classic fixed build menu is opt-in; the command tablet is the default interface
         constructions.checkPref(BuildMenuPreference.oldMenuKey, false);
+        //the enemy-building tools of the Novidades mode are off unless explicitly enabled
+        constructions.checkPref(orbital.game.TestNewFeaturesMode.enemyBuildMenuKey, false, val -> {
+            if(!val) orbital.game.TestNewFeaturesMode.disarmStructureTools();
+        });
 
         sound.checkPref("alwaysmusic", false);
         sound.sliderPref("musicvol", 100, 0, 100, 1, i -> i + "%");
