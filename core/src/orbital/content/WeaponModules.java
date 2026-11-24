@@ -90,7 +90,33 @@ public final class WeaponModules{
         }
     }
 
+    /**
+     * One mountable module per shot type (laser, missile, ...). It holds one weapon per tier;
+     * every active tier fires together from the same dorsal slot.
+     */
+    public static final class Group{
+        public final String key;
+        public final String name;
+        /** one definition per tier, index 0 = T1; null when no hull of that tier has this shot */
+        public final Definition[] tiers = new Definition[5];
+        /** one slot, fixed dorsal cost, independent of how many tiers are active */
+        public final int size = 2;
+        public final float cost = size * TurretSlot.pxTile * size * TurretSlot.pxTile;
+
+        Group(String key, String name){
+            this.key = key;
+            this.name = name;
+        }
+
+        public int tierCount(){
+            int count = 0;
+            for(Definition tier : tiers) if(tier != null) count++;
+            return count;
+        }
+    }
+
     private static @Nullable Seq<Definition> cached;
+    private static @Nullable Seq<Group> cachedGroups;
 
     /**
      * Tier suffix for the hulls whose weapons become modules.
@@ -174,7 +200,39 @@ public final class WeaponModules{
      */
     public static void reload(){
         cached = null;
+        cachedGroups = null;
         all();
+    }
+
+    /** @return the combined module that owns this legacy per-tier definition, if any. */
+    public static @Nullable Group groupFor(Definition definition){
+        if(definition == null) return null;
+        for(Group group : groups()){
+            if(group.tiers[Mathf.clamp(definition.tier, 1, 5) - 1] == definition) return group;
+        }
+        return null;
+    }
+
+    /**
+     * @return one combined module per shot type. When several hulls of the same tier carry the
+     * same shot type, the first one in content order is the representative for that tier.
+     */
+    public static Seq<Group> groups(){
+        if(cachedGroups != null) return cachedGroups;
+        Seq<Group> result = new Seq<>();
+        for(Definition definition : all()){
+            String key = shotKey(definition.weapon);
+            Group group = result.find(g -> g.key.equals(key));
+            if(group == null){
+                group = new Group(key, Core.bundle == null ? key
+                    : Core.bundle.get("weapon.module.shot." + key, key));
+                result.add(group);
+            }
+            int tier = Mathf.clamp(definition.tier, 1, 5) - 1;
+            if(group.tiers[tier] == null) group.tiers[tier] = definition;
+        }
+        cachedGroups = result;
+        return result;
     }
 
     private static boolean usable(Weapon weapon){

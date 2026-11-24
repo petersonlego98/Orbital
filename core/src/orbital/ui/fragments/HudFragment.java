@@ -1539,7 +1539,28 @@ public class HudFragment{
      */
     private void selectModule(Unit unit, int index){
         if(unit == null) return;
+        GroupedWeaponMount group = unit.groupAt(index);
+        if(group != null){
+            openGroupDialog(group);
+            return;
+        }
         if(control.input != null) control.input.selectModule(unit, index);
+    }
+
+    /** Chooses which tiers of a combined weapon module fire together. */
+    private void openGroupDialog(GroupedWeaponMount group){
+        new Dialog(group.group.name){{
+            closeOnBack();
+            cont.add("@weapon.module.tiers.hint").wrap().growX().row();
+            for(int tier = 1; tier <= 5; tier++){
+                if(group.group.tiers[tier - 1] == null) continue;
+                int level = tier;
+                cont.check(Core.bundle.format("weapon.module.tier", tier), group.active[tier - 1], on -> {
+                    if(on || group.activeCount() > 1) group.active[level - 1] = on;
+                }).left().row();
+            }
+            buttons.button("@back", Icon.left, this::hide).size(140f, 48f);
+        }}.show();
     }
 
     private Table actionCell(Unit unit, Drawable icon, String tooltip){

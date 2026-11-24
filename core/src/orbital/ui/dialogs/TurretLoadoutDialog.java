@@ -967,12 +967,12 @@ public class TurretLoadoutDialog extends BaseDialog{
     private void rebuildWeaponGrid(){
         cardMetrics();
 
-        Seq<WeaponModules.Definition> modules = new Seq<>(WeaponModules.Definition.class);
-        for(WeaponModules.Definition module : WeaponModules.all()){
-            if(module == null || module.weapon == null) continue;
-            //see rebuildTurretGrid: hull compatibility only, the lock marks what has no room now
-            if(!unit.type.hasSlotFor(module.size) || !unit.type.fitsSilhouette(module.size)) continue;
-            modules.add(module);
+        Seq<WeaponModules.Group> modules = new Seq<>(WeaponModules.Group.class);
+        for(WeaponModules.Group group : WeaponModules.groups()){
+            if(group == null || group.tierCount() == 0) continue;
+            //hull compatibility only; the lock marks what has no room right now
+            if(!unit.type.hasSlotFor(group.size) || !unit.type.fitsSilhouette(group.size)) continue;
+            modules.add(group);
         }
 
         if(modules.isEmpty()){
@@ -980,30 +980,28 @@ public class TurretLoadoutDialog extends BaseDialog{
             return;
         }
 
-        modules.sort((a, b) -> a.tier != b.tier
-            ? a.tier - b.tier
-            : a.ship.compareTo(b.ship) != 0
-                ? a.ship.compareTo(b.ship)
-                : a.shot.compareTo(b.shot));
+        modules.sort((a, b) -> a.name.compareTo(b.name));
 
-        for(Section<WeaponModules.Definition> section : sections(modules, m -> "weapon-tier-" + m.tier,
-            m -> m.tier > 0
-                ? Core.bundle.format("weapon.module.tier", m.tier)
-                : Core.bundle.get("weapon.module.notier"))){
+        for(Section<WeaponModules.Group> section : sections(modules, g -> "weapon-combined",
+            g -> Core.bundle.get("weapon.module.combined"))){
 
             section(section, () -> {
                 Table grid = newGrid();
                 int inRow = 0;
-                for(WeaponModules.Definition module : section.items){
-                    boolean fits = unit.canMountWeaponModule(module);
-                    //a weapon sprite missing from the atlas shows a generic module glyph, not the hull
+                for(WeaponModules.Group group : section.items){
+                    boolean fits = unit.canMountGroup(group);
+                    WeaponModules.Definition module = group.tiers[0] != null ? group.tiers[0] : group.tiers[1];
+                    for(WeaponModules.Definition tier : group.tiers){
+                        if(tier != null){ module = tier; break; }
+                    }
                     Drawable icon = module.weapon.region != null && module.weapon.region.found()
                         ? new TextureRegionDrawable(module.weapon.region) : Icon.turret;
+                    String tiers = Core.bundle.format("weapon.module.tiers", group.tierCount());
 
-                    moduleCard(grid, icon, module.ship, module.shot, module.size, module.cost,
-                        () -> place(slot -> unit.mountWeaponModule(module, slot) != null,
-                            () -> unit.mountWeaponModule(module) != null),
-                        slot -> unit.mountWeaponModule(module, slot) != null,
+                    moduleCard(grid, icon, group.name, tiers, group.size, group.cost,
+                        () -> place(slot -> unit.mountGroupAt(group, slot) != null,
+                            () -> unit.mountGroup(group) != null),
+                        slot -> unit.mountGroupAt(group, slot) != null,
                         fits ? null : reasonNoRoom(), module.unit);
                     inRow++;
                     if(inRow % columns() == 0) grid.row();

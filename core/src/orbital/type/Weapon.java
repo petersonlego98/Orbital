@@ -44,6 +44,10 @@ public class Weapon implements Cloneable{
     public @Nullable Weapon dorsalSourceWeapon;
     /** display name of a runtime weapon module, or null for native weapons. */
     public @Nullable String moduleDisplayName;
+    /** shot-type group key of a combined weapon module ("laser", "missile", ...). */
+    public @Nullable String groupKey;
+    /** tier (1-5) represented by this copy inside a combined module. */
+    public int groupTier = 0;
     /** bullet shot */
     public BulletType bullet = Bullets.placeholder;
     /** shell ejection effect */

@@ -78,6 +78,12 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * the liquid jets of {@code wave} and {@code tsunami}, which the pilot drives manually.</p>
      */
     public transient ObjectSet<Weapon> autoAimModules = new ObjectSet<>();
+    /**
+     * Runtime-only combined weapon modules: one per shot type, one dorsal slot, with one weapon
+     * copy per tier that the pilot can switch on and off together.
+     */
+    public transient GroupedWeaponMount[] groupedMounts = {};
+
     @ReadOnly transient boolean isRotate;
     @NoSerialize float aimX, aimY;
     boolean isShooting;
@@ -97,6 +103,7 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         //belongs to the unit it was made on, and a previous hull's weapons are gone with it
         disarmedModules.clear();
         autoAimModules.clear();
+        groupedMounts = new GroupedWeaponMount[0];
         selectedModule = null;
         //content-defined removable modules (the Duo of the mono) exist before any runtime
         //mounting, so the pool is built from the spawn-time loadout as well
@@ -111,6 +118,8 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
                 sum += mount.weapon.dorsalCost;
             }
         }
+        //a combined module charges one fixed cost, not one per tier copy
+        for(GroupedWeaponMount group : groupedMounts) sum += group.group.cost;
         return sum;
     }
 
@@ -118,9 +127,9 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     public int mountedTurrets(){
         int count = 0;
         for(WeaponMount mount : mounts){
-            if(mount.weapon.removable) count++;
+            if(mount.weapon.removable && mount.weapon.groupKey == null) count++;
         }
-        return count;
+        return count + groupedMounts.length;
     }
 
     /** @return this unit's shared module supply pool; never null. */
@@ -817,6 +826,12 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * @return the created weapon, or null when that slot does not accept the module.
      */
     public @Nullable Weapon mountWeaponModule(WeaponModules.Definition module, int slotIndex){
+        //a legacy per-tier module is converted to its combined module, with only that tier on
+        WeaponModules.Group group = WeaponModules.groupFor(module);
+        if(group != null){
+            GroupedWeaponMount combined = mountGroupAt(group, slotIndex, module.tier);
+            return combined == null ? null : combined.tiers[module.tier - 1].weapon;
+        }
         if(!canMountWeaponModuleAt(module, slotIndex)) return null;
 
         Weapon weapon = module.copy();
@@ -839,6 +854,93 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
         addWeapon(weapon);
         refreshModuleSupply();
         return weapon;
+    }
+
+    /** @return whether a combined shot-type module still fits on this hull. */
+    public boolean canMountGroup(WeaponModules.Group group){
+        if(group == null || type == null || group.tierCount() == 0) return false;
+        if(!type.hasSlotFor(group.size) || !type.fitsSilhouette(group.size)) return false;
+        if(mountedTurrets() >= type.turretSlots.size) return false;
+        if(loadoutCost() + group.cost > type.dorsalBudget()) return false;
+        return findSlot(group.size, TurretSlot.pxTile * group.size) >= 0;
+    }
+
+    /** Mounts one combined module on the first free dorsal slot. */
+    public @Nullable GroupedWeaponMount mountGroup(WeaponModules.Group group){
+        if(!canMountGroup(group)) return null;
+        return mountGroupAt(group, findSlot(group.size, TurretSlot.pxTile * group.size));
+    }
+
+    /**
+     * Mounts a combined module in one slot. Every tier becomes its own weapon mount on that slot,
+     * but the group counts as a single module for slot, budget and HUD purposes.
+     */
+    public @Nullable GroupedWeaponMount mountGroupAt(WeaponModules.Group group, int slotIndex){
+        return mountGroupAt(group, slotIndex, 0);
+    }
+
+    /** @param onlyTier when greater than zero, only this tier starts active (legacy conversion). */
+    public @Nullable GroupedWeaponMount mountGroupAt(WeaponModules.Group group, int slotIndex, int onlyTier){
+        if(group == null || type == null || slotIndex < 0 || slotIndex >= type.turretSlots.size) return null;
+        if(slotOccupied(slotIndex)) return null;
+        if(!type.hasSlotFor(group.size) || !type.fitsSilhouette(group.size)) return null;
+        if(loadoutCost() + group.cost > type.dorsalBudget()) return null;
+        TurretSlot slot = type.turretSlots.get(slotIndex);
+        GroupedWeaponMount result = new GroupedWeaponMount(group, slotIndex);
+
+        for(int tier = 1; tier <= 5; tier++){
+            WeaponModules.Definition definition = group.tiers[tier - 1];
+            if(definition == null) continue;
+            Weapon weapon = definition.copy();
+            if(Core.atlas != null) weapon.load();
+            weapon.init();
+            weapon.mirror = false;
+            weapon.rotate = true;
+            weapon.controllable = true;
+            weapon.aiControllable = true;
+            weapon.x = slot.offsetX;
+            weapon.y = slot.offsetY;
+            weapon.slotIndex = slotIndex;
+            //the group itself pays the budget once, so tier copies carry no dorsal cost
+            weapon.dorsalCost = 0f;
+            weapon.moduleDisplayName = group.name;
+            weapon.groupKey = group.key;
+            weapon.groupTier = tier;
+            addWeapon(weapon);
+            result.tiers[tier - 1] = mountOf(weapon);
+            result.active[tier - 1] = onlyTier <= 0 || onlyTier == tier;
+        }
+
+        GroupedWeaponMount[] next = java.util.Arrays.copyOf(groupedMounts, groupedMounts.length + 1);
+        next[groupedMounts.length] = result;
+        groupedMounts = next;
+        refreshModuleSupply();
+        return result;
+    }
+
+    /** Removes a combined module and all of its tier weapons. */
+    public boolean removeGroup(GroupedWeaponMount group){
+        if(group == null) return false;
+        for(WeaponMount tier : group.tiers){
+            if(tier != null) removeWeapon(tier.weapon);
+        }
+        Seq<GroupedWeaponMount> remaining = new Seq<>(groupedMounts);
+        remaining.remove(group);
+        groupedMounts = remaining.toArray(GroupedWeaponMount.class);
+        refreshModuleSupply();
+        return true;
+    }
+
+    /** @return the combined module represented by a bottom-bar position, if any. */
+    public @Nullable GroupedWeaponMount groupAt(int index){
+        Seq<Weapon> groups = moduleGroups();
+        if(index < 0 || index >= groups.size) return null;
+        String key = groups.get(index).groupKey;
+        if(key == null) return null;
+        for(GroupedWeaponMount group : groupedMounts){
+            if(group.group.key.equals(key)) return group;
+        }
+        return null;
     }
 
     /** @return true if this exact dorsal slot accepts the combat module right now. */
@@ -1154,6 +1256,8 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
     public static boolean sameModule(Weapon a, Weapon b){
         if(a == b) return true;
         if(a == null || b == null || !a.removable || !b.removable) return false;
+        //all tiers of one combined module are a single HUD cell, whatever their source weapons
+        if(a.groupKey != null && a.groupKey.equals(b.groupKey)) return true;
         if(a instanceof TurretWeapon ta && b instanceof TurretWeapon tb) return ta.turret == tb.turret;
         return a.dorsalSourceWeapon != null && a.dorsalSourceWeapon == b.dorsalSourceWeapon
             && a.dorsalSource == b.dorsalSource;
@@ -1225,7 +1329,20 @@ abstract class WeaponsComp implements Teamc, Posc, Rotc, Velc, Statusc{
      * selected one fires.</p>
      */
     public void applyDisarmed(WeaponMount mount){
-        if(mount != null && disarmedModules.contains(mount.weapon)) mount.shoot = false;
+        if(mount == null) return;
+        if(disarmedModules.contains(mount.weapon)){
+            mount.shoot = false;
+            return;
+        }
+        //a tier switched off in a combined module keeps tracking but never fires
+        String key = mount.weapon.groupKey;
+        if(key == null) return;
+        for(GroupedWeaponMount group : groupedMounts){
+            if(!group.group.key.equals(key)) continue;
+            int tier = mount.weapon.groupTier;
+            if(tier >= 1 && tier <= 5 && !group.active[tier - 1]) mount.shoot = false;
+            return;
+        }
     }
 
     //endregion
