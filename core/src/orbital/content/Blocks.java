@@ -7085,6 +7085,13 @@ public class Blocks{
         ship.evolutionVisuals = new Block[]{shipRefabricator, primeRefabricator};
         ship.evolutionUnits.addAll(UnitTypes.elude, UnitTypes.avert, UnitTypes.obviate);
 
+        //each upgrade replaces every player unit of the line, in place, with the next form
+        air.evolutionChains.addAll(
+            new UnitType[]{UnitTypes.mono, UnitTypes.poly, UnitTypes.mega, UnitTypes.quad, UnitTypes.oct},
+            new UnitType[]{UnitTypes.flare, UnitTypes.horizon, UnitTypes.zenith, UnitTypes.antumbra, UnitTypes.eclipse}
+        );
+        ship.evolutionChains.add(new UnitType[]{UnitTypes.elude, UnitTypes.avert, UnitTypes.obviate});
+
         for(UnitFactory factory : new UnitFactory[]{air, ship}){
             for(UnitType unit : factory.evolutionUnits){
                 if(factory.plans.contains(p -> p.unit == unit)) continue;

@@ -14,6 +14,7 @@ import arc.util.*;
 import arc.util.io.*;
 import orbital.*;
 import orbital.ai.*;
+import orbital.ai.types.CommandAI;
 import orbital.content.WeaponModules;
 import orbital.ctype.*;
 import orbital.entities.*;
@@ -50,8 +51,9 @@ public class UnitFactory extends UnitBlock{
     public Seq<UnitType> evolutionUnits = new Seq<>();
     /** Factory visual per evolution level; index 0 is T2, 1 is T3 and so on. */
     public Block[] evolutionVisuals = {};
-    /** Time, in ticks, to evolve a unit that is fed into a leveled factory. */
-    public float evolutionTime = 60f * 30f;
+    /** Unit lines by tier: each array is {T1, T2, ...} for one hull family. */
+    public Seq<UnitType[]> evolutionChains = new Seq<>();
+
 
     public UnitFactory(String name){
         super(name);
@@ -94,11 +96,8 @@ public class UnitFactory extends UnitBlock{
         config(UnitCommand.class, (UnitFactoryBuild build, UnitCommand command) -> build.command = command);
         configClear((UnitFactoryBuild build) -> build.command = null);
 
-        consume(new ConsumeItemDynamic((UnitFactoryBuild e) -> {
-            UnitPlan evolution = e.evolutionPlan();
-            if(evolution != null) return evolution.requirements;
-            return e.currentPlan != -1 ? plans.get(Math.min(e.currentPlan, plans.size - 1)).requirements : ItemStack.empty;
-        }));
+        consume(new ConsumeItemDynamic((UnitFactoryBuild e) ->
+            e.currentPlan != -1 ? plans.get(Math.min(e.currentPlan, plans.size - 1)).requirements : ItemStack.empty));
     }
 
     @Override
@@ -245,13 +244,6 @@ public class UnitFactory extends UnitBlock{
         public int currentPlan = -1;
         /** Current evolution level of a leveled factory; 1 until it is upgraded. */
         public int level = 1;
-        /** Plan index of the unit this factory evolves a fed payload into; -1 = build mode. */
-        public int evolveTarget = -1;
-
-        /** @return the plan used for the current evolution target, or null. */
-        public @Nullable UnitPlan evolutionPlan(){
-            return evolveTarget >= 0 && evolveTarget < plans.size ? plans.get(evolveTarget) : null;
-        }
 
         public float fraction(){
             return currentPlan == -1 ? 0 : progress / plans.get(currentPlan).time;
@@ -327,11 +319,65 @@ public class UnitFactory extends UnitBlock{
             return cost.length > 0 && core != null && core.items.has(cost, 1f);
         }
 
-        /** Spends the cumulative cost from the core and swaps the factory visual to the next tier. */
+        /** Spends the cumulative cost from the core, swaps the visual and evolves the whole line. */
         public void levelUp(){
             if(!canLevelUp()) return;
             for(ItemStack stack : levelCost(level + 1)) team.core().items.remove(stack.item, stack.amount);
+            int previous = level;
             level++;
+            replaceAllUnits(previous, level);
+        }
+
+        /**
+         * Upgrading a line replaces every unit the player already has in that line: the new hull
+         * appears in the same place with the same controller, orders, health ratio and all mounted
+         * modules. Enemy units are deliberately left alone.
+         */
+        public void replaceAllUnits(int fromTier, int toTier){
+            if(levelChainsEmpty()) return;
+            for(UnitType[] chain : evolutionChains){
+                if(fromTier < 1 || toTier > chain.length) continue;
+                UnitType from = chain[fromTier - 1], to = chain[toTier - 1];
+                if(from == null || to == null || from == to) continue;
+
+                Seq<Unit> affected = new Seq<>();
+                for(Unit other : Groups.unit){
+                    if(other.team == team && other.type == from) affected.add(other);
+                }
+
+                for(Unit old : affected){
+                    UnitController controller = old.controller();
+                    UnitCommand order = controller instanceof CommandAI ai ? ai.command : null;
+                    float healthRatio = old.maxHealth <= 0f ? 1f : old.health / old.maxHealth;
+                    float px = old.x, py = old.y, protation = old.rotation;
+                    WeaponMount[] oldMounts = old.mounts;
+                    SupportMount[] oldSupport = old.supportMounts;
+                    WallMount[] oldWalls = old.wallMounts;
+                    ModuleSupply oldSupply = old.moduleSupply;
+
+                    old.remove();
+
+                    Unit evolved = to.spawn(team, px, py, protation, null);
+                    if(controller != null) evolved.controller(controller);
+                    evolved.health = Math.max(1f, healthRatio * evolved.maxHealth);
+                    //the player asked to keep every module even if the new hull has no slot for it
+                    evolved.mounts = oldMounts;
+                    evolved.supportMounts = oldSupport;
+                    evolved.wallMounts = oldWalls;
+                    evolved.moduleSupply = oldSupply;
+                    if(evolved.controller() instanceof CommandAI ai && order != null) ai.command = order;
+                    Events.fire(new UnitCreateEvent(evolved, this));
+                }
+
+                //a unit waiting inside this factory is part of the line too
+                if(payload instanceof UnitPayload && ((UnitPayload)payload).unit.type == from){
+                    payload = new UnitPayload(to.create(team));
+                }
+            }
+        }
+
+        private boolean levelChainsEmpty(){
+            return evolutionChains == null || evolutionChains.isEmpty();
         }
 
         @Override
@@ -407,15 +453,6 @@ public class UnitFactory extends UnitBlock{
                         evolution.button(Core.bundle.format("factory.evolution.upgrade", level + 1),
                             Styles.defaultt, this::levelUp).size(220f, 36f).left()
                             .disabled(b -> !canLevelUp()).row();
-                    }
-                    evolution.add("@factory.evolution.target").left().row();
-                    for(UnitType target : plans.map(p -> p.unit)
-                        .retainAll(u -> u.unlockedNow() && !u.isBanned() && u.tier > 1 && u.tier <= level)){
-                        int index = plans.indexOf(p -> p.unit == target);
-                        evolution.button("T" + target.tier + " " + target.localizedName, Styles.togglet, () -> {
-                            evolveTarget = evolveTarget == index ? -1 : index;
-                        }).update(b -> b.setChecked(evolveTarget == index))
-                            .size(220f, 32f).left().row();
                     }
                     table.add(evolution).fillX().left();
                 }
@@ -499,31 +536,6 @@ public class UnitFactory extends UnitBlock{
 
             moveOutPayload();
 
-            //evolution mode: a unit payload is consumed together with the cumulative cost of the
-            //target hull, then replaced by the evolved unit on the output conveyor
-            if(leveled && evolveTarget >= 0 && evolveTarget < plans.size
-                && payload instanceof UnitPayload){
-                UnitPlan target = plans.get(evolveTarget);
-                if(efficiency > 0){
-                    progress += edelta() * Vars.state.rules.unitBuildSpeed(team);
-                    speedScl = Mathf.lerpDelta(speedScl, 1f, 0.05f);
-                    if(progress >= evolutionTime){
-                        consume();
-                        Unit evolved = target.unit.create(team);
-                        if(evolved.isCommandable() && command != null) evolved.command().command(command);
-                        payload = new UnitPayload(evolved);
-                        payVector.setZero();
-                        progress = 0f;
-                        evolveTarget = -1;
-                        createSound.at(this, 1f + Mathf.range(0.06f), createSoundVolume);
-                        Events.fire(new UnitCreateEvent(evolved, this));
-                    }
-                }else{
-                    speedScl = Mathf.lerpDelta(speedScl, 0f, 0.05f);
-                }
-                return;
-            }
-
             if(currentPlan != -1 && payload == null){
                 UnitPlan plan = plans.get(currentPlan);
 
@@ -560,16 +572,8 @@ public class UnitFactory extends UnitBlock{
 
         @Override
         public boolean shouldConsume(){
-            boolean evolving = leveled && evolveTarget >= 0 && payload instanceof UnitPayload;
-            if(!evolving && currentPlan == -1) return false;
-            return enabled && (evolving || payload == null) && team.activateUnitFactories();
-        }
-
-        @Override
-        public boolean acceptUnitPayload(Unit unit){
-            UnitPlan target = evolutionPlan();
-            return leveled && target != null && unit.type.tier < target.unit.tier
-                && target.unit.tier <= level && !target.unit.isBanned();
+            if(currentPlan == -1) return false;
+            return enabled && payload == null && team.activateUnitFactories();
         }
 
         @Override
@@ -605,7 +609,7 @@ public class UnitFactory extends UnitBlock{
             write.s(currentPlan);
             TypeIO.writeVecNullable(write, commandPos);
             TypeIO.writeCommand(write, command);
-            //level progression; evolveTarget is transient and must be re-selected after a load
+            //the factory's evolution level persists; the unit line is derived from the block
             write.b(level);
         }
 

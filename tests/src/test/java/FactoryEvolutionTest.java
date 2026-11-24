@@ -1,6 +1,8 @@
 import orbital.content.*;
 import orbital.game.Team;
 import orbital.gen.Building;
+import orbital.gen.Groups;
+import orbital.gen.Unit;
 import orbital.type.*;
 import orbital.world.*;
 import orbital.world.blocks.units.*;
@@ -44,6 +46,10 @@ class FactoryEvolutionTest{
         assertEquals(4, air.evolutionVisuals.length);
         assertSame(Blocks.additiveReconstructor, air.evolutionVisuals[0]);
         assertSame(Blocks.tetrativeReconstructor, air.evolutionVisuals[3]);
+        assertEquals(2, air.evolutionChains.size);
+        assertSame(UnitTypes.poly, air.evolutionChains.get(0)[1]);
+        assertSame(UnitTypes.oct, air.evolutionChains.get(0)[4]);
+        assertSame(UnitTypes.eclipse, air.evolutionChains.get(1)[4]);
     }
 
     @Test
@@ -57,17 +63,22 @@ class FactoryEvolutionTest{
     }
 
     @Test
-    void factoryEvolvesAFedLowerTierUnit(){
-        UnitFactory air = (UnitFactory)Blocks.airFactory;
+    void factoryUpgradeReplacesEveryPlayerUnitInTheLine(){
         UnitFactory.UnitFactoryBuild build = (UnitFactory.UnitFactoryBuild)place(Blocks.airFactory, 12, 12);
-        build.level = 2;
-        build.evolveTarget = air.plans.indexOf(p -> p.unit == UnitTypes.poly);
+        Unit friendly = UnitTypes.mono.spawn(Team.sharded, 100f, 120f, 45f, null);
+        UnitTypes.mono.spawn(Team.crux, 200f, 220f, 0f, null);
+        friendly.health = friendly.maxHealth * 0.5f;
 
-        assertTrue(build.acceptUnitPayload(UnitTypes.mono.create(Team.sharded)),
-            "a T1 hull can be evolved by a T2 factory");
-        assertFalse(build.acceptUnitPayload(UnitTypes.poly.create(Team.sharded)),
-            "a hull of the same tier cannot be evolved again");
-        assertSame(UnitTypes.poly, build.evolutionPlan().unit);
+        build.replaceAllUnits(1, 2);
+
+        Unit evolved = Groups.unit.find(u -> u.team == Team.sharded && u.type == UnitTypes.poly);
+        assertNotNull(evolved, "every player unit of the line becomes the next form");
+        assertEquals(100f, evolved.x, 0.01f, "the new hull takes the old position");
+        assertEquals(120f, evolved.y, 0.01f);
+        assertTrue(evolved.health < evolved.maxHealth, "the health ratio is preserved");
+        assertNull(Groups.unit.find(u -> u.team == Team.sharded && u.type == UnitTypes.mono));
+        assertNotNull(Groups.unit.find(u -> u.team == Team.crux && u.type == UnitTypes.mono),
+            "enemy units are not affected");
     }
 
     @Test
@@ -77,6 +88,7 @@ class FactoryEvolutionTest{
         assertEquals(3, ship.maxLevel);
         assertSame(Blocks.shipRefabricator, ship.evolutionVisuals[0]);
         assertSame(Blocks.primeRefabricator, ship.evolutionVisuals[1]);
+        assertSame(UnitTypes.obviate, ship.evolutionChains.get(0)[2]);
     }
 
     private static Building place(Block block, int x, int y){
